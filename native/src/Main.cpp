@@ -28,7 +28,7 @@ public:
         title.setFont(juce::FontOptions(26.0f));
         status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
-        hint.setText("1 BAR  /  1/16     Drag to draw or erase. Right-drag erases. Space plays when the grid is focused.", juce::dontSendNotification);
+        hint.setText("1 BAR  /  1/16     Draw notes below. Drag audio above, arrows nudge, Cmd/Ctrl+E splits at the playhead.", juce::dontSendNotification);
         hint.setColour(juce::Label::textColourId, juce::Colour(0xff8d98a3));
         tempo.setSliderStyle(juce::Slider::IncDecButtons);
         tempo.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 90, 30);

@@ -391,6 +391,11 @@ void Arrangement::mouseWheelMove(const juce::MouseEvent& event, const juce::Mous
 
 bool Arrangement::keyPressed(const juce::KeyPress& key)
 {
+    if (key.getKeyCode() == juce::KeyPress::leftKey || key.getKeyCode() == juce::KeyPress::rightKey)
+    {
+        nudgeSelected(key.getKeyCode() == juce::KeyPress::rightKey ? 1 : -1, key.getModifiers().isShiftDown());
+        return true;
+    }
     if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'E')
     {
         splitSelectedAtPlayhead();
@@ -417,6 +422,20 @@ void Arrangement::splitSelectedAtPlayhead()
 {
     cancelDrag();
     const auto result = session.splitAudioClip(selected, playheadTime(session.edit->getTransport()));
+    if (result.failed() && status) status(result.getErrorMessage());
+}
+
+void Arrangement::nudgeSelected(int direction, bool byBar)
+{
+    cancelDrag();
+    auto* clip = session.findAudioClip(selected);
+    if (!clip) return;
+    const auto old = clip->getPosition();
+    const auto beatSeconds = 60.0 / session.tempo();
+    const auto delta = (byBar ? beatSeconds * 4.0 : beatSeconds * 0.25) * (direction < 0 ? -1.0 : 1.0);
+    const auto length = old.time.getLength().inSeconds();
+    const auto start = std::max(0.0, old.time.getStart().inSeconds() + delta);
+    const auto result = session.editAudioClip(selected, {start, start + length, old.offset.inSeconds()}, ClipGesture::move);
     if (result.failed() && status) status(result.getErrorMessage());
 }
 

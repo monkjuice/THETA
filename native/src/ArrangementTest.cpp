@@ -148,6 +148,11 @@ int runArrangementTest()
         require(clip != nullptr, "Original clip remains after undo split");
         view.sync();
         view.fit();
+        view.selected = id;
+        view.keyPressed(juce::KeyPress(juce::KeyPress::rightKey));
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.125), "Right arrow nudges selected audio by one sixteenth");
+        session.undo();
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.0), "Undo restores nudge");
 
         const auto event = [&view](juce::Point<float> down, juce::Point<float> point, bool dragged)
         {

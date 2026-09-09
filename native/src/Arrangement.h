@@ -45,6 +45,7 @@ private:
     void zoom(double factor, double anchor);
     void cancelDrag();
     void splitSelectedAtPlayhead();
+    void nudgeSelected(int direction, bool byBar);
     void updatePlayhead();
     float xFor(double seconds) const;
     double timeAt(float x) const;
