@@ -81,7 +81,7 @@ export function moveClip(project, clipId, trackId, start, duplicate = false) {
   return clip;
 }
 export function validateProject(value) {
-  const fail = () => { throw new Error('This is not a valid Theda project.'); };
+  const fail = () => { throw new Error('This is not a valid Theta project.'); };
   const num = (v, min, max) => Number.isFinite(v) && v >= min && v <= max;
   if (!value || value.version !== 1 || typeof value.name !== 'string' || value.name.length > 120 || !num(value.bpm, 40, 240) || ![8, 16, 32, 64].includes(value.bars) || !num(value.master, 0, 1) || typeof value.loop !== 'boolean') fail();
   const end = value.bars * 16;

@@ -1,4 +1,6 @@
-# Theda
+# Theta
+
+[GitHub repository](https://github.com/monkjuice/THETA)
 
 A desktop DAW for creating electronic music, with arrangement and live clip workflows as the longer-term direction. Development currently prioritizes **Windows**, while keeping the native architecture portable to macOS.
 
@@ -8,22 +10,25 @@ Research deliverables: [open-source DAW and Ableton study](research/DAW-STUDY.md
 
 ## Native app: current features
 
+- A startup loading screen showing engine, audio-device, and workspace initialization.
 - One-bar, 16-step note grid covering MIDI notes 48–59.
-- Playback through Tracktion's 4OSC synth and Theda's internal Utility gain device.
+- Playback through Tracktion's 4OSC synth and Theta's internal Utility gain device.
 - Drawing and erasing notes, grouped undo/redo, and tempo control from 40–240 BPM.
 - Play, pause, stop, looping, and audio hardware settings.
 - Audio import onto a separate track, with successive files appended.
+- An arrangement view showing the synth clip and imported audio waveforms, with audio clip selection, moving, non-destructive trimming, and deletion.
+- Mute/solo controls for both tracks, timeline seeking, zoom, scrolling, and optional 1/16-note snapping.
 - Native project save/open, unsaved-change prompts, and background file writing/parsing.
 - A display-synchronized playhead with narrow repaint regions and cached note display data.
 
-This is an early composition workflow, not a complete DAW. The native arrangement editor, live launcher, recording, export UI, media bundling/relinking, and external plugin hosting are not implemented yet. macOS has not been built or tested.
+This is an early composition workflow, not a complete DAW. The arrangement currently has two tracks: one fixed one-bar synth pattern and one editable audio track. Adding/reordering tracks, arranging multiple MIDI patterns, the live launcher, recording, export UI, media bundling/relinking, and external plugin hosting are not implemented yet. macOS has not been built or tested.
 
 ## Run the native app on Windows
 
 If the Release build already exists, run this from the repository root:
 
 ```powershell
-& ".\native\build\ThedaNative_artefacts\Release\Theda Native.exe"
+& ".\native\build\ThetaNative_artefacts\Release\Theta.exe"
 ```
 
 To build it, install Python 3.12+, CMake 3.24+, and Visual Studio 2022 with the **Desktop development with C++** workload and Windows SDK. Run from the repository root:
@@ -33,7 +38,7 @@ python native/scripts/fetch-dependencies.py
 cmake -S native -B native/build -G "Visual Studio 17 2022" -A x64
 cmake --build native/build --config Release --parallel 2
 ctest --test-dir native/build -C Release --output-on-failure
-& ".\native\build\ThedaNative_artefacts\Release\Theda Native.exe"
+& ".\native\build\ThetaNative_artefacts\Release\Theta.exe"
 ```
 
 The fetch script downloads pinned Tracktion and JUCE revisions into `native/.deps`. Dependencies and build outputs are ignored by version control. Node.js and npm are only needed for the preserved web prototype.
@@ -46,6 +51,10 @@ In the current workspace, portable CMake tools are also available at `native/.to
 2. Press **Play**. Adjust BPM to change tempo while keeping the pattern one bar long. **Synth Gain** controls the Utility device after the synth.
 3. Use **Add audio** to place audio on the separate track. The first file starts at zero, and later files append to that track.
 4. Use **Save** to keep the project and **Open** to return to it. An asterisk beside the project name marks unsaved changes.
+
+Imported audio appears in the arrangement above the note editor, and the timeline fits the imported material automatically. Drag the body of an audio clip to move it; drag its left or right edge to trim it. Trimming preserves the source file, and you can extend the edges back to the available source boundaries. Each completed drag is one undo action. Dragging previews the change; playback adopts it on release.
+
+Use **Snap 1/16** to toggle snapping, or hold Alt during a drag to bypass it. Escape cancels an active drag. Delete/Backspace removes the selected audio clip when the arrangement is focused. **M** and **S** mute and solo each track. Click the timeline ruler to seek; **Fit**, **+**, **-**, the scrollbar, and mouse wheel navigate the timeline. Ctrl+wheel zooms around the pointer. The synth clip is currently displayed at bar one; its notes remain editable in the grid below.
 
 The loop covers both the pattern and imported audio. If audio extends beyond one bar, the synth pattern plays only during its first bar; it does not automatically repeat across the longer arrangement.
 
@@ -62,19 +71,23 @@ Command-key handling is included for macOS, but remains unvalidated there.
 
 ## Native project files
 
-Native projects use `.thedaedit` and preserve notes, tempo, device state, and audio references. Imported audio stays at its original path: keep those files in place. Projects do not yet collect media into a portable folder.
+Native projects use `.thetaedit` and preserve notes, tempo, device state, and audio references. Imported audio stays at its original path: keep those files in place. Projects do not yet collect media into a portable folder.
+
+Existing `.thedaedit` projects still open. Saving an existing project keeps its current filename; new projects use `.thetaedit`. Internal device and state identifiers retain their original names so older songs load correctly. Existing audio-device settings also keep their established storage location.
 
 Save writes a detached project snapshot on a worker thread to a temporary file before replacing the destination. Edits made during saving remain marked unsaved. Open validates the project before replacing the current edit; engine reconstruction still runs on the message thread, with editing disabled during that operation.
 
-The web prototype uses a separate `.theda` format. An importer between the two formats has not been implemented.
+The web prototype uses a separate `.theta` format. An importer between the two formats has not been implemented.
+
+The web prototype also accepts its older `.theda` files and retains its existing recovery storage.
 
 ## Native validation and performance
 
-The last Windows validation passed the Release build, both CTest cases, and native window startup/clean close. Tests cover Utility DSP, note gestures and undo/redo, tempo and loop duration, a real 48 kHz MIDI-to-synth WAV render, audio import, project state/media-reference round trips, invalid-project rejection, and changes made after a save snapshot.
+Windows validation includes the Release build and four CTest cases. Tests cover Utility DSP, note gestures and undo/redo, tempo and loop duration, a real 48 kHz MIDI-to-synth WAV render, audio import, project state/media-reference round trips, invalid-project rejection, and changes made after a save snapshot. The arrangement test exercises pointer drags, visible waveform drawing, trim bounds, cancellation, mute/solo undo, deletion/recovery, reopened clip offsets, and a render that verifies the trimmed source region.
 
 These checks do not establish physical audio-device behavior, end-to-end pointer latency, sustained FPS, large-project capacity, or macOS compatibility. The render is an integration test; there is no export button yet.
 
-Audio scheduling belongs to Tracktion rather than the UI. Control feedback is event-driven, the playhead follows display refresh, and a separate 10 Hz timer updates only transport text. Audio-import metadata work and engine reconstruction still need further work to avoid long message-thread stalls. Large mock sessions and benchmark scaffolding are deliberately deferred while development uses small correctness checks.
+Audio scheduling belongs to Tracktion rather than the UI. Control feedback is event-driven, playheads follow display refresh, and a separate 10 Hz timer updates only transport text. Audio thumbnails cache waveform data and scan samples in the background. Clip drags use a local preview and update the engine once on release. Audio-import metadata work and engine reconstruction still need further work to avoid long message-thread stalls. Large mock sessions and benchmark scaffolding are deliberately deferred while development uses small correctness checks.
 
 ## Run the preserved web prototype
 
@@ -87,7 +100,7 @@ npm start
 
 The desktop app opens the “After hours” demo. Press Space to play or pause. Double-click an empty lane to create a clip. Click drum steps to toggle them; use the piano roll to add notes, drag to move or resize them, and right-click to erase. Instruments can be added from the browser or Add track.
 
-Save writes a `.theda` file, including imported audio. Open loads a project. Export renders the arrangement to stereo WAV. The microphone recording feature is experimental and does not provide measured latency compensation. Use the `?` shortcut for controls.
+Save writes a `.theta` file, including imported audio. Open loads a project. Export renders the arrangement to stereo WAV. The microphone recording feature is experimental and does not provide measured latency compensation. Use the `?` shortcut for controls.
 
 For a browser preview:
 

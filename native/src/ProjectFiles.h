@@ -1,7 +1,7 @@
 #pragma once
 #include "Session.h"
 
-namespace theda
+namespace theta
 {
 // File workers receive detached project snapshots, never the live engine/edit.
 class ProjectFiles

@@ -1,7 +1,7 @@
 #pragma once
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace theda
+namespace theta
 {
 namespace te = tracktion::engine;
 
@@ -15,7 +15,7 @@ public:
     ~UtilityDevice() override;
     juce::String getName() const override { return getPluginName(); }
     juce::String getPluginType() override { return xmlTypeName; }
-    juce::String getVendor() override { return "Theda"; }
+    juce::String getVendor() override { return "Theta"; }
     juce::String getSelectableDescription() override { return getName(); }
     BusLayout getBusses() const override { return BusLayout::singlePassThrough(); }
     void initialise(const te::PluginInitialisationInfo&) override;

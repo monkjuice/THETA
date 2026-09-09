@@ -1,4 +1,4 @@
-# Theda: production architecture proposal
+# Theta: production architecture proposal
 
 Status: research-backed direction, 2026-09-08. A small [native engine evaluation](native/README.md) has started; production frontend selection and macOS validation remain pending. See [the DAW source study](research/DAW-STUDY.md), [device contract](research/DEVICE-SYSTEM.md), [interaction specification](research/UX-SPEC.md), and [staged plan](research/ROADMAP.md).
 
@@ -14,7 +14,7 @@ UI performance, consistent frame pacing/FPS, and immediate pointer response are 
 
 The current source remains in place. It includes the arrangement, instrument browser, drum grid, piano roll, mixer, demo composition, project model, and experimental playback/recording/export. Tests and a screenshot are under `tests/` and `artifacts/`.
 
-Keep the visual design, workflow behavior, demo content, validation cases, and project examples. The web UI can remain a candidate production frontend if measurements justify it; otherwise it is an interactive specification for a native interface. Existing `.theda` projects should have an importer into the production model.
+Keep the visual design, workflow behavior, demo content, validation cases, and project examples. The web UI can remain a candidate production frontend if measurements justify it; otherwise it is an interactive specification for a native interface. Existing `.theta` projects should have an importer into the production model.
 
 The current `src/audio.js` implementation should not become the foundation for large sessions without a replacement architecture:
 
@@ -58,7 +58,7 @@ Built-in device processing is native and uses a registry with stable device/para
 
 ## Interface decision
 
-| Candidate | Advantages for Theda | Costs and questions |
+| Candidate | Advantages for Theta | Costs and questions |
 | --- | --- | --- |
 | Native JUCE UI | Direct native/plugin-window integration; control over painting, allocations, and event handling; one primary language | Reimplement current controls and interactions; custom timeline rendering and accessibility still require work |
 | Qt Quick/QML with C++ rendering | Declarative native layout and custom scene-graph rendering; demonstrated by current Zrythm source | Qt/JUCE event-loop integration, deployment, thread ownership, and dense editor behavior need testing |

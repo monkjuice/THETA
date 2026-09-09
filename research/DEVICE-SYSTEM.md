@@ -1,4 +1,4 @@
-# Theda device system
+# Theta device system
 
 Status: proposed application contract. This is a design specification, not an implemented SDK or an ABI promise.
 

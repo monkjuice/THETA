@@ -2,7 +2,7 @@
 #include "Session.h"
 #include <bitset>
 
-namespace theda
+namespace theta
 {
 class StepGrid final : public juce::Component, private juce::ChangeListener
 {

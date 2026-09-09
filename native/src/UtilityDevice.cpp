@@ -1,6 +1,6 @@
 #include "UtilityDevice.h"
 
-namespace theda
+namespace theta
 {
 UtilityDevice::UtilityDevice(te::PluginCreationInfo info) : Plugin(info)
 {

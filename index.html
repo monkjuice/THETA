@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'">
-  <title>Theda — Music Studio</title>
+  <title>Theta — Music Studio</title>
   <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
   <header class="app-header">
-    <div class="brand"><span class="brand-mark"><i></i><i></i><i></i><i></i></span>theda<span class="edition">STUDIO</span></div>
+    <div class="brand"><span class="brand-mark"><i></i><i></i><i></i><i></i></span>theta<span class="edition">STUDIO</span></div>
     <div class="project-heading"><input id="project-name" aria-label="Project name" maxlength="120" value="After hours"><span id="save-state">LOCAL SESSION</span></div>
     <div class="header-actions"><button id="new-project" class="text-button" title="New project (Ctrl+N)">New</button><button id="open-project" class="text-button" title="Open project (Ctrl+O)">Open</button><button id="save-project" class="text-button" title="Save project (Ctrl+S)"><span data-icon="save"></span>Save</button><span class="divider"></span><button id="export" class="primary"><span data-icon="export"></span>Export audio</button></div>
   </header>
@@ -50,11 +50,11 @@
       </section>
     </main>
   </div>
-  <footer class="statusbar"><span><span class="status-dot"></span><span id="status-message">Welcome to Theda. Press Space and find your groove.</span></span><div><button id="help">Keyboard shortcuts <kbd>?</kbd></button><span class="divider"></span><span id="sample-rate">44.1 kHz · Stereo</span><span class="version">THEDA 0.1</span></div></footer>
+  <footer class="statusbar"><span><span class="status-dot"></span><span id="status-message">Welcome to Theta. Press Space and find your groove.</span></span><div><button id="help">Keyboard shortcuts <kbd>?</kbd></button><span class="divider"></span><span id="sample-rate">44.1 kHz · Stereo</span><span class="version">THETA 0.1</span></div></footer>
   <div id="toast" role="status" class="toast"></div>
   <dialog id="modal"><div id="modal-content"></div></dialog>
   <input type="file" id="audio-file" accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a,.webm" hidden multiple>
-  <input type="file" id="project-file" accept=".theda,.json" hidden>
+  <input type="file" id="project-file" accept=".theta,.theda,.json" hidden>
   <script type="module" src="src/app.js"></script>
 </body>
 </html>

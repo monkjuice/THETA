@@ -7,7 +7,7 @@ let app, page, errors, dataPath;
 test.beforeEach(async () => {
   await mkdir('artifacts', { recursive: true });
   dataPath = await mkdtemp(resolve('artifacts/session-'));
-  const env = { ...process.env, THEDA_TEST: '1', THEDA_TEST_DATA: dataPath }; delete env.ELECTRON_RUN_AS_NODE;
+  const env = { ...process.env, THETA_TEST: '1', THETA_TEST_DATA: dataPath }; delete env.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({ args: ['.', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'], env });
   await app.evaluate(({ dialog }) => { dialog.showMessageBoxSync = () => 1; });
   page = await app.firstWindow(); errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -82,5 +82,5 @@ test('empty projects allow new instruments and clips, and reject invalid imports
   const file = resolve(dataPath, 'invalid.theda'); await writeFile(file, JSON.stringify({ ...makeEmpty(), bpm: -20 }));
   await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, file);
   await page.locator('#open-project').click(); await page.locator('#confirm-replace').click();
-  await expect(page.locator('#toast')).toContainText('not a valid Theda project'); await expect(page.locator('.track-row')).toHaveCount(3);
+  await expect(page.locator('#toast')).toContainText('not a valid Theta project'); await expect(page.locator('.track-row')).toHaveCount(3);
 });

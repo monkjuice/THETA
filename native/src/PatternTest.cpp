@@ -1,7 +1,7 @@
 #include "Session.h"
 #include <stdexcept>
 
-namespace theda
+namespace theta
 {
 int runPatternTest()
 {

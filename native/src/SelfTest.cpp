@@ -2,7 +2,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace theda
+namespace theta
 {
 int runSelfTest()
 {

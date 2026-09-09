@@ -1,6 +1,6 @@
 #include "StepGrid.h"
 
-namespace theda
+namespace theta
 {
 StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhead(); })
 {

@@ -1,7 +1,8 @@
 #pragma once
 #include "UtilityDevice.h"
+#include "ClipGeometry.h"
 
-namespace theda
+namespace theta
 {
 // Message-thread facade. The engine owns scheduling, streaming and playback.
 // Member order keeps the engine alive until its edit and devices are released.
@@ -37,6 +38,12 @@ public:
     void undo();
     void redo();
     void refreshLoop();
+    te::WaveAudioClip* findAudioClip(te::EditItemID) const;
+    juce::Result editAudioClip(te::EditItemID, ClipGeometry, ClipGesture);
+    void deleteAudioClip(te::EditItemID);
+    void toggleTrackMute(int track);
+    void toggleTrackSolo(int track);
+    // Keep the established settings location so existing audio-device choices survive.
     te::Engine engine {"Theda Native"};
     std::unique_ptr<te::Edit> edit;
     UtilityDevice* utility = nullptr; // owned by edit's plugin list
@@ -48,4 +55,5 @@ private:
 };
 int runSelfTest();
 int runPatternTest();
+int runArrangementTest();
 }

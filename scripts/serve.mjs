@@ -12,4 +12,4 @@ createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': types[extname(file)], 'Cache-Control': 'no-store' });
     res.end(await readFile(file));
   } catch { res.writeHead(404); res.end('Not found'); }
-}).listen(5173, '127.0.0.1', () => console.log('Theda preview: http://127.0.0.1:5173'));
+}).listen(5173, '127.0.0.1', () => console.log('Theta preview: http://127.0.0.1:5173'));

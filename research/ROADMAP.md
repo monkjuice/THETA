@@ -1,4 +1,4 @@
-# Theda: staged production plan
+# Theta: staged production plan
 
 Status: proposed sequence after source research. No duration or capacity estimate is presented as a measured result.
 
@@ -38,7 +38,7 @@ Exit: choose one production frontend with measurements and screenshots. A candid
 
 ## Stage 3 — One complete song workflow
 
-Implement project/media management, arrangement editing, MIDI input/recording, the drum/piano editors, device chains, basic mixer/routing, undo, recovery, and export. Import prototype `.theda` files through a versioned migration path.
+Implement project/media management, arrangement editing, MIDI input/recording, the drum/piano editors, device chains, basic mixer/routing, undo, recovery, and export. Import prototype `.theta` files through a versioned migration path.
 
 A small set of good devices is enough: sampler/drum rack, polyphonic synth, utility, filter/EQ, delay. Reuse the demo as a workflow fixture, while acknowledging that the native sound implementation may differ.
 

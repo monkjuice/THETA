@@ -281,7 +281,7 @@ async function saveProject() {
   try {
     const atRevision = revision, content = JSON.stringify(project);
     if (window.desktop) { if (!await window.desktop.saveProject(project.name, content)) return false; }
-    else download(`${project.name}.theda`, content, 'application/json');
+    else download(`${project.name}.theta`, content, 'application/json');
     if (revision === atRevision) { dirty = false; $('#save-state').textContent = 'SAVED TO FILE'; }
     toast('Project saved. Your sounds and audio are included.'); return true;
   } catch (error) { toast(`Could not save: ${error.message}`); return false; }

@@ -1,8 +1,12 @@
 #include "Session.h"
 #include "StepGrid.h"
 #include "ProjectFiles.h"
+#include "Theme.h"
+#include "Arrangement.h"
+#include "StartupScreen.h"
+#include <stdexcept>
 
-namespace theda
+namespace theta
 {
 class ControlWindow final : public juce::Component,
                             private Session::Listener,
@@ -10,14 +14,15 @@ class ControlWindow final : public juce::Component,
                             private juce::Timer
 {
 public:
-    explicit ControlWindow(Session& s) : session(s), grid(s), files(s)
+    explicit ControlWindow(Session& s) : session(s), grid(s), arrangement(s), files(s)
     {
         setOpaque(true);
         files.status = [this](const juce::String& message) { status.setText(message, juce::dontSendNotification); };
         files.loadingChanged = [this](bool loading) { setEnabled(!loading); };
+        arrangement.status = files.status;
         open.onClick = [this] { files.open(); };
         save.onClick = [this] { files.save(); };
-        title.setText("THEDA", juce::dontSendNotification);
+        title.setText("THETA", juce::dontSendNotification);
         title.setFont(juce::FontOptions(26.0f));
         status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
@@ -75,13 +80,15 @@ public:
         };
         for (auto* component : std::initializer_list<juce::Component*>{
                  &title, &status, &position, &gainLabel, &gain, &play, &stop, &import, &settings,
-                 &grid, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName})
+                 &grid, &arrangement, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
         session.addChangeListener(this);
         session.listeners.add(this);
         session.edit->getUndoManager().addChangeListener(this);
-        setSize(1020, 650);
+        patternLabel.setText("PATTERN 1  /  NOTE EDITOR", juce::dontSendNotification);
+        patternLabel.setColour(juce::Label::textColourId, juce::Colour(0xffb8c4aa));
+        setSize(1120, 840);
         changeListenerCallback(nullptr);
         // This updates a text readout only. Pointer events and control painting
         // are not throttled to this timer; there is no full-window repaint loop.
@@ -121,7 +128,9 @@ public:
         redo.setBounds(604, 119, 60, 30);
         clear.setBounds(672, 119, 88, 30);
         position.setBounds(getWidth() - 165, 116, 140, 36);
-        grid.setBounds(24, 174, getWidth() - 48, getHeight() - 300);
+        arrangement.setBounds(24, 174, getWidth() - 48, 246);
+        patternLabel.setBounds(24, 430, getWidth() - 48, 24);
+        grid.setBounds(24, 464, getWidth() - 48, getHeight() - 590);
         hint.setBounds(24, getHeight() - 117, getWidth() - 48, 28);
         gainLabel.setBounds(40, getHeight() - 66, 140, 28);
         gain.setBounds(180, getHeight() - 66, getWidth() - 220, 30);
@@ -181,6 +190,7 @@ private:
             {
                 if (safe == nullptr || selected.getResult() == juce::File{}) return;
                 const auto result = safe->session.importAudio(selected.getResult());
+                if (result.wasOk()) safe->arrangement.fit();
                 safe->status.setText(result.wasOk() ? selected.getResult().getFileName()
                                                    : result.getErrorMessage(), juce::dontSendNotification);
             });
@@ -206,9 +216,10 @@ private:
     }
 
     Session& session;
-    juce::Label title, status, position, gainLabel, hint, documentName;
+    juce::Label title, status, position, gainLabel, hint, documentName, patternLabel;
     juce::Slider gain;
     StepGrid grid;
+    Arrangement arrangement;
     juce::Slider tempo;
     juce::TextButton undo {"Undo"}, redo {"Redo"}, clear {"Clear"};
     juce::TextButton play {"Play"}, stop {"Stop"}, import {"Add audio"}, settings {"Audio settings"};
@@ -218,31 +229,43 @@ private:
     ProjectFiles files;
 };
 
-class Application final : public juce::JUCEApplication
+class Application final : public juce::JUCEApplication, private juce::Timer
 {
 public:
-    const juce::String getApplicationName() override { return "Theda Native"; }
+    const juce::String getApplicationName() override { return "Theta"; }
     const juce::String getApplicationVersion() override { return "0.1.0"; }
     void initialise(const juce::String& args) override
     {
-        if (args == "--self-test" || args == "--pattern-test")
+        if (args == "--self-test" || args == "--pattern-test" || args == "--arrangement-test")
         {
-            setApplicationReturnValue(args == "--self-test" ? runSelfTest() : runPatternTest());
+            setApplicationReturnValue(args == "--self-test" ? runSelfTest()
+                : args == "--pattern-test" ? runPatternTest() : runArrangementTest());
             quit();
             return;
         }
         theme.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff343a40));
         theme.setColour(juce::Slider::trackColourId, juce::Colour(0xffc6d58c));
         juce::LookAndFeel::setDefaultLookAndFeel(&theme);
-        session = std::make_unique<Session>();
-        session->engine.getDeviceManager().initialise(0, 2);
+        startupTest = args == "--startup-test";
         window = std::make_unique<Window>();
-        window->setContentOwned(new ControlWindow(*session), true);
-        window->centreWithSize(1020, 650);
-        window->setVisible(true);
+        loading = new StartupScreen();
+        loading->setSize(560, 320);
+        window->setContentOwned(loading.getComponent(), true);
+        window->centreWithSize(560, 320);
+        window->setVisible(!startupTest);
+        const auto screenshot = juce::SystemStats::getEnvironmentVariable("THETA_STARTUP_SNAPSHOT", {});
+        if (startupTest && screenshot.isNotEmpty())
+        {
+            if (auto stream = juce::File(screenshot).createOutputStream())
+                juce::PNGImageFormat().writeImageToStream(loading->createComponentSnapshot(loading->getLocalBounds()), *stream);
+        }
+        // Let the window become visible before constructing the engine. Engine
+        // initialization requires the message thread; yield between its phases.
+        startTimer(40);
     }
     void shutdown() override
     {
+        stopTimer();
         window.reset();
         session.reset();
         juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
@@ -255,23 +278,60 @@ public:
                 controls->requestClose();
                 return;
             }
+        stopTimer();
         quit();
     }
 
 private:
+    void timerCallback() override
+    {
+        stopTimer();
+        if (!window || !loading) return;
+        try
+        {
+            if (window->getContentComponent() != loading.getComponent())
+                throw std::runtime_error("Startup screen was replaced before initialization finished.");
+            if (auto* peer = window->getPeer()) peer->performAnyPendingRepaintsNow();
+            if (startupStage == 0)
+                session = std::make_unique<Session>();
+            else if (startupStage == 1)
+                session->engine.getDeviceManager().initialise(0, 2);
+            else
+            {
+                window->setContentOwned(new ControlWindow(*session), true);
+                window->setResizable(true, false);
+                window->setResizeLimits(960, 780, 2400, 1600);
+                window->centreWithSize(1120, 840);
+                if (startupTest) quit();
+                return;
+            }
+            loading->setStage(++startupStage);
+            startTimer(1);
+        }
+        catch (const std::exception& error)
+        {
+            setApplicationReturnValue(1);
+            if (loading) loading->showError(error.what());
+            std::fprintf(stderr, "Theta startup failed: %s\n", error.what());
+            if (startupTest) quit();
+        }
+    }
+
     struct Window final : juce::DocumentWindow
     {
-        Window() : DocumentWindow("Theda Native", juce::Colour(0xff171a1e), allButtons)
+        Window() : DocumentWindow("Theta", juce::Colour(0xff171a1e), allButtons)
         {
             setUsingNativeTitleBar(true);
-            setResizable(true, false);
-            setResizeLimits(960, 540, 2000, 1200);
+            setResizable(false, false);
         }
         void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
     };
-    juce::LookAndFeel_V4 theme;
+    Theme theme;
     std::unique_ptr<Session> session;
     std::unique_ptr<Window> window;
+    juce::Component::SafePointer<StartupScreen> loading;
+    int startupStage = 0;
+    bool startupTest = false;
 };
 }
-START_JUCE_APPLICATION(theda::Application)
+START_JUCE_APPLICATION(theta::Application)

@@ -1,6 +1,6 @@
 #include "Session.h"
 
-namespace theda
+namespace theta
 {
 Session::Session()
 {
@@ -172,7 +172,7 @@ void Session::markModified()
 juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::File& file)
 {
     if (!state.hasType(te::IDs::EDIT) || static_cast<int>(state.getProperty("thedaFormatVersion")) != 1)
-        return juce::Result::fail("This is not a supported Theda native project.");
+        return juce::Result::fail("This is not a supported Theta native project.");
     auto candidate = te::loadEditFromState(engine, state.createCopy());
     if (!candidate) return juce::Result::fail("The project could not be loaded.");
     candidate->editFileRetriever = [file] { return file; };
@@ -214,6 +214,72 @@ void Session::projectSaved(const juce::ValueTree& snapshot, const juce::File& fi
         savedRevision = changeRevision;
         edit->resetChangedStatus();
     }
+    sendSynchronousChangeMessage();
+}
+
+te::WaveAudioClip* Session::findAudioClip(te::EditItemID id) const
+{
+    for (auto* clip : te::getAudioTracks(*edit)[1]->getClips())
+        if (clip->itemID == id) return dynamic_cast<te::WaveAudioClip*>(clip);
+    return nullptr;
+}
+
+juce::Result Session::editAudioClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture)
+{
+    auto* clip = findAudioClip(id);
+    if (!clip) return juce::Result::fail("The audio clip no longer exists.");
+    if (!std::isfinite(next.start) || !std::isfinite(next.end) || !std::isfinite(next.offset)
+        || next.start < 0.0 || next.end <= next.start || next.offset < -1.0e-8
+        || next.end > te::Edit::getMaximumEditEnd().inSeconds())
+        return juce::Result::fail("Invalid clip position.");
+    const auto old = clip->getPosition();
+    if (std::abs(old.time.getStart().inSeconds() - next.start) < 1.0e-8
+        && std::abs(old.time.getEnd().inSeconds() - next.end) < 1.0e-8
+        && std::abs(old.offset.inSeconds() - next.offset) < 1.0e-8)
+        return juce::Result::ok();
+    edit->getUndoManager().beginNewTransaction(gesture == ClipGesture::move ? "Move audio clip" : "Trim audio clip");
+    clip->setPosition({{tracktion::core::TimePosition::fromSeconds(next.start),
+                       tracktion::core::TimePosition::fromSeconds(next.end)},
+                       tracktion::core::TimeDuration::fromSeconds(std::max(0.0, next.offset))});
+    refreshLoop();
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+void Session::deleteAudioClip(te::EditItemID id)
+{
+    if (auto* clip = findAudioClip(id))
+    {
+        edit->getUndoManager().beginNewTransaction("Delete audio clip");
+        clip->removeFromParent();
+        refreshLoop();
+        edit->getUndoManager().beginNewTransaction();
+        markModified();
+        sendSynchronousChangeMessage();
+    }
+}
+
+void Session::toggleTrackMute(int track)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size())) return;
+    edit->getUndoManager().beginNewTransaction("Track mute");
+    tracks[track]->state.setProperty(te::IDs::mute, !tracks[track]->isMuted(false), &edit->getUndoManager());
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    sendSynchronousChangeMessage();
+}
+
+void Session::toggleTrackSolo(int track)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size())) return;
+    edit->getUndoManager().beginNewTransaction("Track solo");
+    tracks[track]->state.setProperty(te::IDs::solo, !tracks[track]->isSolo(false), &edit->getUndoManager());
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
     sendSynchronousChangeMessage();
 }
 }

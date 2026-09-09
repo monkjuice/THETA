@@ -1,6 +1,6 @@
 #include "ProjectFiles.h"
 
-namespace theda
+namespace theta
 {
 void ProjectFiles::save(bool saveAs, std::function<void(bool)> completion)
 {
@@ -17,9 +17,9 @@ void ProjectFiles::save(bool saveAs, std::function<void(bool)> completion)
     }
     busy = true;
     const auto suggested = session.projectFile == juce::File{}
-        ? juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Untitled.thedaedit")
-        : session.projectFile;
-    chooser = std::make_unique<juce::FileChooser>("Save project", suggested, "*.thedaedit");
+        ? juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Untitled.thetaedit")
+        : session.projectFile.withFileExtension("thetaedit");
+    chooser = std::make_unique<juce::FileChooser>("Save project", suggested, "*.thetaedit");
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                         | juce::FileBrowserComponent::warnAboutOverwriting,
         [weak = juce::WeakReference<ProjectFiles>(this), completion](const juce::FileChooser& selected)
@@ -85,7 +85,7 @@ void ProjectFiles::open()
 void ProjectFiles::chooseOpen()
 {
     busy = true;
-    chooser = std::make_unique<juce::FileChooser>("Open project", session.projectFile, "*.thedaedit");
+    chooser = std::make_unique<juce::FileChooser>("Open project", session.projectFile, "*.thetaedit;*.thedaedit");
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
         [weak = juce::WeakReference<ProjectFiles>(this)](const juce::FileChooser& selected)
         {

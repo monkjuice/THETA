@@ -2,15 +2,17 @@ const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 
-app.setName('Theda');
-if (process.env.THEDA_TEST_DATA) app.setPath('userData', process.env.THEDA_TEST_DATA);
+app.setName('Theta');
+// Preserve the prototype's existing recovery database after the visible rename.
+app.setPath('userData', path.join(app.getPath('appData'), 'Theda'));
+if (process.env.THETA_TEST_DATA) app.setPath('userData', process.env.THETA_TEST_DATA);
 let window;
 function createWindow() {
   window = new BrowserWindow({
     width: 1540, height: 980, minWidth: 1060, minHeight: 720,
-    backgroundColor: '#181a1b', title: 'Theda — Music Studio',
+    backgroundColor: '#181a1b', title: 'Theta — Music Studio',
     autoHideMenuBar: true,
-    show: process.env.THEDA_TEST !== '1',
+    show: process.env.THETA_TEST !== '1',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
@@ -35,13 +37,13 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('project:save', async (_event, name, content) => {
     if (typeof content !== 'string' || content.length > 150_000_000) throw new Error('Project is too large to save (150 MB limit).');
-    const result = await dialog.showSaveDialog(window, { defaultPath: `${safeName(name)}.theda`, filters: [{ name: 'Theda project', extensions: ['theda'] }] });
+    const result = await dialog.showSaveDialog(window, { defaultPath: `${safeName(name)}.theta`, filters: [{ name: 'Theta project', extensions: ['theta'] }] });
     if (result.canceled) return null;
     await fs.writeFile(result.filePath, content, 'utf8');
     return path.basename(result.filePath);
   });
   ipcMain.handle('project:open', async () => {
-    const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'Theda project', extensions: ['theda', 'json'] }] });
+    const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'Theta project', extensions: ['theta', 'theda', 'json'] }] });
     if (result.canceled) return null;
     const stat = await fs.stat(result.filePaths[0]);
     if (stat.size > 150_000_000) throw new Error('Project exceeds the 150 MB limit.');
