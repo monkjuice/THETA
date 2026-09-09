@@ -12,6 +12,7 @@ int runPatternTest()
             if (!valid) throw std::runtime_error(message);
         };
         Session session;
+        require(session.utility != nullptr && session.audioUtility != nullptr, "Session creates synth and audio Utility devices");
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");
         session.beginNoteGesture();
@@ -101,6 +102,7 @@ int runPatternTest()
         auto loadedXml = juce::parseXML(project.getFile());
         require(loadedXml != nullptr, "Read saved project");
         require(session.restoreProject(juce::ValueTree::fromXml(*loadedXml), project.getFile()).wasOk(), "Restore project");
+        require(session.utility != nullptr && session.audioUtility != nullptr, "Project restore keeps synth and audio Utility devices");
         require(session.pattern().getSequence().getNumNotes() == 10, "Notes survive project reopen");
         require(std::abs(session.tempo() - 90.0) < 0.001, "Tempo survives project reopen");
         require(!session.hasUnsavedChanges(), "Opened project is clean");

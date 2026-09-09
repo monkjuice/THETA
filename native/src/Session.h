@@ -57,6 +57,7 @@ public:
     te::Engine engine {"Theda Native"};
     std::unique_ptr<te::Edit> edit;
     UtilityDevice* utility = nullptr; // owned by edit's plugin list
+    UtilityDevice* audioUtility = nullptr; // owned by edit's plugin list
 private:
     void refreshAfterUndoRedo(bool changed);
     te::MidiClip* patternClip = nullptr; // owned by edit

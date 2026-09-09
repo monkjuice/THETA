@@ -19,7 +19,11 @@ Session::Session()
     utility->gain().setParameter(-12.0f, juce::dontSendNotification);
     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     patternClip = track->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
-    te::getAudioTracks(*edit)[1]->setName("Audio 1");
+    auto* audioTrack = te::getAudioTracks(*edit)[1];
+    audioTrack->setName("Audio 1");
+    auto audioDevice = edit->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
+    audioUtility = dynamic_cast<UtilityDevice*>(audioDevice.get());
+    audioTrack->pluginList.insertPlugin(audioDevice, 0, nullptr);
     refreshLoop();
     edit->getUndoManager().clearUndoHistory();
     edit->resetChangedStatus();
@@ -224,6 +228,7 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
         return juce::Result::fail("This editor requires a pattern track and an audio track.");
     te::MidiClip* nextPattern = nullptr;
     UtilityDevice* nextUtility = nullptr;
+    UtilityDevice* nextAudioUtility = nullptr;
     bool hasSynth = false;
     for (auto* clip : tracks[0]->getClips())
         if (auto* midi = dynamic_cast<te::MidiClip*>(clip)) nextPattern = midi;
@@ -232,13 +237,22 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
         if (auto* device = dynamic_cast<UtilityDevice*>(plugin)) nextUtility = device;
         if (dynamic_cast<te::FourOscPlugin*>(plugin) != nullptr) hasSynth = true;
     }
+    for (auto plugin : tracks[1]->pluginList)
+        if (auto* device = dynamic_cast<UtilityDevice*>(plugin)) nextAudioUtility = device;
     if (!nextPattern || !nextUtility || !hasSynth)
         return juce::Result::fail("The project is missing its pattern or synth devices.");
+    if (!nextAudioUtility)
+    {
+        auto device = candidate->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
+        nextAudioUtility = dynamic_cast<UtilityDevice*>(device.get());
+        tracks[1]->pluginList.insertPlugin(device, 0, nullptr);
+    }
     listeners.call(&Listener::editWillChange);
     stop();
     edit = std::move(candidate);
     patternClip = nextPattern;
     utility = nextUtility;
+    audioUtility = nextAudioUtility;
     projectFile = file;
     savedRevision = ++changeRevision;
     edit->getUndoManager().clearUndoHistory();

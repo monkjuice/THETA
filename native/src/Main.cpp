@@ -28,6 +28,7 @@ public:
         title.setFont(juce::FontOptions(26.0f));
         status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
+        audioGainLabel.setText("AUDIO GAIN", juce::dontSendNotification);
         hint.setText("1 BAR  /  1/16     Draw notes below. Drag audio above, arrows nudge, Cmd/Ctrl+E splits at the playhead.", juce::dontSendNotification);
         hint.setColour(juce::Label::textColourId, juce::Colour(0xff8d98a3));
         tempo.setSliderStyle(juce::Slider::IncDecButtons);
@@ -60,6 +61,27 @@ public:
             session.utility->gain().setParameter(static_cast<float>(gain.getValue()), juce::sendNotification);
             session.markModified();
         };
+        audioGain.setSliderStyle(juce::Slider::LinearHorizontal);
+        audioGain.setTextBoxStyle(juce::Slider::TextBoxRight, false, 85, 26);
+        audioGain.setRange(-60.0, 6.0, 0.1);
+        audioGain.setValue(session.audioUtility->gain().getCurrentValue(), juce::dontSendNotification);
+        audioGain.setTextValueSuffix(" dB");
+        audioGain.setDoubleClickReturnValue(true, 0.0);
+        audioGain.onDragStart = [this]
+        {
+            session.edit->getUndoManager().beginNewTransaction("Audio gain");
+            session.audioUtility->gain().parameterChangeGestureBegin();
+        };
+        audioGain.onDragEnd = [this]
+        {
+            session.audioUtility->gain().parameterChangeGestureEnd();
+            session.edit->getUndoManager().beginNewTransaction();
+        };
+        audioGain.onValueChange = [this]
+        {
+            session.audioUtility->gain().setParameter(static_cast<float>(audioGain.getValue()), juce::sendNotification);
+            session.markModified();
+        };
         play.onClick = [this] { session.togglePlayback(); };
         stop.onClick = [this] { session.stop(); };
         import.onClick = [this] { chooseAudio(); };
@@ -81,7 +103,7 @@ public:
             audioSettings = options.launchAsync();
         };
         for (auto* component : std::initializer_list<juce::Component*>{
-                 &title, &status, &position, &gainLabel, &gain, &play, &stop, &import, &settings,
+                 &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &import, &settings,
                  &browser, &grid, &arrangement, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
@@ -139,8 +161,11 @@ public:
         patternLabel.setBounds(editorX, 430, editorW, 24);
         grid.setBounds(editorX, 464, editorW, getHeight() - 590);
         hint.setBounds(editorX, getHeight() - 117, editorW, 28);
-        gainLabel.setBounds(editorX + 16, getHeight() - 66, 140, 28);
-        gain.setBounds(editorX + 156, getHeight() - 66, editorW - 156, 30);
+        const auto half = (editorW - 28) / 2;
+        gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
+        gain.setBounds(editorX + 112, getHeight() - 66, half - 112, 30);
+        audioGainLabel.setBounds(editorX + half + 28, getHeight() - 66, 100, 28);
+        audioGain.setBounds(editorX + half + 128, getHeight() - 66, editorW - half - 128, 30);
     }
 
     bool keyPressed(const juce::KeyPress& key) override
@@ -209,6 +234,8 @@ private:
         tempo.setValue(session.tempo(), juce::dontSendNotification);
         if (!gain.isMouseButtonDown())
             gain.setValue(session.utility->gain().getCurrentValue(), juce::dontSendNotification);
+        if (!audioGain.isMouseButtonDown())
+            audioGain.setValue(session.audioUtility->gain().getCurrentValue(), juce::dontSendNotification);
         undo.setEnabled(session.edit->getUndoManager().canUndo());
         redo.setEnabled(session.edit->getUndoManager().canRedo());
         const auto name = session.projectFile == juce::File{} ? juce::String("Untitled") : session.projectFile.getFileNameWithoutExtension();
@@ -223,8 +250,8 @@ private:
     }
 
     Session& session;
-    juce::Label title, status, position, gainLabel, hint, documentName, patternLabel;
-    juce::Slider gain;
+    juce::Label title, status, position, gainLabel, audioGainLabel, hint, documentName, patternLabel;
+    juce::Slider gain, audioGain;
     BrowserPanel browser;
     StepGrid grid;
     Arrangement arrangement;
