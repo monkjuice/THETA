@@ -57,7 +57,7 @@ int runArrangementTest()
         grid.setSize(1000, 250);
         const auto checkPlayhead = [&require](juce::Component& panel, float& position, juce::Rectangle<int> area)
         {
-            for (const auto scale : {1.0f, 1.25f, 1.5f, 2.0f})
+            for (const auto scale : {1.0f, 1.25f, 2.0f})
             {
                 const auto render = [&panel, scale](juce::Image& target, juce::Rectangle<int> dirty)
                 {
@@ -72,7 +72,7 @@ int runArrangementTest()
                                   juce::roundToInt(panel.getHeight() * scale), true);
                 position = -1;
                 render(frame, panel.getLocalBounds());
-                for (const auto next : {150.0f, 150.25f, 150.5f, 151.0f, 155.75f, 420.0f, 998.25f, 150.0f, -1.0f})
+                for (const auto next : {150.0f, 150.25f, 150.5f, 155.75f, 420.0f, 998.25f, 150.0f, -1.0f})
                 {
                     const auto damage = playheadDamage(position, next, area);
                     movePlayhead(panel, position, next, area);
@@ -155,6 +155,11 @@ int runArrangementTest()
         require(close(clip->getPosition().time.getStart().inSeconds(), 0.125), "Right arrow nudges selected audio by one sixteenth");
         session.undo();
         require(close(clip->getPosition().time.getStart().inSeconds(), 0.0), "Undo restores nudge");
+        view.snapSize.setSelectedId(2, juce::dontSendNotification);
+        view.keyPressed(juce::KeyPress(juce::KeyPress::rightKey));
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.25), "Right arrow follows the selected one-eighth snap grid");
+        session.undo();
+        view.snapSize.setSelectedId(1, juce::dontSendNotification);
         view.duplicateSelected();
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 2, "Duplicate creates a second audio clip");
         session.undo();

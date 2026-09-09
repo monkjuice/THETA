@@ -40,8 +40,16 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     zoomOut.onClick = [this] { zoom(2.0, viewStart + viewSpan * 0.5); };
     splitButton.onClick = [this] { splitSelectedAtPlayhead(); };
     duplicateButton.onClick = [this] { duplicateSelected(); };
+    snapSize.addItem("1/16", 1);
+    snapSize.addItem("1/8", 2);
+    snapSize.addItem("1/4", 3);
+    snapSize.addItem("1 Bar", 4);
+    snapSize.setSelectedId(1, juce::dontSendNotification);
+    snapSize.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff262c32));
+    snapSize.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff46515a));
     for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &snap, &scroll})
         addAndMakeVisible(control);
+    addAndMakeVisible(snapSize);
     for (int i = 0; i < 2; ++i)
     {
         mute[i].setButtonText("M");
@@ -211,7 +219,8 @@ void Arrangement::resized()
     zoomIn.setBounds(240, 3, 32, 26);
     splitButton.setBounds(282, 3, 58, 26);
     duplicateButton.setBounds(348, 3, 52, 26);
-    snap.setBounds(410, 3, 112, 26);
+    snap.setBounds(410, 3, 58, 26);
+    snapSize.setBounds(474, 3, 74, 26);
     for (int i = 0; i < 2; ++i)
     {
         mute[i].setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
@@ -302,7 +311,7 @@ void Arrangement::scrollBarMoved(juce::ScrollBar*, double start)
 
 double Arrangement::snapped(double seconds, bool bypass) const
 {
-    const auto unit = 60.0 / session.tempo() * 0.25;
+    const auto unit = snapUnitSeconds();
     return snap.getToggleState() && !bypass ? std::round(seconds / unit) * unit : seconds;
 }
 
@@ -468,12 +477,23 @@ void Arrangement::nudgeSelected(int direction, bool byBar)
     auto* clip = session.findAudioClip(selected);
     if (!clip) return;
     const auto old = clip->getPosition();
-    const auto beatSeconds = 60.0 / session.tempo();
-    const auto delta = (byBar ? beatSeconds * 4.0 : beatSeconds * 0.25) * (direction < 0 ? -1.0 : 1.0);
+    const auto delta = (byBar ? 60.0 / session.tempo() * 4.0 : snapUnitSeconds()) * (direction < 0 ? -1.0 : 1.0);
     const auto length = old.time.getLength().inSeconds();
     const auto start = std::max(0.0, old.time.getStart().inSeconds() + delta);
     const auto result = session.editAudioClip(selected, {start, start + length, old.offset.inSeconds()}, ClipGesture::move);
     if (result.failed() && status) status(result.getErrorMessage());
+}
+
+double Arrangement::snapUnitSeconds() const
+{
+    const auto beatSeconds = 60.0 / session.tempo();
+    switch (snapSize.getSelectedId())
+    {
+        case 2: return beatSeconds * 0.5;
+        case 3: return beatSeconds;
+        case 4: return beatSeconds * 4.0;
+        default: return beatSeconds * 0.25;
+    }
 }
 
 void Arrangement::changeListenerCallback(juce::ChangeBroadcaster*) { cancelDrag(); sync(); }

@@ -32,7 +32,7 @@ public:
         status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
         audioGainLabel.setText("AUDIO GAIN", juce::dontSendNotification);
-        hint.setText("1 BAR  /  1/16     Draw notes below. Drag audio above, arrows nudge, Cmd/Ctrl+E splits, Cmd/Ctrl+D duplicates.", juce::dontSendNotification);
+        hint.setText("1 BAR     Draw notes below. Drag audio above, arrows nudge by the snap grid, Cmd/Ctrl+E splits, Cmd/Ctrl+D duplicates.", juce::dontSendNotification);
         hint.setColour(juce::Label::textColourId, juce::Colour(0xff8d98a3));
         tempo.setSliderStyle(juce::Slider::IncDecButtons);
         tempo.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 90, 30);
