@@ -39,7 +39,8 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     zoomIn.onClick = [this] { zoom(0.5, viewStart + viewSpan * 0.5); };
     zoomOut.onClick = [this] { zoom(2.0, viewStart + viewSpan * 0.5); };
     splitButton.onClick = [this] { splitSelectedAtPlayhead(); };
-    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &snap, &scroll})
+    duplicateButton.onClick = [this] { duplicateSelected(); };
+    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &snap, &scroll})
         addAndMakeVisible(control);
     for (int i = 0; i < 2; ++i)
     {
@@ -94,7 +95,7 @@ void Arrangement::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffbbc4cc));
     g.drawText("ARRANGEMENT", 10, 0, 138, 30, juce::Justification::centredLeft);
     g.setColour(juce::Colour(0xff8a969f));
-    g.drawText("Drag audio to move / edges to trim / Split at playhead", 520, 0, getWidth() - 530, 30, juce::Justification::centredLeft);
+    g.drawText("Drag audio to move / edges to trim / split / duplicate", 570, 0, getWidth() - 580, 30, juce::Justification::centredLeft);
     for (int track = 0; track < 2; ++track)
     {
         const auto row = lane(track);
@@ -202,7 +203,8 @@ void Arrangement::resized()
     zoomOut.setBounds(204, 3, 32, 26);
     zoomIn.setBounds(240, 3, 32, 26);
     splitButton.setBounds(282, 3, 58, 26);
-    snap.setBounds(350, 3, 112, 26);
+    duplicateButton.setBounds(348, 3, 52, 26);
+    snap.setBounds(410, 3, 112, 26);
     for (int i = 0; i < 2; ++i)
     {
         mute[i].setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
@@ -401,6 +403,11 @@ bool Arrangement::keyPressed(const juce::KeyPress& key)
         splitSelectedAtPlayhead();
         return true;
     }
+    if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'D')
+    {
+        duplicateSelected();
+        return true;
+    }
     if (key.getKeyCode() == juce::KeyPress::escapeKey && dragging)
     {
         cancelDrag();
@@ -422,6 +429,13 @@ void Arrangement::splitSelectedAtPlayhead()
 {
     cancelDrag();
     const auto result = session.splitAudioClip(selected, playheadTime(session.edit->getTransport()));
+    if (result.failed() && status) status(result.getErrorMessage());
+}
+
+void Arrangement::duplicateSelected()
+{
+    cancelDrag();
+    const auto result = session.duplicateAudioClip(selected);
     if (result.failed() && status) status(result.getErrorMessage());
 }
 

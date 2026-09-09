@@ -153,6 +153,12 @@ int runArrangementTest()
         require(close(clip->getPosition().time.getStart().inSeconds(), 0.125), "Right arrow nudges selected audio by one sixteenth");
         session.undo();
         require(close(clip->getPosition().time.getStart().inSeconds(), 0.0), "Undo restores nudge");
+        view.duplicateSelected();
+        require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 2, "Duplicate creates a second audio clip");
+        session.undo();
+        require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Undo duplicate restores one audio clip");
+        clip = session.findAudioClip(id);
+        require(clip != nullptr, "Original clip remains after undo duplicate");
 
         const auto event = [&view](juce::Point<float> down, juce::Point<float> point, bool dragged)
         {

@@ -59,6 +59,7 @@ public:
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
     juce::Result editAudioClip(te::EditItemID, ClipGeometry, ClipGesture);
     juce::Result splitAudioClip(te::EditItemID, double splitTimeSeconds);
+    juce::Result duplicateAudioClip(te::EditItemID);
     void deleteAudioClip(te::EditItemID);
     void toggleTrackMute(int track);
     void toggleTrackSolo(int track);

@@ -45,6 +45,7 @@ private:
     void zoom(double factor, double anchor);
     void cancelDrag();
     void splitSelectedAtPlayhead();
+    void duplicateSelected();
     void nudgeSelected(int direction, bool byBar);
     void updatePlayhead();
     float xFor(double seconds) const;
@@ -62,7 +63,7 @@ private:
     juce::AudioThumbnailCache thumbnailCache {32};
     std::map<juce::String, std::unique_ptr<Waveform>> waveforms;
     std::vector<ClipView> clips;
-    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, snap {"Snap 1/16"};
+    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, snap {"Snap 1/16"};
     std::array<juce::TextButton, 2> mute, solo;
     juce::ScrollBar scroll {false};
     juce::VBlankAttachment vblank;

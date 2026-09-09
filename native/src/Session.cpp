@@ -390,6 +390,26 @@ juce::Result Session::splitAudioClip(te::EditItemID id, double splitTimeSeconds)
     return juce::Result::ok();
 }
 
+juce::Result Session::duplicateAudioClip(te::EditItemID id)
+{
+    auto* clip = findAudioClip(id);
+    if (!clip) return juce::Result::fail("Select an audio clip to duplicate.");
+    const auto old = clip->getPosition();
+    auto* track = te::getAudioTracks(*edit)[1];
+    edit->getUndoManager().beginNewTransaction("Duplicate audio clip");
+    auto copy = track->insertWaveClip(clip->getName() + " copy", clip->getSourceFileReference().getFile(),
+        {{old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, old.offset}, false);
+    if (copy == nullptr)
+        return juce::Result::fail("The duplicate clip could not be created.");
+    refreshLoop();
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
 void Session::deleteAudioClip(te::EditItemID id)
 {
     if (auto* clip = findAudioClip(id))
