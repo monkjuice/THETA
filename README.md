@@ -4,16 +4,16 @@
 
 A desktop DAW for creating electronic music, with arrangement and live clip workflows as the longer-term direction. Development currently prioritizes **Windows**, while keeping the native architecture portable to macOS.
 
-The active application uses **C++20, Tracktion Engine, and JUCE**. It provides an early pattern-composition workflow. The original Electron/Web Audio prototype is preserved as a visual and workflow reference. See [ARCHITECTURE.md](ARCHITECTURE.md) for the architecture and [native/README.md](native/README.md) for implementation details.
+The active application uses **C++20, Tracktion Engine, and JUCE**. It provides an early pattern-composition workflow. See [ARCHITECTURE.md](ARCHITECTURE.md) for the architecture and [native/README.md](native/README.md) for implementation details.
 
 Research deliverables: [open-source DAW and Ableton study](research/DAW-STUDY.md), [pinned source map](research/SOURCE_MAP.md), [internal device architecture](research/DEVICE-SYSTEM.md), [interaction and visual direction](research/UX-SPEC.md), and [implementation roadmap and validation status](research/ROADMAP.md).
 
-## Native app: current features
+## Native App
 
 - A startup loading screen showing engine, audio-device, and workspace initialization.
-- One-bar, 16-step note grid covering MIDI notes 48–59.
+- One-bar, 16-step note grid covering MIDI notes 48-59.
 - Playback through Tracktion's 4OSC synth and Theta's internal Utility gain device.
-- Drawing and erasing notes, grouped undo/redo, and tempo control from 40–240 BPM.
+- Drawing and erasing notes, grouped undo/redo, and tempo control from 40-240 BPM.
 - Play, pause, stop, looping, and audio hardware settings.
 - Audio import onto a separate track, with successive files appended.
 - An arrangement view showing the synth clip and imported audio waveforms, with audio clip selection, moving, non-destructive trimming, and deletion.
@@ -23,7 +23,7 @@ Research deliverables: [open-source DAW and Ableton study](research/DAW-STUDY.md
 
 This is an early composition workflow, not a complete DAW. The arrangement currently has two tracks: one fixed one-bar synth pattern and one editable audio track. Adding/reordering tracks, arranging multiple MIDI patterns, the live launcher, recording, export UI, media bundling/relinking, and external plugin hosting are not implemented yet. macOS has not been built or tested.
 
-## Run the native app on Windows
+## Run On Windows
 
 If the Release build already exists, run this from the repository root:
 
@@ -41,11 +41,11 @@ ctest --test-dir native/build -C Release --output-on-failure
 & ".\native\build\ThetaNative_artefacts\Release\Theta.exe"
 ```
 
-The fetch script downloads pinned Tracktion and JUCE revisions into `native/.deps`. Dependencies and build outputs are ignored by version control. Node.js and npm are only needed for the preserved web prototype.
+The fetch script downloads pinned Tracktion and JUCE revisions into `native/.deps`. Dependencies and build outputs are ignored by version control.
 
 In the current workspace, portable CMake tools are also available at `native/.tools/cmake-3.31.6-windows-x86_64/bin`. If CMake is not on your PATH, invoke `cmake.exe` and `ctest.exe` from that directory. These local tools are not included in a fresh checkout.
 
-## Create a pattern
+## Create A Pattern
 
 1. Draw notes in the grid. Drag from an empty cell to add notes; drag from an existing note or right-drag to erase. Each stroke is one undo action.
 2. Press **Play**. Adjust BPM to change tempo while keeping the pattern one bar long. **Synth Gain** controls the Utility device after the synth.
@@ -69,56 +69,16 @@ The loop covers both the pattern and imported audio. If audio extends beyond one
 
 Command-key handling is included for macOS, but remains unvalidated there.
 
-## Native project files
+## Native Project Files
 
 Native projects use `.thetaedit` and preserve notes, tempo, device state, and audio references. Imported audio stays at its original path: keep those files in place. Projects do not yet collect media into a portable folder.
 
-Existing `.thedaedit` projects still open. Saving an existing project keeps its current filename; new projects use `.thetaedit`. Internal device and state identifiers retain their original names so older songs load correctly. Existing audio-device settings also keep their established storage location.
-
 Save writes a detached project snapshot on a worker thread to a temporary file before replacing the destination. Edits made during saving remain marked unsaved. Open validates the project before replacing the current edit; engine reconstruction still runs on the message thread, with editing disabled during that operation.
 
-The web prototype uses a separate `.theta` format. An importer between the two formats has not been implemented.
-
-The web prototype also accepts its older `.theda` files and retains its existing recovery storage.
-
-## Native validation and performance
+## Validation
 
 Windows validation includes the Release build and four CTest cases. Tests cover Utility DSP, note gestures and undo/redo, tempo and loop duration, a real 48 kHz MIDI-to-synth WAV render, audio import, project state/media-reference round trips, invalid-project rejection, and changes made after a save snapshot. The arrangement test exercises pointer drags, visible waveform drawing, trim bounds, cancellation, mute/solo undo, deletion/recovery, reopened clip offsets, and a render that verifies the trimmed source region.
 
 These checks do not establish physical audio-device behavior, end-to-end pointer latency, sustained FPS, large-project capacity, or macOS compatibility. The render is an integration test; there is no export button yet.
 
 Audio scheduling belongs to Tracktion rather than the UI. Control feedback is event-driven, playheads follow display refresh, and a separate 10 Hz timer updates only transport text. Audio thumbnails cache waveform data and scan samples in the background. Clip drags use a local preview and update the engine once on release. Audio-import metadata work and engine reconstruction still need further work to avoid long message-thread stalls. Large mock sessions and benchmark scaffolding are deliberately deferred while development uses small correctness checks.
-
-## Run the preserved web prototype
-
-The Electron app contains the original arrangement, drum grid, piano roll, mixer, and demo song. Its recording and export paths are experimental; it is not the production audio foundation.
-
-```powershell
-npm install
-npm start
-```
-
-The desktop app opens the “After hours” demo. Press Space to play or pause. Double-click an empty lane to create a clip. Click drum steps to toggle them; use the piano roll to add notes, drag to move or resize them, and right-click to erase. Instruments can be added from the browser or Add track.
-
-Save writes a `.theta` file, including imported audio. Open loads a project. Export renders the arrangement to stereo WAV. The microphone recording feature is experimental and does not provide measured latency compensation. Use the `?` shortcut for controls.
-
-For a browser preview:
-
-```powershell
-npm run dev
-```
-
-Open http://127.0.0.1:5173. Native file dialogs become browser downloads/file selection in that mode.
-
-## Web prototype checks
-
-```powershell
-npm test
-npm run test:ui
-```
-
-The model suite checks scheduling, validation, editing, and WAV encoding. The desktop suite launches isolated hidden Electron instances and tests UI workflows, persistence, audio rendering, and simulated microphone recording. Automated microphone tests do not verify physical hardware or recording latency.
-
-Previously, nine model tests and a desktop editing/save/reopen test passed. The full desktop suite did not complete successfully: export/recording cases and teardown timed out.
-
-The prototype has not been benchmarked or validated for production-size projects. It does not yet host VST plugins, support hardware MIDI, provide ASIO device settings, implement tempo maps or automation, or stream long audio files from disk. See the architecture proposal for those requirements.

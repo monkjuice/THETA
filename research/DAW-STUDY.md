@@ -4,7 +4,7 @@ Research date: 2026-09-08. Scope: focused source-code and primary-documentation 
 
 ## Recommendation
 
-Theta should have a native C++ audio engine, an extensible internal device system, and an interface designed around composing complete songs. Evaluate Tracktion Engine before constructing our own scheduler, recording pipeline, automation system, and routing graph. Compare native JUCE and Qt Quick for the production interface using the same representative editing workload. Keep the web prototype as a working design reference and possible frontend fallback.
+Theta should have a native C++ audio engine, an extensible internal device system, and an interface designed around composing complete songs. Evaluate Tracktion Engine before constructing our own scheduler, recording pipeline, automation system, and routing graph. Compare native JUCE and Qt Quick for the production interface using the same representative editing workload.
 
 This recommendation addresses the clarified requirements: Windows and macOS from the start; personal use; electronic composition plus recording; large projects; instruments and effects implemented as replaceable modules. Third-party VST hosting is an optional future adapter, not the definition of modularity.
 
@@ -115,4 +115,4 @@ Build one narrow native engine proof before migrating screens: streamed audio pl
 
 Then compare a representative timeline/device-panel slice across the leading UI candidates. Use the interaction requirements in [UX-SPEC.md](UX-SPEC.md), the modular contract in [DEVICE-SYSTEM.md](DEVICE-SYSTEM.md), and the acceptance gates in [ROADMAP.md](ROADMAP.md).
 
-No production native engine or replacement UI has been implemented as part of this research. The current prototype remains intact.
+The native engine evaluation now carries the active implementation work.

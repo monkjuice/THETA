@@ -9,7 +9,7 @@ namespace te = tracktion::engine;
 class UtilityDevice final : public te::Plugin
 {
 public:
-    inline static const char* xmlTypeName = "theda.utility.v1";
+    inline static const char* xmlTypeName = "theta.utility.v1";
     static const char* getPluginName() { return "Utility"; }
     explicit UtilityDevice(te::PluginCreationInfo);
     ~UtilityDevice() override;

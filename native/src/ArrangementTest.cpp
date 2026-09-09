@@ -205,7 +205,7 @@ int runArrangementTest()
         session.undo();
         require(session.findAudioClip(id) != nullptr, "Undo restores deleted clip");
         const auto saved = session.projectSnapshot();
-        juce::TemporaryFile project(".thedaedit");
+        juce::TemporaryFile project(".thetaedit");
         require(session.restoreProject(saved, project.getFile()).wasOk(), "Reopen arranged project");
         clip = session.findAudioClip(id);
         require(clip != nullptr, "Clip identity survives reopen");

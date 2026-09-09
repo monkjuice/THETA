@@ -6,7 +6,7 @@ Session::Session()
 {
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
     edit = te::createEmptyEdit(engine, {});
-    edit->state.setProperty("thedaFormatVersion", 1, nullptr);
+    edit->state.setProperty("thetaFormatVersion", 1, nullptr);
     edit->tempoSequence.getTempo(0)->setBpm(120.0);
     edit->ensureNumberOfAudioTracks(2);
     auto* track = te::getAudioTracks(*edit)[0];
@@ -159,7 +159,7 @@ juce::ValueTree Session::projectSnapshot()
 {
     edit->flushState();
     auto snapshot = edit->state.createCopy();
-    snapshot.setProperty("thedaSnapshotRevision", changeRevision, nullptr);
+    snapshot.setProperty("thetaSnapshotRevision", changeRevision, nullptr);
     return snapshot;
 }
 
@@ -171,7 +171,7 @@ void Session::markModified()
 
 juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::File& file)
 {
-    if (!state.hasType(te::IDs::EDIT) || static_cast<int>(state.getProperty("thedaFormatVersion")) != 1)
+    if (!state.hasType(te::IDs::EDIT) || static_cast<int>(state.getProperty("thetaFormatVersion")) != 1)
         return juce::Result::fail("This is not a supported Theta native project.");
     auto candidate = te::loadEditFromState(engine, state.createCopy());
     if (!candidate) return juce::Result::fail("The project could not be loaded.");
@@ -209,7 +209,7 @@ void Session::projectSaved(const juce::ValueTree& snapshot, const juce::File& fi
 {
     projectFile = file;
     // Edits made while the worker wrote the snapshot must remain unsaved.
-    if (static_cast<juce::int64>(snapshot.getProperty("thedaSnapshotRevision")) == changeRevision)
+    if (static_cast<juce::int64>(snapshot.getProperty("thetaSnapshotRevision")) == changeRevision)
     {
         savedRevision = changeRevision;
         edit->resetChangedStatus();

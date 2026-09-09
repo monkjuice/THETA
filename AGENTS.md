@@ -4,8 +4,8 @@
 
 - Build a polished native desktop DAW. Prioritize Windows while preserving macOS portability.
 - Treat UI frame pacing and immediate pointer response as core requirements.
-- Preserve existing work, including the original Electron prototype. Avoid large mock projects or benchmark scaffolding unless requested.
-- The product is Theta and the repository is https://github.com/monkjuice/THETA.git. The local workspace may still be named `theda`; retain legacy project compatibility deliberately.
+- Preserve existing native work. Avoid large mock projects or benchmark scaffolding unless requested.
+- The product is Theta and the repository is https://github.com/monkjuice/THETA.git. The local workspace may still be named `theda`.
 
 ## Commit and push workflow
 

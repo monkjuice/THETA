@@ -85,7 +85,7 @@ void ProjectFiles::open()
 void ProjectFiles::chooseOpen()
 {
     busy = true;
-    chooser = std::make_unique<juce::FileChooser>("Open project", session.projectFile, "*.thetaedit;*.thedaedit");
+    chooser = std::make_unique<juce::FileChooser>("Open project", session.projectFile, "*.thetaedit");
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
         [weak = juce::WeakReference<ProjectFiles>(this)](const juce::FileChooser& selected)
         {

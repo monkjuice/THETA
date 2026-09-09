@@ -4,7 +4,7 @@ Status: proposed design requirements informed by the [DAW study](DAW-STUDY.md). 
 
 ## Design premise
 
-The interface should support a continuous path from a sound to a finished song. Preserve the prototype's quiet charcoal palette, clear track colors, and integrated clip editor. Rework its tiny typography, fixed panel sizes, hidden track overflow, whole-panel redraws, and controls that change editing state implicitly.
+The interface should support a continuous path from a sound to a finished song. Keep the useful design findings: a quiet charcoal palette, clear track colors, and an integrated clip editor. Avoid tiny typography, fixed panel sizes, hidden track overflow, whole-panel redraws, and controls that change editing state implicitly.
 
 Confirmed user priorities: UI performance, sustained frame rate, consistent frame pacing, and immediate pointer response are primary selection criteria alongside visual and interaction quality. Evaluate these during editing and audio playback, not just idle animation.
 
@@ -43,7 +43,7 @@ The overview and panel splitters are functional navigation controls. Remember pa
 ## Visual rules
 
 - Use a restrained neutral background with visibly separated surfaces. Track colors identify musical material; selection uses an additional outline; recording and faults have dedicated states. Never encode state by color alone.
-- Target 12–14 logical-pixel text for normal controls, with scaling available. Small labels must remain legible at common Windows scaling and macOS Retina settings. The prototype's 8–9 px utility text needs revision.
+- Target 12–14 logical-pixel text for normal controls, with scaling available. Small labels must remain legible at common Windows scaling and macOS Retina settings.
 - Align numbers, grids, and waveforms consistently. Use tabular numerals for time and levels. Show meaningful units: dB, Hz, milliseconds, beats, and percentages where appropriate.
 - Prefer flat, compact controls with clear focus and hover states. Use space to group related operations; avoid giving every control a large card.
 - Device panels share a common header, bypass, preset, macro, and parameter treatment. Give individual synths distinct visualizations without inventing a new control language for each one.

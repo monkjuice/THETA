@@ -32,7 +32,7 @@ If Tracktion is selected, its Plugin, AutomatableParameter, and state mechanisms
 
 | Area | Required behavior |
 | --- | --- |
-| Identity | Stable type ID such as `org.theda.analog-bass`; separate stable instance ID; schema version; human-readable name and tags |
+| Identity | Stable type ID such as `org.theta.analog-bass`; separate stable instance ID; schema version; human-readable name and tags |
 | Ports | Explicit audio input/output buses, channel capabilities, note/event ports, and optional sidechain inputs |
 | Parameters | Stable IDs, range and units, default, linear/logarithmic mapping, quantization, automation capability, modulation capability, and smoothing policy |
 | Lifecycle | Create and load assets off the audio thread; prepare for sample rate and maximum block; process bounded blocks; reset/flush; release off the audio thread |
@@ -72,7 +72,7 @@ Keep the initial routing graph acyclic. If feedback is introduced, require an ex
 4. Filter/EQ and delay: prove reusable effects, tails, tempo synchronization, and parameter automation.
 5. Drum rack and macro container: prove composition of devices.
 
-Keep the prototype's sound names and demo composition as migration fixtures. Do not claim the browser synths and native replacements will sound identical without matching oscillator, envelope, filter, pan, and effect behavior.
+Keep representative sound names and demo composition ideas as migration fixtures. Do not claim browser synths and native replacements will sound identical without matching oscillator, envelope, filter, pan, and effect behavior.
 
 ## Extension policy
 

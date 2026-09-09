@@ -10,13 +10,13 @@ Status: proposed sequence after source research. No duration or capacity estimat
 - Internal devices as the extension mechanism for sounds, effects, and later modulators.
 - Large sessions and a polished, coherent interface.
 - UI performance, consistent FPS/frame pacing, and immediate pointer response are explicit priorities.
-- Preserve the existing prototype and its useful design work.
+- Preserve useful design findings while moving implementation work into the native app.
 
 Still unspecified: reference Windows/Mac hardware and audio interfaces, typical/max project size, which genres and sound palette to prioritize, and whether arrangement editing or live launching is the first primary workflow. Until clarified, use both in the model and prioritize a complete arrangement workflow for the first native proof. No macOS runtime validation can be claimed from the current Windows workspace.
 
 ## Stage 0 — Research and design record
 
-Deliverables: [DAW-STUDY.md](DAW-STUDY.md), [SOURCE_MAP.md](SOURCE_MAP.md), [DEVICE-SYSTEM.md](DEVICE-SYSTEM.md), [UX-SPEC.md](UX-SPEC.md), and this plan. Preserve source snapshots and the original prototype.
+Deliverables: [DAW-STUDY.md](DAW-STUDY.md), [SOURCE_MAP.md](SOURCE_MAP.md), [DEVICE-SYSTEM.md](DEVICE-SYSTEM.md), [UX-SPEC.md](UX-SPEC.md), and this plan. Preserve source snapshots.
 
 Exit: the engine recommendation, interface shortlist, and unknowns are explicit. This stage is complete as a source/documentation study; runtime comparisons are still pending.
 
@@ -30,7 +30,7 @@ Exit: identical session fixtures work on both platforms; audio continues when th
 
 ## Stage 2 — Interface selection and visual proof
 
-Compare JUCE native and Qt Quick using the same timeline/device-panel scene and the engine from Stage 1. Retain the web prototype for comparison and as a possible WebView frontend. A full rewrite in three frameworks is unnecessary: implement a focused vertical slice.
+Compare JUCE native and Qt Quick using the same timeline/device-panel scene and the engine from Stage 1. A full rewrite in multiple frameworks is unnecessary: implement a focused vertical slice.
 
 Include typography, splitter resizing, trackpad zoom, marquee selection, note dragging, device parameters, and UI scaling. Verify event-loop ownership and native windows. Use both sparse and dense sessions. Compare interaction latency, memory, frame-time distribution, build/deployment complexity, and accessibility. Run the same 60 Hz / 120 Hz presentation and pointer-response traces defined in [UX-SPEC.md](UX-SPEC.md#frame-pacing-and-pointer-response), during audio playback and background work. Report p95/p99 and worst stalls as well as average FPS; a smoothly moving system cursor does not demonstrate responsive application controls.
 
@@ -38,7 +38,7 @@ Exit: choose one production frontend with measurements and screenshots. A candid
 
 ## Stage 3 — One complete song workflow
 
-Implement project/media management, arrangement editing, MIDI input/recording, the drum/piano editors, device chains, basic mixer/routing, undo, recovery, and export. Import prototype `.theta` files through a versioned migration path.
+Implement project/media management, arrangement editing, MIDI input/recording, the drum/piano editors, device chains, basic mixer/routing, undo, recovery, and export.
 
 A small set of good devices is enough: sampler/drum rack, polyphonic synth, utility, filter/EQ, delay. Reuse the demo as a workflow fixture, while acknowledging that the native sound implementation may differ.
 
@@ -76,4 +76,4 @@ Do not promise “unlimited tracks.” Report workload and hardware. A deep seri
 
 ## Prototype status
 
-The original Electron/Web Audio source is preserved. Nine model tests passed. A desktop test verified editing and native project save/reopen, but the full desktop suite did not complete successfully: export/recording cases and test teardown timed out, and remaining execution was stopped when the task switched to architecture research. The prototype must not be described as fully validated or production-ready. A small native engine evaluation now lives in `native/`; no production migration or packaged release is complete.
+The web source has been removed from the active tree. A small native engine evaluation now lives in `native/`; no production migration or packaged release is complete.

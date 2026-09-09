@@ -4,29 +4,15 @@ Status: research-backed direction, 2026-09-08. A small [native engine evaluation
 
 ## Product intent
 
-Build a desktop DAW for complete songs, with electronic composition first and audio recording alongside it. Large projects and predictable playback matter. The existing Electron/Web Audio implementation is a workflow prototype, not an agreed production architecture.
+Build a desktop DAW for complete songs, with electronic composition first and audio recording alongside it. Large projects and predictable playback matter.
 
 Confirmed: prioritize Windows development now while keeping macOS in the architecture; personal use; internal modular instruments/effects are required, while external plugin hosting is not an initial requirement. Both arrangement and live clip workflows matter, starting with electronic music. Target hardware, project sizes, and the initial sound palette remain to be established.
 
 UI performance, consistent frame pacing/FPS, and immediate pointer response are confirmed priorities alongside visual quality. These are frontend acceptance criteria under real audio and editing load, not optional polish.
 
-## What exists and what to preserve
+## What Exists
 
-The current source remains in place. It includes the arrangement, instrument browser, drum grid, piano roll, mixer, demo composition, project model, and experimental playback/recording/export. Tests and a screenshot are under `tests/` and `artifacts/`.
-
-Keep the visual design, workflow behavior, demo content, validation cases, and project examples. The web UI can remain a candidate production frontend if measurements justify it; otherwise it is an interactive specification for a native interface. Existing `.theta` projects should have an importer into the production model.
-
-The current `src/audio.js` implementation should not become the foundation for large sessions without a replacement architecture:
-
-- JavaScript timers feed a short lookahead schedule from the UI thread.
-- Events are found by scanning tracks, clips, and notes on each sequencer step.
-- Audio files are decoded in full and retained in memory.
-- Projects embed base64 audio; undo copies the project rather than recording editing commands.
-- UI updates frequently rebuild whole panels; there is no timeline virtualization.
-- Microphone capture uses MediaRecorder, with no sample-aligned recording or measured latency compensation.
-- There is no native audio-device configuration, external plugin host, plugin delay compensation, tempo map, streaming recorder, or hardware MIDI recording.
-
-Web Audio processes its graph separately from the UI. This prototype's main-thread scheduling and data management are the specific concerns; this is not a claim that JavaScript computes every audio sample.
+The current source is a native C++20/Tracktion/JUCE application with a pattern editor, two-track arrangement view, audio import, native project save/open, and focused native tests.
 
 ## Proposed engine direction
 
@@ -62,12 +48,11 @@ Built-in device processing is native and uses a registry with stable device/para
 | --- | --- | --- |
 | Native JUCE UI | Direct native/plugin-window integration; control over painting, allocations, and event handling; one primary language | Reimplement current controls and interactions; custom timeline rendering and accessibility still require work |
 | Qt Quick/QML with C++ rendering | Declarative native layout and custom scene-graph rendering; demonstrated by current Zrythm source | Qt/JUCE event-loop integration, deployment, thread ownership, and dense editor behavior need testing |
-| JUCE shell with HTML/CSS/TypeScript WebView | Can reuse much of the prototype interface; rapid visual iteration; C++ engine remains independent | Browser memory, native bridge design, OS WebView differences, focus/drag behavior, and rendering under load need measurement |
-| Electron UI with separate native engine | Retains current shell and consistent Chromium frontend | Higher runtime footprint and additional process/IPC lifecycle complexity; requires measurement rather than assumption |
+| JUCE shell with HTML/CSS/TypeScript WebView | Rapid visual iteration; C++ engine remains independent | Browser memory, native bridge design, OS WebView differences, focus/drag behavior, and rendering under load need measurement |
 
 JavaScript is not automatically the best interface technology. Nor does a native interface automatically scale. Both need visible-region rendering, waveform caches, bounded meter updates, incremental model changes, and disciplined allocations.
 
-Proposed decision method: evaluate JUCE native first for integration with the leading engine candidate, then Qt Quick as the principal alternative for a customized visual workspace. Compare the same small timeline/device slice, driven by the same engine, on both platforms. Keep WebView reuse as an option; select from measurements of interaction, rendering, memory, and integration costs. Preserve the web prototype regardless; existing code should not dictate the production choice solely because it already exists.
+Proposed decision method: evaluate JUCE native first for integration with the leading engine candidate, then Qt Quick as the principal alternative for a customized visual workspace. Compare the same small timeline/device slice, driven by the same engine, on both platforms. Keep WebView as an option; select from measurements of interaction, rendering, memory, and integration costs.
 
 Apply the [frame-pacing and pointer-response gates](research/UX-SPEC.md#frame-pacing-and-pointer-response) to every candidate. Target refresh-aware 60/120 Hz interaction on reference hardware, measure event-to-presented-control latency and frame-time tails, and verify that UI activity does not introduce audio underruns. A drag preview must not wait for an audio-thread acknowledgement or media processing. Presentation performance and authoritative edit correctness must both pass; average FPS or idle screenshots cannot settle the frontend choice.
 
@@ -78,7 +63,7 @@ Adding Rust/Tauri would introduce another language boundary without presently es
 - Stream audio from project files through bounded read-ahead caches. Decode and generate multiresolution waveform peaks in background workers.
 - Persist a versioned session document, media files, and caches separately. Provide a portable collect-and-save operation, atomic document saves, crash recovery, and missing-media relinking.
 - Use editing commands and incremental undo; avoid cloning complete projects and embedded media on each edit.
-- Separate musical time from sample time. Support a tempo map and defined conversions; migrate prototype sixteenth-note positions without losing fractional timing.
+- Separate musical time from sample time. Support a tempo map and defined conversions.
 - Compile an indexed playback representation. Avoid scanning every note in the project per callback or UI frame.
 - Define audio routing, plugin latency compensation, automation timing, voice limits, tails, and block-boundary behavior before adding complex features.
 - Support offline rendering using the same processing model as playback. Test equivalence where plugins are deterministic.
@@ -102,10 +87,10 @@ These are evaluation proposals, not passed benchmarks or supported product limit
 ## Development sequence
 
 1. Record the confirmed platform/personal-use/internal-device scope and agree on measurable targets.
-2. Preserve the prototype and establish a native build plus engine evaluation harness.
+2. Establish and maintain a native build plus engine evaluation harness.
 3. Prove native audio output, MIDI sequencing, streamed playback, recording, and rendering independently of the UI.
 4. Compare frontend candidates against the same engine and fixtures; record the decision.
-5. Migrate one complete workflow and import prototype projects. Keep the prototype available throughout migration.
+5. Build out one complete workflow on the selected native stack.
 6. Add routing, automation, racks, clip launching, and editing depth in measured increments. Add external plugin hosting only if wanted.
 
 ## Primary references
@@ -116,4 +101,3 @@ These are evaluation proposals, not passed benchmarks or supported product limit
 - [Tracktion Engine: purpose, platforms, C++ requirements, and separate licensing](https://github.com/Tracktion/tracktion_engine)
 - [Tracktion Engine: playback, plugins, recording, automation, and clip launching](https://github.com/Tracktion/tracktion_engine/blob/develop/FEATURES.md)
 - [VST3: processing, editing, and threading interfaces](https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical%2BDocumentation/API%2BDocumentation/Index.html)
-- [Web Audio: graph and worklet interfaces](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)

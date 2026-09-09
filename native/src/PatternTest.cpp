@@ -80,7 +80,7 @@ int runPatternTest()
         require(audioTrack->getClips().size() == 1, "Import creates an audio clip");
         require(audioTrack->getClips()[0]->getPosition().time.getStart().inSeconds() == 0.0, "First audio import starts at zero");
 
-        juce::TemporaryFile project(".thedaedit");
+        juce::TemporaryFile project(".thetaedit");
         const auto snapshot = session.projectSnapshot();
         auto projectXml = snapshot.createXml();
         require(projectXml->writeTo(project.getFile()), "Write project snapshot");

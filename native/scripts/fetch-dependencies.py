@@ -12,7 +12,10 @@ DEPENDENCIES = (
 
 for name, repository, revision in DEPENDENCIES:
     destination = ROOT / name
-    marker = destination / '.theda-revision'
+    marker = destination / '.theta-revision'
+    legacy_marker = destination / '.theda-revision'
+    if legacy_marker.exists() and not marker.exists():
+        legacy_marker.rename(marker)
     if marker.exists() and marker.read_text() == revision:
         print(f'{name}: already at {revision}', flush=True)
         continue
