@@ -48,6 +48,8 @@ int runArrangementTest()
         view.setLookAndFeel(&theme);
         view.setSize(1000, 246);
         view.fit();
+        int notifiedTrack = -1;
+        view.trackSelected = [&notifiedTrack](int track) { notifiedTrack = track; };
 
         // Compare incremental frames to complete renders, including fractional
         // Windows display scales, wraparound, seeks, and hiding the playhead.
@@ -166,6 +168,11 @@ int runArrangementTest()
                 juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1.0f, 0, 0, 0, 0,
                 &view, &view, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
         };
+        view.mouseDown(event({40, 82}, {40, 82}, false));
+        require(view.selectedTrack == 0, "Clicking the pattern lane selects the pattern track");
+        view.mouseDown(event({40, 180}, {40, 180}, false));
+        require(view.selectedTrack == 1 && notifiedTrack == 1, "Clicking the audio lane selects and broadcasts the audio track");
+        view.selected = id;
         const auto drag = [&view, &event](juce::Point<float> down, juce::Point<float> to)
         {
             view.mouseDown(event(down, down, false));

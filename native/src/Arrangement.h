@@ -22,6 +22,7 @@ public:
     bool keyPressed(const juce::KeyPress&) override;
     void fit();
     std::function<void(juce::String)> status;
+    std::function<void(int)> trackSelected;
 private:
     friend int runArrangementTest();
     struct Waveform;
@@ -44,6 +45,7 @@ private:
     void updateScroll();
     void zoom(double factor, double anchor);
     void cancelDrag();
+    void selectTrack(int track);
     void splitSelectedAtPlayhead();
     void duplicateSelected();
     void nudgeSelected(int direction, bool byBar);
@@ -69,6 +71,7 @@ private:
     juce::VBlankAttachment vblank;
     double viewStart = 0.0, viewSpan = 8.0, songEnd = 2.0;
     te::EditItemID selected;
+    int selectedTrack = 0;
     bool dragging = false;
     ClipGesture gesture = ClipGesture::move;
     ClipGeometry original, preview;

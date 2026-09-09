@@ -14,6 +14,7 @@ public:
     ~DeviceRack() override;
     void paint(juce::Graphics&) override;
     void resized() override;
+    void selectTrack(int track);
     std::function<void(juce::String)> status;
 
 private:
@@ -21,7 +22,6 @@ private:
     void paintListBoxItem(int row, juce::Graphics&, int width, int height, bool selected) override;
     void selectedRowsChanged(int lastRowSelected) override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
-    void selectTrack(int track);
     void sync();
 
     Session& session;

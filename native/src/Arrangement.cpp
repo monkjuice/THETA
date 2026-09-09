@@ -101,6 +101,13 @@ void Arrangement::paint(juce::Graphics& g)
         const auto row = lane(track);
         g.setColour(juce::Colour(track == 0 ? 0xff242b31 : 0xff20272e));
         g.fillRect(row);
+        if (track == selectedTrack)
+        {
+            g.setColour(juce::Colour(0xff343f47));
+            g.fillRect(row.withWidth(headerWidth));
+            g.setColour(juce::Colour(0xffc6d58c));
+            g.fillRect(row.withWidth(3.0f));
+        }
         g.setColour(juce::Colour(0xffc4cbd1));
         g.drawText(track == 0 ? "01  Pattern synth" : "02  Audio 1", 10, static_cast<int>(row.getY()) + 8, 130, 22, juce::Justification::centredLeft);
     }
@@ -311,6 +318,12 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
     if (!event.mods.isLeftButtonDown()) return;
+    for (int track = 0; track < 2; ++track)
+        if (lane(track).withX(0.0f).contains(event.position))
+        {
+            selectTrack(track);
+            break;
+        }
     if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
     {
         session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(std::max(0.0, timeAt(event.position.x))));
@@ -321,6 +334,7 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     if (index < 0) { selected = {}; repaint(); return; }
     const auto& clip = clips[static_cast<size_t>(index)];
     selected = clip.id;
+    selectTrack(clip.track);
     repaint();
     if (clip.track == 0) return;
     original = preview = clip.position;
@@ -424,6 +438,15 @@ bool Arrangement::keyPressed(const juce::KeyPress& key)
 }
 
 void Arrangement::cancelDrag() { dragging = false; }
+
+void Arrangement::selectTrack(int track)
+{
+    track = juce::jlimit(0, 1, track);
+    if (selectedTrack == track) return;
+    selectedTrack = track;
+    if (trackSelected) trackSelected(track);
+    repaint();
+}
 
 void Arrangement::splitSelectedAtPlayhead()
 {

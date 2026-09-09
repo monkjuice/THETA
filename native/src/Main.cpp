@@ -22,6 +22,7 @@ public:
         files.status = [this](const juce::String& message) { status.setText(message, juce::dontSendNotification); };
         files.loadingChanged = [this](bool loading) { setEnabled(!loading); };
         arrangement.status = files.status;
+        arrangement.trackSelected = [this](int track) { rack.selectTrack(track); };
         browser.status = files.status;
         rack.status = files.status;
         open.onClick = [this] { files.open(); };
