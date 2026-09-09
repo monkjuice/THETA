@@ -141,17 +141,21 @@ void Session::refreshLoop()
 
 void Session::undo()
 {
-    if (edit->getUndoManager().undo()) markModified();
-    edit->tempoSequence.updateTempoData();
-    refreshLoop();
-    sendSynchronousChangeMessage();
+    refreshAfterUndoRedo(edit->getUndoManager().undo());
 }
 
 void Session::redo()
 {
-    if (edit->getUndoManager().redo()) markModified();
+    refreshAfterUndoRedo(edit->getUndoManager().redo());
+}
+
+void Session::refreshAfterUndoRedo(bool changed)
+{
+    if (changed) markModified();
     edit->tempoSequence.updateTempoData();
     refreshLoop();
+    if (changed && edit->getTransport().isPlaying())
+        edit->restartPlayback();
     sendSynchronousChangeMessage();
 }
 

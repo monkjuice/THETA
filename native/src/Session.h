@@ -48,6 +48,7 @@ public:
     std::unique_ptr<te::Edit> edit;
     UtilityDevice* utility = nullptr; // owned by edit's plugin list
 private:
+    void refreshAfterUndoRedo(bool changed);
     te::MidiClip* patternClip = nullptr; // owned by edit
     // Engine initialization also changes its edit flag asynchronously. Track
     // user commands separately so startup cannot dirty an untouched document.
