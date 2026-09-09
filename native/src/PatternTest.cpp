@@ -12,7 +12,8 @@ int runPatternTest()
             if (!valid) throw std::runtime_error(message);
         };
         Session session;
-        require(session.utility != nullptr && session.audioUtility != nullptr, "Session creates synth and audio Utility devices");
+        require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr && session.drums != nullptr,
+                "Session creates synth, drum, and Utility devices");
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");
         session.beginNoteGesture();
@@ -29,10 +30,13 @@ int runPatternTest()
         require(sequence.getNumNotes() == 2, "Redo restores the gesture");
         session.applyPatternPreset(Session::PatternPreset::HouseKit);
         require(sequence.getNumNotes() == 10, "Drum kit preset loads notes");
+        require(!session.synth->isEnabled() && session.drums->isEnabled(), "Drum kit preset enables drum instrument");
         session.undo();
         require(sequence.getNumNotes() == 2, "Undo restores notes before preset load");
+        require(session.synth->isEnabled() && !session.drums->isEnabled(), "Undo restores synth instrument");
         session.redo();
         require(sequence.getNumNotes() == 10, "Redo restores preset load");
+        require(!session.synth->isEnabled() && session.drums->isEnabled(), "Redo restores drum instrument");
         session.clearPattern();
         require(sequence.getNumNotes() == 0, "Clear notes");
         session.undo();
@@ -102,7 +106,9 @@ int runPatternTest()
         auto loadedXml = juce::parseXML(project.getFile());
         require(loadedXml != nullptr, "Read saved project");
         require(session.restoreProject(juce::ValueTree::fromXml(*loadedXml), project.getFile()).wasOk(), "Restore project");
-        require(session.utility != nullptr && session.audioUtility != nullptr, "Project restore keeps synth and audio Utility devices");
+        require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr && session.drums != nullptr,
+                "Project restore keeps synth, drum, and Utility devices");
+        require(!session.synth->isEnabled() && session.drums->isEnabled(), "Project restore keeps drum instrument selection");
         require(session.pattern().getSequence().getNumNotes() == 10, "Notes survive project reopen");
         require(std::abs(session.tempo() - 90.0) < 0.001, "Tempo survives project reopen");
         require(!session.hasUnsavedChanges(), "Opened project is clean");

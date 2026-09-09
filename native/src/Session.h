@@ -1,5 +1,6 @@
 #pragma once
 #include "UtilityDevice.h"
+#include "DrumDevice.h"
 #include "ClipGeometry.h"
 
 namespace theta
@@ -58,8 +59,11 @@ public:
     std::unique_ptr<te::Edit> edit;
     UtilityDevice* utility = nullptr; // owned by edit's plugin list
     UtilityDevice* audioUtility = nullptr; // owned by edit's plugin list
+    te::FourOscPlugin* synth = nullptr; // owned by edit's plugin list
+    DrumDevice* drums = nullptr; // owned by edit's plugin list
 private:
     void refreshAfterUndoRedo(bool changed);
+    void setPatternInstrument(bool useDrums);
     te::MidiClip* patternClip = nullptr; // owned by edit
     // Engine initialization also changes its edit flag asynchronously. Track
     // user commands separately so startup cannot dirty an untouched document.

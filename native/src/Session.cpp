@@ -5,17 +5,23 @@ namespace theta
 Session::Session()
 {
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
+    engine.getPluginManager().createBuiltInType<DrumDevice>();
     edit = te::createEmptyEdit(engine, {});
     edit->state.setProperty("thetaFormatVersion", 1, nullptr);
     edit->tempoSequence.getTempo(0)->setBpm(120.0);
     edit->ensureNumberOfAudioTracks(2);
     auto* track = te::getAudioTracks(*edit)[0];
     track->setName("Pattern synth");
-    auto synth = edit->getPluginCache().createNewPlugin(te::FourOscPlugin::xmlTypeName, {});
-    track->pluginList.insertPlugin(synth, 0, nullptr);
+    auto synthPlugin = edit->getPluginCache().createNewPlugin(te::FourOscPlugin::xmlTypeName, {});
+    synth = dynamic_cast<te::FourOscPlugin*>(synthPlugin.get());
+    track->pluginList.insertPlugin(synthPlugin, 0, nullptr);
+    auto drumPlugin = edit->getPluginCache().createNewPlugin(DrumDevice::xmlTypeName, {});
+    drums = dynamic_cast<DrumDevice*>(drumPlugin.get());
+    drums->setEnabled(false);
+    track->pluginList.insertPlugin(drumPlugin, 1, nullptr);
     auto device = edit->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
     utility = dynamic_cast<UtilityDevice*>(device.get());
-    track->pluginList.insertPlugin(device, 1, nullptr);
+    track->pluginList.insertPlugin(device, 2, nullptr);
     utility->gain().setParameter(-12.0f, juce::dontSendNotification);
     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     patternClip = track->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
@@ -130,16 +136,18 @@ void Session::applyPatternPreset(PatternPreset preset)
                                       {1, 58, 1}, {3, 58, 1}, {6, 58, 1}, {9, 58, 1}, {12, 58, 1}, {15, 58, 1}};
     static constexpr Note minimalKit[] {{0, 48, 1}, {7, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1}, {2, 58, 1}, {10, 58, 1}, {14, 58, 1}};
 
+    auto useDrums = false;
     switch (preset)
     {
         case PatternPreset::WarmPulse:  notes = warmPulse;  count = static_cast<int>(std::size(warmPulse));  name = "Warm pulse"; break;
         case PatternPreset::AcidSteps:  notes = acidSteps;  count = static_cast<int>(std::size(acidSteps));  name = "Acid steps"; break;
-        case PatternPreset::HouseKit:   notes = houseKit;   count = static_cast<int>(std::size(houseKit));   name = "House kit"; break;
-        case PatternPreset::BreakKit:   notes = breakKit;   count = static_cast<int>(std::size(breakKit));   name = "Break kit"; break;
-        case PatternPreset::MinimalKit: notes = minimalKit; count = static_cast<int>(std::size(minimalKit)); name = "Minimal kit"; break;
+        case PatternPreset::HouseKit:   notes = houseKit;   count = static_cast<int>(std::size(houseKit));   name = "House kit"; useDrums = true; break;
+        case PatternPreset::BreakKit:   notes = breakKit;   count = static_cast<int>(std::size(breakKit));   name = "Break kit"; useDrums = true; break;
+        case PatternPreset::MinimalKit: notes = minimalKit; count = static_cast<int>(std::size(minimalKit)); name = "Minimal kit"; useDrums = true; break;
     }
 
     edit->getUndoManager().beginNewTransaction("Load " + name);
+    setPatternInstrument(useDrums);
     auto& sequence = pattern().getSequence();
     sequence.removeAllNotes(&edit->getUndoManager());
     for (int i = 0; i < count; ++i)
@@ -152,6 +160,13 @@ void Session::applyPatternPreset(PatternPreset preset)
     if (edit->getTransport().isPlaying())
         edit->restartPlayback();
     sendSynchronousChangeMessage();
+}
+
+void Session::setPatternInstrument(bool useDrums)
+{
+    if (synth) synth->setEnabled(!useDrums);
+    if (drums) drums->setEnabled(useDrums);
+    edit->state.setProperty("thetaPatternInstrument", useDrums ? "drums" : "synth", &edit->getUndoManager());
 }
 
 double Session::tempo() const { return edit->tempoSequence.getTempo(0)->getBpm(); }
@@ -229,18 +244,28 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
     te::MidiClip* nextPattern = nullptr;
     UtilityDevice* nextUtility = nullptr;
     UtilityDevice* nextAudioUtility = nullptr;
-    bool hasSynth = false;
+    te::FourOscPlugin* nextSynth = nullptr;
+    DrumDevice* nextDrums = nullptr;
     for (auto* clip : tracks[0]->getClips())
         if (auto* midi = dynamic_cast<te::MidiClip*>(clip)) nextPattern = midi;
     for (auto plugin : tracks[0]->pluginList)
     {
         if (auto* device = dynamic_cast<UtilityDevice*>(plugin)) nextUtility = device;
-        if (dynamic_cast<te::FourOscPlugin*>(plugin) != nullptr) hasSynth = true;
+        if (auto* device = dynamic_cast<te::FourOscPlugin*>(plugin)) nextSynth = device;
+        if (auto* device = dynamic_cast<DrumDevice*>(plugin)) nextDrums = device;
     }
     for (auto plugin : tracks[1]->pluginList)
         if (auto* device = dynamic_cast<UtilityDevice*>(plugin)) nextAudioUtility = device;
-    if (!nextPattern || !nextUtility || !hasSynth)
+    if (!nextPattern || !nextUtility || !nextSynth)
         return juce::Result::fail("The project is missing its pattern or synth devices.");
+    if (!nextDrums)
+    {
+        auto device = candidate->getPluginCache().createNewPlugin(DrumDevice::xmlTypeName, {});
+        nextDrums = dynamic_cast<DrumDevice*>(device.get());
+        if (!nextDrums) return juce::Result::fail("The drum device could not be created.");
+        nextDrums->setEnabled(false);
+        tracks[0]->pluginList.insertPlugin(device, 1, nullptr);
+    }
     if (!nextAudioUtility)
     {
         auto device = candidate->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
@@ -253,6 +278,9 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
     patternClip = nextPattern;
     utility = nextUtility;
     audioUtility = nextAudioUtility;
+    synth = nextSynth;
+    drums = nextDrums;
+    setPatternInstrument(edit->state.getProperty("thetaPatternInstrument").toString() == "drums");
     projectFile = file;
     savedRevision = ++changeRevision;
     edit->getUndoManager().clearUndoHistory();
