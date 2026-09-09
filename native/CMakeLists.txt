@@ -19,7 +19,7 @@ juce_add_gui_app(ThetaNative
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 target_sources(ThetaNative PRIVATE
-    src/Main.cpp src/Session.cpp src/StepGrid.cpp src/Arrangement.cpp src/ProjectFiles.cpp
+    src/Main.cpp src/Session.cpp src/StepGrid.cpp src/Arrangement.cpp src/ProjectFiles.cpp src/Playhead.cpp
     src/UtilityDevice.cpp src/SelfTest.cpp src/PatternTest.cpp src/ArrangementTest.cpp)
 target_compile_definitions(ThetaNative PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0

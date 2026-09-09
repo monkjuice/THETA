@@ -4,6 +4,16 @@
 #include "Playhead.h"
 #include <stdexcept>
 
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
+
 namespace theta
 {
 int runArrangementTest()
@@ -88,6 +98,21 @@ int runArrangementTest()
         view.setTopLeftPosition(-10000, -10000);
         view.addToDesktop(0);
         view.setVisible(true);
+       #if JUCE_WINDOWS
+        // Exercise the native damage handoff, not just software image painting.
+        // Simulate a new position arriving in vblank while earlier damage is
+        // already queued. Both strips must reach D2D before vblank drawing.
+        auto* peer = view.getPeer();
+        const auto direct2D = peer->getAvailableRenderingEngines().indexOf("Direct2D");
+        require(direct2D >= 0, "Windows rendering regression requires Direct2D");
+        peer->setCurrentRenderingEngine(direct2D);
+        const auto hwnd = static_cast<HWND>(peer->getNativeHandle());
+        UpdateWindow(hwnd);
+        view.repaint(150, 32, 6, 196);
+        require(GetUpdateRect(hwnd, nullptr, FALSE) != 0, "Repaint queues native window damage");
+        movePlayhead(view, view.playhead, 300, view.getLocalBounds().withTrimmedTop(32).withTrimmedBottom(18));
+        require(GetUpdateRect(hwnd, nullptr, FALSE) == 0, "Playhead damage must reach Direct2D before the vblank callback returns");
+       #endif
         session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(0.5));
         view.zoom(0.5, 0.5);
         require(view.playhead == static_cast<int>(view.xFor(0.5)), "Zoom must keep the playhead visible before the next vblank");

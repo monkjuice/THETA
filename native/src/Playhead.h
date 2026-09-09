@@ -3,8 +3,7 @@
 
 namespace theta
 {
-// Submit one damage region for a complete old-to-new frame. The margin covers
-// physical-pixel rounding at fractional desktop scales (125%, 150%, etc.).
+// Each footprint includes physical-pixel rounding at fractional desktop scales.
 inline juce::Rectangle<int> playheadDamage(int previous, int next, juce::Rectangle<int> area)
 {
     const auto strip = [area](int x)
@@ -15,11 +14,5 @@ inline juce::Rectangle<int> playheadDamage(int previous, int next, juce::Rectang
     return strip(previous).getUnion(strip(next));
 }
 
-inline void movePlayhead(juce::Component& owner, int& current, int next, juce::Rectangle<int> area)
-{
-    if (current == next) return;
-    const auto damage = playheadDamage(current, next, area);
-    current = next;
-    if (!damage.isEmpty()) owner.repaint(damage);
-}
+void movePlayhead(juce::Component& owner, int& current, int next, juce::Rectangle<int> area);
 }
