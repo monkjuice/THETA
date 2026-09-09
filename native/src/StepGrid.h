@@ -24,7 +24,8 @@ private:
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited;
     bool drawing = false, adding = true;
-    int lastHit = -1, playhead = -1;
+    int lastHit = -1;
+    float playhead = -1.0f;
     juce::VBlankAttachment vblank;
     static constexpr float labelWidth = 54.0f, headerHeight = 26.0f;
 };

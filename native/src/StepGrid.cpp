@@ -56,8 +56,8 @@ void StepGrid::paint(juce::Graphics& g)
     }
     if (playhead >= 0)
     {
-        g.setColour(juce::Colour(0xfff0f4de));
-        g.fillRect(playhead, static_cast<int>(headerHeight), 2, getHeight() - static_cast<int>(headerHeight));
+        g.setColour(playheadColour);
+        g.fillRect(playhead, headerHeight, 2.0f, getHeight() - headerHeight);
     }
 }
 
@@ -128,13 +128,14 @@ void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 
 void StepGrid::updatePlayhead()
 {
-    int next = -1;
+    float next = -1.0f;
     auto& transport = session.edit->getTransport();
     if (isShowing() && transport.isPlaying())
     {
-        const auto beat = session.edit->tempoSequence.toBeats(transport.getPosition()).inBeats();
+        const auto beat = session.edit->tempoSequence.toBeats(
+            tracktion::core::TimePosition::fromSeconds(playheadTime(transport))).inBeats();
         if (beat >= 0.0 && beat < 4.0)
-            next = static_cast<int>(labelWidth + beat / 4.0 * (getWidth() - labelWidth));
+            next = static_cast<float>(labelWidth + beat / 4.0 * (getWidth() - labelWidth));
     }
     movePlayhead(*this, playhead, next,
                  getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight)));

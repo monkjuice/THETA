@@ -1,4 +1,5 @@
 #include "Playhead.h"
+#include <tracktion_engine/tracktion_engine.h>
 
 #if JUCE_WINDOWS
  #ifndef NOMINMAX
@@ -12,7 +13,25 @@
 
 namespace theta
 {
-void movePlayhead(juce::Component& owner, int& current, int next, juce::Rectangle<int> area)
+double playheadTime(const tracktion::engine::TransportControl& transport)
+{
+    // TransportControl::getPosition is copied from the audio playhead by a
+    // 50 Hz message-thread timer. Read the audio graph's latency-adjusted
+    // position on every display refresh instead; no UI clock can drift from it.
+    if (transport.isPlaying() && !transport.isUserDragging())
+        if (auto* context = transport.getCurrentPlaybackContext(); context && context->isPlaybackGraphAllocated())
+        {
+            // Show an immediate seek while the audio thread adopts it. A
+            // scheduled future jump must not move the display ahead of audio.
+            if (const auto pending = context->getPendingPositionChange(); pending && *pending == transport.getPosition())
+                return pending->inSeconds();
+            if (context->isPlaying())
+                return context->getAudibleTimelineTime().inSeconds();
+        }
+    return transport.getPosition().inSeconds();
+}
+
+void movePlayhead(juce::Component& owner, float& current, float next, juce::Rectangle<int> area)
 {
     if (current == next) return;
     const auto previous = std::exchange(current, next);

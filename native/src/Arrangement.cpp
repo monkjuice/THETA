@@ -161,10 +161,10 @@ void Arrangement::paint(juce::Graphics& g)
         g.setColour(juce::Colour(0xff75828e));
         g.drawText("Add audio to see its waveform here", lane(1).reduced(16, 0), juce::Justification::centredLeft);
     }
-    if (playhead >= static_cast<int>(headerWidth))
+    if (playhead >= headerWidth)
     {
-        g.setColour(juce::Colour(0xffeff5d9));
-        g.fillRect(playhead, static_cast<int>(rulerTop), 2, getHeight() - static_cast<int>(rulerTop) - 18);
+        g.setColour(playheadColour);
+        g.fillRect(playhead, rulerTop, 2.0f, getHeight() - rulerTop - 18.0f);
     }
 }
 
@@ -375,11 +375,11 @@ void Arrangement::editDidChange() { sync(); fit(); }
 
 void Arrangement::updatePlayhead()
 {
-    int next = -1;
+    float next = -1.0f;
     if (isShowing())
     {
-        const auto x = xFor(session.edit->getTransport().getPosition().inSeconds());
-        if (x >= headerWidth && x < getWidth()) next = static_cast<int>(x);
+        const auto x = xFor(playheadTime(session.edit->getTransport()));
+        if (x >= headerWidth && x < getWidth()) next = x;
     }
     movePlayhead(*this, playhead, next,
                  getLocalBounds().withTrimmedTop(static_cast<int>(rulerTop)).withTrimmedBottom(18));

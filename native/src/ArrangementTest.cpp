@@ -53,7 +53,7 @@ int runArrangementTest()
         // Windows display scales, wraparound, seeks, and hiding the playhead.
         StepGrid grid(session);
         grid.setSize(1000, 250);
-        const auto checkPlayhead = [&require](juce::Component& panel, int& position, juce::Rectangle<int> area)
+        const auto checkPlayhead = [&require](juce::Component& panel, float& position, juce::Rectangle<int> area)
         {
             for (const auto scale : {1.0f, 1.25f, 1.5f, 2.0f})
             {
@@ -70,7 +70,7 @@ int runArrangementTest()
                                   juce::roundToInt(panel.getHeight() * scale), true);
                 position = -1;
                 render(frame, panel.getLocalBounds());
-                for (const auto next : {150, 151, 155, 420, 998, 150, -1})
+                for (const auto next : {150.0f, 150.25f, 150.5f, 151.0f, 155.75f, 420.0f, 998.25f, 150.0f, -1.0f})
                 {
                     const auto damage = playheadDamage(position, next, area);
                     movePlayhead(panel, position, next, area);
@@ -81,7 +81,7 @@ int runArrangementTest()
                         for (int x = 0; x < frame.getWidth(); ++x)
                         {
                             if (frame.getPixelAt(x, y) != expected.getPixelAt(x, y))
-                                std::fprintf(stderr, "%s scale %.2f next %d pixel %d,%d actual %s expected %s\n",
+                                std::fprintf(stderr, "%s scale %.2f next %.2f pixel %d,%d actual %s expected %s\n",
                                              panel.getTitle().toRawUTF8(), scale, next, x, y,
                                              frame.getPixelAt(x, y).toString().toRawUTF8(), expected.getPixelAt(x, y).toString().toRawUTF8());
                             require(frame.getPixelAt(x, y) == expected.getPixelAt(x, y),
@@ -115,9 +115,10 @@ int runArrangementTest()
        #endif
         session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(0.5));
         view.zoom(0.5, 0.5);
-        require(view.playhead == static_cast<int>(view.xFor(0.5)), "Zoom must keep the playhead visible before the next vblank");
+        require(view.playhead == view.xFor(0.5), "Zoom must preserve the fractional playhead position before the next vblank");
+        require(close(playheadTime(session.edit->getTransport()), 0.5), "Stopped playhead follows the seek position");
         view.fit();
-        require(view.playhead == static_cast<int>(view.xFor(0.5)), "Fit must update the playhead immediately");
+        require(view.playhead == view.xFor(0.5), "Fit must update the playhead immediately");
         session.stop();
         view.setVisible(false);
         view.removeFromDesktop();

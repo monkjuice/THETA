@@ -64,7 +64,7 @@ private:
     ClipGesture gesture = ClipGesture::move;
     ClipGeometry original, preview;
     double dragTime = 0.0, sourceDuration = 0.0;
-    int playhead = -1;
+    float playhead = -1.0f;
     static constexpr float headerWidth = 148.0f, rulerTop = 32.0f, lanesTop = 56.0f;
 };
 }
