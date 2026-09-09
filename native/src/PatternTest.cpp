@@ -14,6 +14,12 @@ int runPatternTest()
         Session session;
         require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr && session.drums != nullptr,
                 "Session creates synth, drum, and Utility devices");
+        auto* effectTrack = te::getAudioTracks(*session.edit)[1];
+        const auto initialAudioPluginCount = effectTrack->pluginList.size();
+        require(session.addAudioEffect(Session::AudioEffect::Equaliser).wasOk(), "Audio FX browser action inserts EQ");
+        require(effectTrack->pluginList.size() == initialAudioPluginCount + 1, "Audio FX insert grows the audio track chain");
+        session.undo();
+        require(effectTrack->pluginList.size() == initialAudioPluginCount, "Undo removes inserted audio effect");
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");
         session.beginNoteGesture();

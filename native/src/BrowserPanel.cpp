@@ -32,17 +32,21 @@ BrowserPanel::BrowserPanel(Session& s) : session(s)
     categories[0].setToggleState(true, juce::dontSendNotification);
 
     items = {
-        {"Sounds", "Warm pulse", "Soft one-bar 4OSC chord pulse", Session::PatternPreset::WarmPulse},
-        {"Sounds", "Acid steps", "Tight 16-step synth riff", Session::PatternPreset::AcidSteps},
-        {"Drums", "House kit", "Four-on-floor kick, backbeat, hats", Session::PatternPreset::HouseKit},
-        {"Drums", "Break kit", "Syncopated kick/snare/hats groove", Session::PatternPreset::BreakKit},
-        {"Drums", "Minimal kit", "Sparse kick/snare/hats sketch", Session::PatternPreset::MinimalKit},
-        {"Instruments", "4OSC synth", "Loaded on Pattern synth", std::nullopt},
-        {"Instruments", "Utility gain", "Post-synth gain stage", std::nullopt},
-        {"Audio FX", "Utility gain", "Track gain control, undoable", std::nullopt},
-        {"Audio FX", "EQ placeholder", "Device rack surface coming next", std::nullopt},
-        {"MIDI FX", "Snap 1/16", "Grid quantized note entry", std::nullopt},
-        {"MIDI FX", "Pattern presets", "Double-click rows to replace notes", std::nullopt}
+        {"Sounds", "Warm pulse", "Soft one-bar 4OSC chord pulse", Session::PatternPreset::WarmPulse, std::nullopt},
+        {"Sounds", "Acid steps", "Tight 16-step synth riff", Session::PatternPreset::AcidSteps, std::nullopt},
+        {"Drums", "House kit", "Four-on-floor kick, backbeat, hats", Session::PatternPreset::HouseKit, std::nullopt},
+        {"Drums", "Break kit", "Syncopated kick/snare/hats groove", Session::PatternPreset::BreakKit, std::nullopt},
+        {"Drums", "Minimal kit", "Sparse kick/snare/hats sketch", Session::PatternPreset::MinimalKit, std::nullopt},
+        {"Instruments", "4OSC synth", "Loaded by sound presets", std::nullopt, std::nullopt},
+        {"Instruments", "Theta Drums", "Loaded by drum kit presets", std::nullopt, std::nullopt},
+        {"Instruments", "Utility gain", "Post-instrument gain stage", std::nullopt, std::nullopt},
+        {"Audio FX", "Utility gain", "Always on the audio track", std::nullopt, std::nullopt},
+        {"Audio FX", "EQ", "Insert Tracktion 4-band EQ", std::nullopt, Session::AudioEffect::Equaliser},
+        {"Audio FX", "Reverb", "Insert Tracktion reverb", std::nullopt, Session::AudioEffect::Reverb},
+        {"Audio FX", "Delay", "Insert Tracktion delay", std::nullopt, Session::AudioEffect::Delay},
+        {"Audio FX", "Compressor", "Insert Tracktion compressor", std::nullopt, Session::AudioEffect::Compressor},
+        {"MIDI FX", "Snap 1/16", "Grid quantized note entry", std::nullopt, std::nullopt},
+        {"MIDI FX", "Pattern presets", "Double-click rows to replace notes", std::nullopt, std::nullopt}
     };
 
     list.setRowHeight(38);
@@ -88,7 +92,7 @@ void BrowserPanel::paintListBoxItem(int row, juce::Graphics& g, int width, int h
     if (!juce::isPositiveAndBelow(row, rows.size())) return;
     const auto& item = items[static_cast<size_t>(rows[static_cast<size_t>(row)])];
     g.fillAll(selected ? juce::Colour(0xff34424a) : juce::Colour(row % 2 == 0 ? 0xff20262c : 0xff242a31));
-    g.setColour(item.preset ? juce::Colour(0xffc6d58c) : juce::Colour(0xff8cc5d2));
+    g.setColour(item.preset ? juce::Colour(0xffc6d58c) : item.effect ? juce::Colour(0xffffb15f) : juce::Colour(0xff8cc5d2));
     g.fillRoundedRectangle(8.0f, height * 0.5f - 4.0f, 8.0f, 8.0f, 1.5f);
     g.setFont(juce::FontOptions(14.0f));
     g.setColour(juce::Colour(0xffe5ebef));
@@ -136,6 +140,11 @@ void BrowserPanel::applyRow(int row)
     {
         session.applyPatternPreset(*item.preset);
         if (status) status("Loaded " + item.name);
+    }
+    else if (item.effect)
+    {
+        const auto result = session.addAudioEffect(*item.effect);
+        if (status) status(result.wasOk() ? "Added " + item.name + " to Audio 1" : result.getErrorMessage());
     }
     else if (status)
     {

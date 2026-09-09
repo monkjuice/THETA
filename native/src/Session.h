@@ -18,6 +18,13 @@ public:
         BreakKit,
         MinimalKit
     };
+    enum class AudioEffect
+    {
+        Equaliser,
+        Reverb,
+        Delay,
+        Compressor
+    };
     struct Listener
     {
         virtual ~Listener() = default;
@@ -43,6 +50,7 @@ public:
     void endNoteGesture();
     void clearPattern();
     void applyPatternPreset(PatternPreset);
+    juce::Result addAudioEffect(AudioEffect);
     double tempo() const;
     void setTempo(double bpm);
     void undo();

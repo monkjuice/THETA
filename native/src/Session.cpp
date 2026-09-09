@@ -169,6 +169,32 @@ void Session::setPatternInstrument(bool useDrums)
     edit->state.setProperty("thetaPatternInstrument", useDrums ? "drums" : "synth", &edit->getUndoManager());
 }
 
+juce::Result Session::addAudioEffect(AudioEffect effect)
+{
+    const char* type = nullptr;
+    juce::String name;
+    switch (effect)
+    {
+        case AudioEffect::Equaliser:  type = te::EqualiserPlugin::xmlTypeName;  name = "EQ"; break;
+        case AudioEffect::Reverb:     type = te::ReverbPlugin::xmlTypeName;     name = "Reverb"; break;
+        case AudioEffect::Delay:      type = te::DelayPlugin::xmlTypeName;      name = "Delay"; break;
+        case AudioEffect::Compressor: type = te::CompressorPlugin::xmlTypeName; name = "Compressor"; break;
+    }
+
+    auto* track = te::getAudioTracks(*edit)[1];
+    edit->getUndoManager().beginNewTransaction("Add " + name);
+    auto plugin = edit->getPluginCache().createNewPlugin(type, {});
+    if (plugin == nullptr)
+        return juce::Result::fail(name + " could not be created.");
+    track->pluginList.insertPlugin(plugin, track->pluginList.size(), nullptr);
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
 double Session::tempo() const { return edit->tempoSequence.getTempo(0)->getBpm(); }
 
 void Session::setTempo(double bpm)
