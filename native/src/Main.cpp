@@ -246,6 +246,8 @@ private:
             audioGain.setValue(session.audioUtility->gain().getCurrentValue(), juce::dontSendNotification);
         undo.setEnabled(session.edit->getUndoManager().canUndo());
         redo.setEnabled(session.edit->getUndoManager().canRedo());
+        patternLabel.setText(session.isPatternDrums() ? "PATTERN 1  /  DRUM EDITOR" : "PATTERN 1  /  NOTE EDITOR",
+                             juce::dontSendNotification);
         const auto name = session.projectFile == juce::File{} ? juce::String("Untitled") : session.projectFile.getFileNameWithoutExtension();
         documentName.setText(name + (session.hasUnsavedChanges() ? " *" : ""), juce::dontSendNotification);
     }

@@ -169,6 +169,11 @@ void Session::setPatternInstrument(bool useDrums)
     edit->state.setProperty("thetaPatternInstrument", useDrums ? "drums" : "synth", &edit->getUndoManager());
 }
 
+bool Session::isPatternDrums() const
+{
+    return drums != nullptr && drums->isEnabled();
+}
+
 juce::Result Session::addAudioEffect(AudioEffect effect)
 {
     const char* type = nullptr;

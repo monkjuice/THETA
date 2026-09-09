@@ -3,6 +3,17 @@
 
 namespace theta
 {
+namespace
+{
+juce::String drumLaneName(int pitch)
+{
+    if (pitch == 48) return "Kick";
+    if (pitch == 53) return "Snare";
+    if (pitch == 58) return "Hat";
+    return juce::MidiMessage::getMidiNoteName(pitch, true, true, 4);
+}
+}
+
 StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhead(); })
 {
     setOpaque(true);
@@ -40,11 +51,13 @@ void StepGrid::paint(juce::Graphics& g)
     {
         const auto pitch = Session::lowestNote + Session::pitches - 1 - row;
         const bool black = juce::MidiMessage::isMidiNoteBlack(pitch);
+        const bool namedDrum = session.isPatternDrums() && (pitch == 48 || pitch == 53 || pitch == 58);
         auto key = cell(0, row).withX(0).withWidth(labelWidth - 4);
-        g.setColour(juce::Colour(black ? 0xff15191e : 0xff30373e));
+        g.setColour(juce::Colour(namedDrum ? 0xff3a3325 : black ? 0xff15191e : 0xff30373e));
         g.fillRect(key.reduced(0, 1));
-        g.setColour(juce::Colour(0xffbac2ca));
-        g.drawText(juce::MidiMessage::getMidiNoteName(pitch, true, true, 4), key, juce::Justification::centred);
+        g.setColour(juce::Colour(namedDrum ? 0xffffc16a : 0xffbac2ca));
+        g.drawText(session.isPatternDrums() ? drumLaneName(pitch) : juce::MidiMessage::getMidiNoteName(pitch, true, true, 4),
+                   key, juce::Justification::centred);
         for (int step = 0; step < Session::steps; ++step)
         {
             const auto bounds = cell(step, row).reduced(2.0f, 2.0f);
@@ -113,6 +126,7 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
 void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 {
     std::bitset<Session::steps * Session::pitches> next;
+    const auto nextDrumLabels = session.isPatternDrums();
     for (auto* note : session.pattern().getSequence().getNotes())
     {
         const auto row = Session::lowestNote + Session::pitches - 1 - note->getNoteNumber();
@@ -122,6 +136,12 @@ void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
     }
     const auto changed = next ^ notes;
     notes = next;
+    if (showingDrumLabels != nextDrumLabels)
+    {
+        showingDrumLabels = nextDrumLabels;
+        repaint();
+        return;
+    }
     for (int i = 0; i < Session::steps * Session::pitches; ++i)
         if (changed.test(static_cast<size_t>(i))) repaint(cell(i % Session::steps, i / Session::steps).getSmallestIntegerContainer());
 }

@@ -23,7 +23,7 @@ private:
     void updatePlayhead();
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited;
-    bool drawing = false, adding = true;
+    bool drawing = false, adding = true, showingDrumLabels = false;
     int lastHit = -1;
     float playhead = -1.0f;
     juce::VBlankAttachment vblank;

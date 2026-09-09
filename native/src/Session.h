@@ -58,6 +58,7 @@ public:
     void endNoteGesture();
     void clearPattern();
     void applyPatternPreset(PatternPreset);
+    bool isPatternDrums() const;
     juce::Result addAudioEffect(AudioEffect);
     std::vector<DeviceSlot> deviceSlots(int track) const;
     juce::Result toggleDeviceEnabled(int track, int slot);
