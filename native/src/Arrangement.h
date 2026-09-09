@@ -23,6 +23,7 @@ public:
     void fit();
     std::function<void(juce::String)> status;
 private:
+    friend int runArrangementTest();
     struct Waveform;
     struct ClipView
     {

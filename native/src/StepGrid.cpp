@@ -1,4 +1,5 @@
 #include "StepGrid.h"
+#include "Playhead.h"
 
 namespace theta
 {
@@ -135,11 +136,9 @@ void StepGrid::updatePlayhead()
         if (beat >= 0.0 && beat < 4.0)
             next = static_cast<int>(labelWidth + beat / 4.0 * (getWidth() - labelWidth));
     }
-    if (next == playhead) return;
-    if (playhead >= 0) repaint(playhead, 0, 2, getHeight());
-    playhead = next;
-    if (playhead >= 0) repaint(playhead, 0, 2, getHeight());
+    movePlayhead(*this, playhead, next,
+                 getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight)));
 }
 
-void StepGrid::resized() { playhead = -1; repaint(); }
+void StepGrid::resized() { updatePlayhead(); repaint(); }
 }

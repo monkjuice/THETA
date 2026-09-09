@@ -1,4 +1,5 @@
 #include "Arrangement.h"
+#include "Playhead.h"
 #include <set>
 
 namespace theta
@@ -179,8 +180,8 @@ void Arrangement::resized()
         solo[i].setBounds(62, static_cast<int>(lane(i).getY()) + 38, 42, 26);
     }
     scroll.setBounds(static_cast<int>(headerWidth), getHeight() - 14, getWidth() - static_cast<int>(headerWidth), 14);
-    playhead = -1;
     updateScroll();
+    updatePlayhead();
 }
 
 void Arrangement::sync()
@@ -229,7 +230,7 @@ void Arrangement::fit()
     viewStart = 0.0;
     viewSpan = std::max(4.0, songEnd * 1.1);
     updateScroll();
-    playhead = -1;
+    updatePlayhead();
     repaint();
 }
 
@@ -240,7 +241,7 @@ void Arrangement::zoom(double factor, double anchor)
     viewSpan = std::clamp(viewSpan * factor, 0.25, std::max(60.0, songEnd * 2.0));
     viewStart = std::max(0.0, anchor - viewSpan * fraction);
     updateScroll();
-    playhead = -1;
+    updatePlayhead();
     repaint();
 }
 
@@ -248,7 +249,7 @@ void Arrangement::scrollBarMoved(juce::ScrollBar*, double start)
 {
     cancelDrag();
     viewStart = start;
-    playhead = -1;
+    updatePlayhead();
     repaint();
 }
 
@@ -273,6 +274,7 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
     {
         session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(std::max(0.0, timeAt(event.position.x))));
+        updatePlayhead();
         return;
     }
     const auto index = hit(event.position);
@@ -344,7 +346,7 @@ void Arrangement::mouseWheelMove(const juce::MouseEvent& event, const juce::Mous
     {
         viewStart -= (std::abs(wheel.deltaX) > std::abs(wheel.deltaY) ? wheel.deltaX : wheel.deltaY) * viewSpan * 0.3;
         updateScroll();
-        playhead = -1;
+        updatePlayhead();
         repaint();
     }
 }
@@ -379,9 +381,7 @@ void Arrangement::updatePlayhead()
         const auto x = xFor(session.edit->getTransport().getPosition().inSeconds());
         if (x >= headerWidth && x < getWidth()) next = static_cast<int>(x);
     }
-    if (next == playhead) return;
-    if (playhead >= 0) repaint(playhead, static_cast<int>(rulerTop), 2, getHeight() - static_cast<int>(rulerTop) - 18);
-    playhead = next;
-    if (playhead >= 0) repaint(playhead, static_cast<int>(rulerTop), 2, getHeight() - static_cast<int>(rulerTop) - 18);
+    movePlayhead(*this, playhead, next,
+                 getLocalBounds().withTrimmedTop(static_cast<int>(rulerTop)).withTrimmedBottom(18));
 }
 }

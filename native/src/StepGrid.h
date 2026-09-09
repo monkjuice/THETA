@@ -15,6 +15,7 @@ public:
     void mouseUp(const juce::MouseEvent&) override;
     void resized() override;
 private:
+    friend int runArrangementTest();
     juce::Rectangle<float> cell(int step, int row) const;
     int hit(juce::Point<float>) const;
     void apply(int index);

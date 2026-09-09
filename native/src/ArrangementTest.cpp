@@ -1,5 +1,7 @@
 #include "Arrangement.h"
 #include "Theme.h"
+#include "StepGrid.h"
+#include "Playhead.h"
 #include <stdexcept>
 
 namespace theta
@@ -31,13 +33,75 @@ int runArrangementTest()
             require(writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples()), "Write fixture");
         }
         Session session;
-        require(session.importAudio(source.getFile()).wasOk(), "Import audio");
-        auto* clip = te::getAudioTracks(*session.edit)[1]->getClips()[0];
-        const auto id = clip->itemID;
         Theme theme;
         Arrangement view(session);
         view.setLookAndFeel(&theme);
         view.setSize(1000, 246);
+        view.fit();
+
+        // Compare incremental frames to complete renders, including fractional
+        // Windows display scales, wraparound, seeks, and hiding the playhead.
+        StepGrid grid(session);
+        grid.setSize(1000, 250);
+        const auto checkPlayhead = [&require](juce::Component& panel, int& position, juce::Rectangle<int> area)
+        {
+            for (const auto scale : {1.0f, 1.25f, 1.5f, 2.0f})
+            {
+                const auto render = [&panel, scale](juce::Image& target, juce::Rectangle<int> dirty)
+                {
+                    juce::Graphics g(target);
+                    // Native damage is an outward-rounded physical-pixel region,
+                    // not an antialiased fractional clip applied over old pixels.
+                    g.reduceClipRegion((dirty.toFloat() * scale).getSmallestIntegerContainer());
+                    g.addTransform(juce::AffineTransform::scale(scale));
+                    panel.paint(g);
+                };
+                juce::Image frame(juce::Image::RGB, juce::roundToInt(panel.getWidth() * scale),
+                                  juce::roundToInt(panel.getHeight() * scale), true);
+                position = -1;
+                render(frame, panel.getLocalBounds());
+                for (const auto next : {150, 151, 155, 420, 998, 150, -1})
+                {
+                    const auto damage = playheadDamage(position, next, area);
+                    movePlayhead(panel, position, next, area);
+                    render(frame, damage);
+                    juce::Image expected(juce::Image::RGB, frame.getWidth(), frame.getHeight(), true);
+                    render(expected, panel.getLocalBounds());
+                    for (int y = 0; y < frame.getHeight(); ++y)
+                        for (int x = 0; x < frame.getWidth(); ++x)
+                        {
+                            if (frame.getPixelAt(x, y) != expected.getPixelAt(x, y))
+                                std::fprintf(stderr, "%s scale %.2f next %d pixel %d,%d actual %s expected %s\n",
+                                             panel.getTitle().toRawUTF8(), scale, next, x, y,
+                                             frame.getPixelAt(x, y).toString().toRawUTF8(), expected.getPixelAt(x, y).toString().toRawUTF8());
+                            require(frame.getPixelAt(x, y) == expected.getPixelAt(x, y),
+                                    "Incremental playhead frame must match full render without trails or missing pixels");
+                        }
+                }
+            }
+        };
+        checkPlayhead(view, view.playhead, view.getLocalBounds().withTrimmedTop(32).withTrimmedBottom(18));
+        checkPlayhead(grid, grid.playhead, grid.getLocalBounds().withTrimmedTop(26));
+
+        // isShowing() requires a visible desktop peer. Keep this tiny navigation
+        // check offscreen and remove the peer before exercising clip gestures.
+        view.setTopLeftPosition(-10000, -10000);
+        view.addToDesktop(0);
+        view.setVisible(true);
+        session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(0.5));
+        view.zoom(0.5, 0.5);
+        require(view.playhead == static_cast<int>(view.xFor(0.5)), "Zoom must keep the playhead visible before the next vblank");
+        view.fit();
+        require(view.playhead == static_cast<int>(view.xFor(0.5)), "Fit must update the playhead immediately");
+        session.stop();
+        view.setVisible(false);
+        view.removeFromDesktop();
+
+        // Start asynchronous waveform scanning after the deterministic frame check.
+        require(session.importAudio(source.getFile()).wasOk(), "Import audio");
+        auto* clip = te::getAudioTracks(*session.edit)[1]->getClips()[0];
+        const auto id = clip->itemID;
+        view.sync();
         view.fit();
 
         const auto event = [&view](juce::Point<float> down, juce::Point<float> point, bool dragged)
