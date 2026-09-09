@@ -1,0 +1,284 @@
+// SPDX-FileCopyrightText: © 2019-2021, 2024, 2026 Alexandros Theodotou <alex@zrythm.org>
+// SPDX-License-Identifier: LicenseRef-ZrythmLicense
+/*
+ * This file incorporates work covered by the following copyright and
+ * permission notice:
+ *
+ * ---
+ *
+ * Copyright (C) 2017, 2019 Robin Gareus <robin@gareus.org>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * ---
+ */
+
+#pragma once
+
+#include "dsp/fork_join_executor.h"
+#include "dsp/graph_node.h"
+#include "utils/rt_thread_id.h"
+
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_core/juce_core.h>
+#include <moodycamel/lightweightsemaphore.h>
+#include <rigtorp/MPMCQueue.h>
+
+namespace zrythm::dsp::graph
+{
+
+class GraphThread;
+
+/**
+ * @brief Manages the scheduling and execution of a graph of DSP nodes.
+ *
+ * The GraphScheduler class is responsible for managing the lifecycle of the
+ * graph nodes, including starting and terminating the processing threads,
+ * triggering the processing of nodes, and coordinating the overall execution
+ * of the graph.
+ *
+ * The class provides methods to rechain the graph nodes, start and terminate
+ * the processing threads, and run a processing cycle. It also includes
+ * various internal data structures and synchronization primitives to
+ * facilitate the efficient parallel processing of the graph.
+ *
+ * TODO: investigate work contracts as a replacement of task queues:
+ * https://github.com/buildingcpp/work_contract
+ */
+class GraphScheduler
+{
+  friend class GraphThread;
+  static constexpr int MAX_GRAPH_THREADS = 128;
+
+public:
+  /**
+   * @brief Request for a function to run on the main thread (blocking).
+   */
+  using RunOnMainThreadFunc = std::function<void (std::function<void ()>)>;
+
+  /**
+   * @brief Construct a new Graph Scheduler.
+   *
+   * @param sample_rate Sample rate.
+   * @param max_block_length Maximum block length @ref run_cycle() is expected
+   * to be called with.
+   * @param realtime_threads Whether to use threads with realtime privileges.
+   * @param thread_workgroup Optional workgroup (used on Mac).
+   */
+  GraphScheduler (
+    RunOnMainThreadFunc                 run_on_main_thread_func,
+    units::sample_rate_t                sample_rate,
+    units::sample_u32_t                 max_block_length,
+    bool                                realtime_threads = true,
+    std::optional<juce::AudioWorkgroup> thread_workgroup = std::nullopt);
+  // copy/move don't make sense here
+  GraphScheduler (const GraphScheduler &) = delete;
+  GraphScheduler &operator= (const GraphScheduler &) = delete;
+  GraphScheduler (GraphScheduler &&) = delete;
+  GraphScheduler &operator= (GraphScheduler &&) = delete;
+  ~GraphScheduler ();
+
+  /**
+   * @brief Steals the nodes from the given collection and prepares for
+   * processing.
+   *
+   * @warning Nodes added here are expected to be unique for their
+   * IProcessable's. This means that an IProcessable-derived object may not be
+   * in more than one graph at a time, otherwise @ref release_node_resources()
+   * may be called while another graph is using them. FIXME: alleviate this
+   * but passing the graph to prepare_for_processing/release_resources and
+   * having each processable have a separate cache per graph.
+   *
+   * @param nodes Nodes to steal.
+   * @param sample_rate The current sample rate to prepare the nodes for.
+   * @param block_length The current block length to prepare the nodes for.
+   */
+  void rechain_from_node_collection (
+    GraphNodeCollection &&nodes,
+    units::sample_rate_t  sample_rate,
+    units::sample_u32_t   max_block_length);
+
+  /**
+   * Starts the threads that will be processing the graph.
+   *
+   * @param num_threads Number of threads to use. If not set, uses an
+   * appropriate number based on the number of cores. If set, the number will
+   * be clamped to reasonable bounds.
+   * @throw ZrythmException on failure.
+   */
+  void start_threads (std::optional<int> num_threads = std::nullopt);
+
+  /**
+   * Tell all threads to terminate.
+   */
+  void terminate_threads ();
+
+  auto &get_nodes () { return graph_nodes_; }
+
+  /**
+   * @brief To be called repeatedly by a system audio callback thread.
+   *
+   * @param time_nfo
+   * @param remaining_preroll_frames
+   * @param transport Transport state for this cycle
+   * @param tempo_map Tempo map for this cycle
+   */
+  void run_cycle (
+    dsp::graph::ProcessBlockInfo time_nfo,
+    units::sample_u64_t          remaining_preroll_frames,
+    const dsp::ITransport       &transport,
+    const dsp::TempoMap         &tempo_map);
+
+  /**
+   * @brief Returns whether the given thread is one of the graph threads.
+   */
+  bool contains_thread (RTThreadId::IdType thread_id);
+
+  auto get_time_nfo () const { return time_nfo_; }
+  auto get_remaining_preroll_frames () const
+  {
+    return remaining_preroll_frames_;
+  }
+
+  /**
+   * @brief Returns the ITransport instance to be used in this cycle.
+   *
+   * To be called during processing for example by GraphNode's.
+   * @return auto&
+   */
+  auto &get_transport_for_this_cycle () const
+  {
+    assert (current_transport_.has_value ());
+    return current_transport_->get ();
+  }
+
+  /**
+   * @brief Returns the TempoMap instance to be used in this cycle.
+   *
+   * To be called during processing for example by GraphNode's.
+   * @return auto&
+   */
+  auto &get_tempo_map_for_this_cycle () const
+  {
+    assert (current_tempo_map_.has_value ());
+    return current_tempo_map_->get ();
+  }
+
+private:
+  /**
+   * Called when an upstream (parent) node has completed processing.
+   */
+  [[gnu::hot]] void trigger_node (GraphNode &node);
+
+  /**
+   * @brief Called before calling run_cycle() to make sure each node has
+   * its buffers ready.
+   */
+  void prepare_nodes_for_processing ();
+
+  /**
+   * @brief Called when processing is finished (in this destructor) to clean up
+   * resources allocated by @ref prepare_for_processing().
+   */
+  void release_node_resources ();
+
+private:
+  struct ThreadSet;
+  std::unique_ptr<ThreadSet> thread_set_;
+  [[nodiscard]] size_t num_threads () const noexcept [[clang::nonblocking]];
+
+  /**
+   * @brief Time info for the current process cycle.
+   */
+  dsp::graph::ProcessBlockInfo time_nfo_;
+
+  /**
+   * @brief Transport for the current process cycle.
+   */
+  std::optional<std::reference_wrapper<const dsp::ITransport>> current_transport_;
+
+  /**
+   * @brief TempoMap for the current process cycle.
+   */
+  std::optional<std::reference_wrapper<const dsp::TempoMap>> current_tempo_map_;
+
+  /**
+   * @brief Number of preroll frames remaining in the current process cycle.
+   */
+  units::sample_u64_t remaining_preroll_frames_;
+
+  /** Synchronization with main process callback. */
+  moodycamel::LightweightSemaphore callback_start_sem_{ 0 };
+  moodycamel::LightweightSemaphore callback_done_sem_{ 0 };
+
+  /** Number of threads waiting for work. */
+  std::atomic<int> idle_thread_cnt_ = 0;
+
+  /**
+   * @brief Set while @ref rechain_from_node_collection() replaces the
+   * trigger queue.
+   *
+   * Workers that wake up while this is set go back to sleep without
+   * accessing the queue. They are still counted in @ref idle_thread_cnt_
+   * between waking up and decrementing the counter, so the idle-count wait
+   * in rechain alone cannot tell whether a woken worker is about to access
+   * the queue.
+   */
+  std::atomic<bool> rechain_pending_{ false };
+
+  /** Wake up graph node process threads. */
+  // This is not a std::counting_semaphore due to issues on MSVC/Windows.
+  moodycamel::LightweightSemaphore trigger_sem_{ 0 };
+
+  /** Queue containing nodes that can be processed. */
+  std::optional<rigtorp::MPMCQueue<GraphNode *>> trigger_queue_{
+    std::in_place, 8
+  };
+
+  /**
+   * @brief Live graph nodes.
+   */
+  GraphNodeCollection graph_nodes_;
+
+  /** Remaining unprocessed terminal nodes in this cycle. */
+  std::atomic<int> terminal_refcnt_ = 0;
+
+  /**
+   * @brief If this contains a value, realtime threads will be created with
+   * these options, otherwise default options will be used.
+   */
+  std::optional<juce::Thread::RealtimeOptions> realtime_thread_options_;
+
+  /** Audio workgroup for threads. */
+  std::optional<juce::AudioWorkgroup> thread_workgroup_;
+
+  /**
+   * @brief Fork-join executor for intra-node parallel work.
+   *
+   * Started/stopped together with the graph threads (@ref start_threads /
+   * @ref terminate_threads) with as many workers as there are graph worker
+   * threads, and handed to nodes each cycle via
+   * @ref ProcessBlockInfo::fork_join_executor_. Its workers are separate
+   * from the graph workers so that a graph worker blocked in exec() never
+   * consumes the threads its tasks run on.
+   */
+  ForkJoinExecutor fork_join_executor_;
+
+  units::sample_rate_t sample_rate_;
+  units::sample_u32_t  max_block_length_;
+
+  RunOnMainThreadFunc run_on_main_thread_func_;
+};
+
+} // namespace zrythm::dsp::graph

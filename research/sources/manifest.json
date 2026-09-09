@@ -1,0 +1,344 @@
+[
+  {
+    "repository": "ardour",
+    "path": "libs/ardour/ardour/audioengine.h",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/libs/ardour/ardour/audioengine.h",
+    "local": "ardour/libs__ardour__ardour__audioengine.h.txt",
+    "sha256": "dcbfbd07bce68fd9b4f770e28ee6307a59236ecc80cad5df0789b0215d768b3c",
+    "bytes": 10616
+  },
+  {
+    "repository": "ardour",
+    "path": "libs/ardour/ardour/processor.h",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/libs/ardour/ardour/processor.h",
+    "local": "ardour/libs__ardour__ardour__processor.h.txt",
+    "sha256": "4b71910f7d4e895f45d846a13a2919c085cd56b7ce3c4ae628b6160e1c6b6a83",
+    "bytes": 7491
+  },
+  {
+    "repository": "ardour",
+    "path": "libs/ardour/ardour/region.h",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/libs/ardour/ardour/region.h",
+    "local": "ardour/libs__ardour__ardour__region.h.txt",
+    "sha256": "1c87c113079d256cff2d9855491cf352cd650b9e8b363b42df36ef485f68de81",
+    "bytes": 26721
+  },
+  {
+    "repository": "ardour",
+    "path": "libs/ardour/ardour/graph.h",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/libs/ardour/ardour/graph.h",
+    "local": "ardour/libs__ardour__ardour__graph.h.txt",
+    "sha256": "8a07499741fa4a297103dce80b961ce86aa3ac1648a53b478fee231cd9a852a0",
+    "bytes": 4402
+  },
+  {
+    "repository": "ardour",
+    "path": "libs/ardour/session_process.cc",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/libs/ardour/session_process.cc",
+    "local": "ardour/libs__ardour__session_process.cc.txt",
+    "sha256": "6ad14c1b405e9ff5675c14ba94a790a1e148d42c9ebcf6a87a27cff669936a46",
+    "bytes": 54465
+  },
+  {
+    "repository": "ardour",
+    "path": "libs/ardour/disk_reader.cc",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/libs/ardour/disk_reader.cc",
+    "local": "ardour/libs__ardour__disk_reader.cc.txt",
+    "sha256": "63f588feaae0b76cc276a3b8a9dff164b5a0947e19d5400229bccf7a722b3ec9",
+    "bytes": 61883
+  },
+  {
+    "repository": "ardour",
+    "path": "COPYING",
+    "commit": "e5a21ea1946e3f084c4c34a79206357abf058aa6",
+    "url": "https://github.com/Ardour/ardour/blob/e5a21ea1946e3f084c4c34a79206357abf058aa6/COPYING",
+    "local": "ardour/COPYING.txt",
+    "sha256": "ef1ec8140a63fbdb3e91a8e41b0d8e6773c97c9c636eabff121b2cdbd1145ff6",
+    "bytes": 16291
+  },
+  {
+    "repository": "lmms",
+    "path": "include/AudioEngine.h",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/include/AudioEngine.h",
+    "local": "lmms/include__AudioEngine.h.txt",
+    "sha256": "f7e4629f87d954d097274987fcf2fc919b377c54c7140ed3d8ac18c91d894d9b",
+    "bytes": 11200
+  },
+  {
+    "repository": "lmms",
+    "path": "include/Instrument.h",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/include/Instrument.h",
+    "local": "lmms/include__Instrument.h.txt",
+    "sha256": "c5543e02819a79c1494cfe5e458a00f9ef02f778d40e59e64c6bbd88ca02a1c5",
+    "bytes": 5473
+  },
+  {
+    "repository": "lmms",
+    "path": "include/Effect.h",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/include/Effect.h",
+    "local": "lmms/include__Effect.h.txt",
+    "sha256": "895b9c778074b295b81cf3bec3e526c7c8e62ce98f21f259c746219590508dab",
+    "bytes": 5006
+  },
+  {
+    "repository": "lmms",
+    "path": "include/AutomatableModel.h",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/include/AutomatableModel.h",
+    "local": "lmms/include__AutomatableModel.h.txt",
+    "sha256": "fba00d4e8ea504fbd4fddd2a593dd511e49c2ea6b6e1f07b07d9c72f7070bec7",
+    "bytes": 13015
+  },
+  {
+    "repository": "lmms",
+    "path": "src/core/AudioEngine.cpp",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/src/core/AudioEngine.cpp",
+    "local": "lmms/src__core__AudioEngine.cpp.txt",
+    "sha256": "d7c2e79e108fbe324792ab51487fc8330c8d9b55e757b0f500aafe0b8c693bb9",
+    "bytes": 20558
+  },
+  {
+    "repository": "lmms",
+    "path": "src/core/Song.cpp",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/src/core/Song.cpp",
+    "local": "lmms/src__core__Song.cpp.txt",
+    "sha256": "f99783ac6718cafb4c041cbbe9ee2102c52155456e736adec289abea208af0ca",
+    "bytes": 36634
+  },
+  {
+    "repository": "lmms",
+    "path": "README.md",
+    "commit": "4e677cb6c6ab7ac8bec221097053753c1eb273e3",
+    "url": "https://github.com/LMMS/lmms/blob/4e677cb6c6ab7ac8bec221097053753c1eb273e3/README.md",
+    "local": "lmms/README.md.txt",
+    "sha256": "0927de10c728101e40b887099a17d7a8bc1ab5aef41d7028b0379e9af5ec2269",
+    "bytes": 3132
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/dsp/engine.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/dsp/engine.h",
+    "local": "zrythm/src__dsp__engine.h.txt",
+    "sha256": "bc25719277158cb3fd0dbd9b91ebde85cce71b61f4da3462c2addbc64d263bc7",
+    "bytes": 12599
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/dsp/graph_scheduler.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/dsp/graph_scheduler.h",
+    "local": "zrythm/src__dsp__graph_scheduler.h.txt",
+    "sha256": "06d253b4af6620c5916b98503e0d2a28ef5afa5b5214df4c1bc4a98b27075e53",
+    "bytes": 9406
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/dsp/graph_builder.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/dsp/graph_builder.h",
+    "local": "zrythm/src__dsp__graph_builder.h.txt",
+    "sha256": "7b03b256edd685608760493558f71fa98c5508c23934296a9a5388c3713b04f8",
+    "bytes": 838
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/dsp/processor_base.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/dsp/processor_base.h",
+    "local": "zrythm/src__dsp__processor_base.h.txt",
+    "sha256": "9ffe64fc13ea067e819ff9d2b7dac3974bef0ca2467f1a2f97bd0a9dd860079c",
+    "bytes": 11977
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/dsp/parameter.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/dsp/parameter.h",
+    "local": "zrythm/src__dsp__parameter.h.txt",
+    "sha256": "a9ede2a0c01ba82732316c0cb8f5b60da379d8aac1c1bdd7ab63d24bd582d7ae",
+    "bytes": 18073
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/dsp/playhead_qml_adapter.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/dsp/playhead_qml_adapter.h",
+    "local": "zrythm/src__dsp__playhead_qml_adapter.h.txt",
+    "sha256": "c4848975b80dc33e3beedbdda9aead0dddb6037870f47fa7eab9793efe556d21",
+    "bytes": 916
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/commands/change_parameter_value_command.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/commands/change_parameter_value_command.h",
+    "local": "zrythm/src__commands__change_parameter_value_command.h.txt",
+    "sha256": "3f40b9b445a30c3bf0846ad5195a8bd6463161009d5e26466bae6b26a9816ea6",
+    "bytes": 1823
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/engine-process/ipc_message.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/engine-process/ipc_message.h",
+    "local": "zrythm/src__engine-process__ipc_message.h.txt",
+    "sha256": "3ffca6decb9ff4dc3d9c277e33c1688a1e0c3b3dfeaa5daf174b81ebf2949721",
+    "bytes": 752
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/engine-process/audio_engine_application.cpp",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/engine-process/audio_engine_application.cpp",
+    "local": "zrythm/src__engine-process__audio_engine_application.cpp.txt",
+    "sha256": "dea051e2253905608cc907d2dac24d629354977f3fe2262b60056867695c6f65",
+    "bytes": 3846
+  },
+  {
+    "repository": "zrythm",
+    "path": "README.md",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/README.md",
+    "local": "zrythm/README.md.txt",
+    "sha256": "153e88d9007bb90862417a3515d3e0e2d8332c89c3090acb7f6841321b10958e",
+    "bytes": 9475
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/plugins/tracktion_Plugin.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/plugins/tracktion_Plugin.h",
+    "local": "tracktion/modules__tracktion_engine__plugins__tracktion_Plugin.h.txt",
+    "sha256": "0d47104e8ba2555f55e939e3292e5ac308ba548f56a088ac87714b0c29e9bf9b",
+    "bytes": 29628
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/model/edit/tracktion_Edit.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/model/edit/tracktion_Edit.h",
+    "local": "tracktion/modules__tracktion_engine__model__edit__tracktion_Edit.h.txt",
+    "sha256": "48dfd7ac69e95e5257734c24783c9c867c9c499d8af4e396cbafb826d84a5a33",
+    "bytes": 47577
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_graph/tracktion_graph/tracktion_Node.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_graph/tracktion_graph/tracktion_Node.h",
+    "local": "tracktion/modules__tracktion_graph__tracktion_graph__tracktion_Node.h.txt",
+    "sha256": "711b8041bef75c939d818b6599512b34be38b49678f982fb227fdde5cd509418",
+    "bytes": 32404
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/playback/graph/tracktion_ArrangerLauncherSwitchingNode.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/playback/graph/tracktion_ArrangerLauncherSwitchingNode.h",
+    "local": "tracktion/modules__tracktion_engine__playback__graph__tracktion_ArrangerLauncherSwitchingNode.h.txt",
+    "sha256": "a36a05bc11d1c4fe310d7ac73b06454d74b7d8e6f0e8f934c79b1809f460a520",
+    "bytes": 6553
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/playback/graph/tracktion_PluginNode.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/playback/graph/tracktion_PluginNode.h",
+    "local": "tracktion/modules__tracktion_engine__playback__graph__tracktion_PluginNode.h.txt",
+    "sha256": "11adef8404e732120a2cb8a243e001c258641848cf8cf8f62b5865e63747b340",
+    "bytes": 3776
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/model/clips/tracktion_WaveAudioClip.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/model/clips/tracktion_WaveAudioClip.h",
+    "local": "tracktion/modules__tracktion_engine__model__clips__tracktion_WaveAudioClip.h.txt",
+    "sha256": "22fb02bc7d1494534acd2d9f953d5abeef8ca242f2effeb15ff4bd681a813d43",
+    "bytes": 5050
+  },
+  {
+    "repository": "tracktion",
+    "path": "LICENSE.md",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/LICENSE.md",
+    "local": "tracktion/LICENSE.md.txt",
+    "sha256": "d86b440f57d2138af510a4d2ba8fdfcc6f7277f443923d5d651004ff7ad58f86",
+    "bytes": 748
+  },
+  {
+    "repository": "tracktion",
+    "path": "FEATURES.md",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/FEATURES.md",
+    "local": "tracktion/FEATURES.md.txt",
+    "sha256": "5fd9054743a26d33ee11a9a9563a223832891178e0840c6012d64735cea9d08b",
+    "bytes": 4741
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/plugins/tracktion_PluginManager.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/plugins/tracktion_PluginManager.h",
+    "local": "tracktion/modules__tracktion_engine__plugins__tracktion_PluginManager.h.txt",
+    "sha256": "9fc72b546dc9c1371c720d0e696dbb5d3433d34972d7f8dafd7e7b96d3a5b08a",
+    "bytes": 6017
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/audio_files/tracktion_AudioFileCache.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/audio_files/tracktion_AudioFileCache.h",
+    "local": "tracktion/modules__tracktion_engine__audio_files__tracktion_AudioFileCache.h.txt",
+    "sha256": "55ab869bfad859c9e30c0ae89971cdf89f6f1d648c435fa8b5d8f8c8e3dec6d1",
+    "bytes": 5506
+  },
+  {
+    "repository": "tracktion",
+    "path": "modules/tracktion_engine/model/automation/tracktion_AutomatableParameter.h",
+    "commit": "4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86",
+    "url": "https://github.com/Tracktion/tracktion_engine/blob/4536d8a21664fe6ec2aa34b25abc87fa2a0d3b86/modules/tracktion_engine/model/automation/tracktion_AutomatableParameter.h",
+    "local": "tracktion/modules__tracktion_engine__model__automation__tracktion_AutomatableParameter.h.txt",
+    "sha256": "bdb2f016ee219f0ca9823e15c5f9e09113b2f6697ccacd11f4d83d72b6e870cc",
+    "bytes": 18580
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/gui/qml/components/arranger/Timeline.qml",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/gui/qml/components/arranger/Timeline.qml",
+    "local": "zrythm/src__gui__qml__components__arranger__Timeline.qml.txt",
+    "sha256": "4eba00945b7043513620d6a9a8672c47d7928940fb968dadea20b079cee70733",
+    "bytes": 34229
+  },
+  {
+    "repository": "zrythm",
+    "path": "src/gui/qquick/waveform_canvas_renderer.h",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/src/gui/qquick/waveform_canvas_renderer.h",
+    "local": "zrythm/src__gui__qquick__waveform_canvas_renderer.h.txt",
+    "sha256": "5de83871ad7d2d2f2b43cc9b06a9c47932a9ebcdb8e5d6be4e90e06c61b7a0ec",
+    "bytes": 5476
+  },
+  {
+    "repository": "zrythm",
+    "path": "LICENSES/LicenseRef-ZrythmLicense.txt",
+    "commit": "a6ac5800f29dbed14d84bc39479665e286b42c8a",
+    "url": "https://github.com/zrythm/zrythm/blob/a6ac5800f29dbed14d84bc39479665e286b42c8a/LICENSES/LicenseRef-ZrythmLicense.txt",
+    "local": "zrythm/LICENSES__LicenseRef-ZrythmLicense.txt.txt",
+    "sha256": "85e37e7c4bcb5aa152f094acfeb5d141a503f96aa9d6be54525d410151fb2a47",
+    "bytes": 35717
+  }
+]

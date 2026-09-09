@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# Preserve upstream study snapshots byte-for-byte for their recorded hashes.
+research/sources/** -text
