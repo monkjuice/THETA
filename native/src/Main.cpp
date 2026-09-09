@@ -4,6 +4,7 @@
 #include "Theme.h"
 #include "Arrangement.h"
 #include "BrowserPanel.h"
+#include "DeviceRack.h"
 #include "StartupScreen.h"
 #include <stdexcept>
 
@@ -15,13 +16,14 @@ class ControlWindow final : public juce::Component,
                             private juce::Timer
 {
 public:
-    explicit ControlWindow(Session& s) : session(s), browser(s), grid(s), arrangement(s), files(s)
+    explicit ControlWindow(Session& s) : session(s), browser(s), grid(s), arrangement(s), rack(s), files(s)
     {
         setOpaque(true);
         files.status = [this](const juce::String& message) { status.setText(message, juce::dontSendNotification); };
         files.loadingChanged = [this](bool loading) { setEnabled(!loading); };
         arrangement.status = files.status;
         browser.status = files.status;
+        rack.status = files.status;
         open.onClick = [this] { files.open(); };
         save.onClick = [this] { files.save(); };
         title.setText("THETA", juce::dontSendNotification);
@@ -104,7 +106,7 @@ public:
         };
         for (auto* component : std::initializer_list<juce::Component*>{
                  &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &import, &settings,
-                 &browser, &grid, &arrangement, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
+                 &browser, &grid, &arrangement, &rack, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
         session.addChangeListener(this);
@@ -133,7 +135,7 @@ public:
     {
         g.fillAll(juce::Colour(0xff171a1e));
         g.setColour(juce::Colour(0xff24282d));
-        g.fillRoundedRectangle(24.0f, static_cast<float>(getHeight() - 78), static_cast<float>(getWidth() - 48), 54.0f, 8.0f);
+        g.fillRoundedRectangle(262.0f, static_cast<float>(getHeight() - 78), static_cast<float>(getWidth() - 286), 54.0f, 8.0f);
     }
 
     void resized() override
@@ -159,7 +161,8 @@ public:
         browser.setBounds(0, 104, browserWidth, getHeight() - 104);
         arrangement.setBounds(editorX, 174, editorW, 246);
         patternLabel.setBounds(editorX, 430, editorW, 24);
-        grid.setBounds(editorX, 464, editorW, getHeight() - 590);
+        grid.setBounds(editorX, 464, editorW, getHeight() - 684);
+        rack.setBounds(editorX, getHeight() - 206, editorW, 82);
         hint.setBounds(editorX, getHeight() - 117, editorW, 28);
         const auto half = (editorW - 28) / 2;
         gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
@@ -260,6 +263,7 @@ private:
     BrowserPanel browser;
     StepGrid grid;
     Arrangement arrangement;
+    DeviceRack rack;
     juce::Slider tempo;
     juce::TextButton undo {"Undo"}, redo {"Redo"}, clear {"Clear"};
     juce::TextButton play {"Play"}, stop {"Stop"}, import {"Add audio"}, settings {"Audio settings"};

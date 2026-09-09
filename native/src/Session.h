@@ -2,6 +2,7 @@
 #include "UtilityDevice.h"
 #include "DrumDevice.h"
 #include "ClipGeometry.h"
+#include <vector>
 
 namespace theta
 {
@@ -24,6 +25,13 @@ public:
         Reverb,
         Delay,
         Compressor
+    };
+    struct DeviceSlot
+    {
+        juce::String name;
+        juce::String type;
+        bool enabled = true;
+        bool removable = false;
     };
     struct Listener
     {
@@ -51,6 +59,9 @@ public:
     void clearPattern();
     void applyPatternPreset(PatternPreset);
     juce::Result addAudioEffect(AudioEffect);
+    std::vector<DeviceSlot> deviceSlots(int track) const;
+    juce::Result toggleDeviceEnabled(int track, int slot);
+    juce::Result deleteDevice(int track, int slot);
     double tempo() const;
     void setTempo(double bpm);
     void undo();

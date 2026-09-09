@@ -195,6 +195,56 @@ juce::Result Session::addAudioEffect(AudioEffect effect)
     return juce::Result::ok();
 }
 
+std::vector<Session::DeviceSlot> Session::deviceSlots(int track) const
+{
+    std::vector<DeviceSlot> slots;
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size())) return slots;
+    for (auto* plugin : tracks[track]->pluginList)
+    {
+        if (plugin == nullptr) continue;
+        const auto type = plugin->getPluginType();
+        slots.push_back({plugin->getDisplayName(), type, plugin->isEnabled(),
+                         track == 1 && type != UtilityDevice::xmlTypeName});
+    }
+    return slots;
+}
+
+juce::Result Session::toggleDeviceEnabled(int track, int slot)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return juce::Result::fail("Select a device first.");
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr) return juce::Result::fail("Select a device first.");
+    edit->getUndoManager().beginNewTransaction(plugin->isEnabled() ? "Bypass device" : "Enable device");
+    plugin->setEnabled(!plugin->isEnabled());
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::deleteDevice(int track, int slot)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return juce::Result::fail("Select a removable device first.");
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr || track != 1 || plugin->getPluginType() == UtilityDevice::xmlTypeName)
+        return juce::Result::fail("Core devices stay in the starter track chain.");
+    edit->getUndoManager().beginNewTransaction("Delete device");
+    plugin->removeFromParent();
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
 double Session::tempo() const { return edit->tempoSequence.getTempo(0)->getBpm(); }
 
 void Session::setTempo(double bpm)
