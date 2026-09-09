@@ -93,6 +93,15 @@ int runArrangementTest()
         checkPlayhead(view, view.playhead, view.getLocalBounds().withTrimmedTop(32).withTrimmedBottom(18));
         checkPlayhead(grid, grid.playhead, grid.getLocalBounds().withTrimmedTop(26));
 
+        session.applyPatternPreset(Session::PatternPreset::AcidSteps);
+        view.sync();
+        auto midiPicture = view.createComponentSnapshot(view.getLocalBounds());
+        int midiPixels = 0;
+        for (int y = 95; y < 122; ++y)
+            for (int x = 155; x < 620; ++x)
+                if (midiPicture.getPixelAt(x, y) == juce::Colour(0xffc6d58c)) ++midiPixels;
+        require(midiPixels >= 25, "Pattern lane must draw visible MIDI notes");
+
         // isShowing() requires a visible desktop peer. Keep this tiny navigation
         // check offscreen and remove the peer before exercising clip gestures.
         view.setTopLeftPosition(-10000, -10000);
@@ -127,6 +136,16 @@ int runArrangementTest()
         require(session.importAudio(source.getFile()).wasOk(), "Import audio");
         auto* clip = te::getAudioTracks(*session.edit)[1]->getClips()[0];
         const auto id = clip->itemID;
+        view.sync();
+        view.fit();
+        view.selected = id;
+        session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(0.5));
+        view.splitSelectedAtPlayhead();
+        require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 2, "Split creates a second audio clip");
+        session.undo();
+        require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Undo split restores one audio clip");
+        clip = session.findAudioClip(id);
+        require(clip != nullptr, "Original clip remains after undo split");
         view.sync();
         view.fit();
 

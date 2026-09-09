@@ -38,7 +38,8 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     fitButton.onClick = [this] { fit(); };
     zoomIn.onClick = [this] { zoom(0.5, viewStart + viewSpan * 0.5); };
     zoomOut.onClick = [this] { zoom(2.0, viewStart + viewSpan * 0.5); };
-    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &snap, &scroll})
+    splitButton.onClick = [this] { splitSelectedAtPlayhead(); };
+    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &snap, &scroll})
         addAndMakeVisible(control);
     for (int i = 0; i < 2; ++i)
     {
@@ -93,7 +94,7 @@ void Arrangement::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffbbc4cc));
     g.drawText("ARRANGEMENT", 10, 0, 138, 30, juce::Justification::centredLeft);
     g.setColour(juce::Colour(0xff8a969f));
-    g.drawText("Drag audio to move / edges to trim", 470, 0, getWidth() - 480, 30, juce::Justification::centredLeft);
+    g.drawText("Drag audio to move / edges to trim / Split at playhead", 520, 0, getWidth() - 530, 30, juce::Justification::centredLeft);
     for (int track = 0; track < 2; ++track)
     {
         const auto row = lane(track);
@@ -152,8 +153,35 @@ void Arrangement::paint(juce::Graphics& g)
         }
         else
         {
-            g.setColour(juce::Colour(0xffc6d58c));
-            g.drawText("Edit notes below", visible.reduced(6, 0).withTop(box.getY() + 26.0f), juce::Justification::centredLeft, true);
+            const auto noteArea = box.withTop(box.getY() + 28.0f).reduced(6.0f, 5.0f);
+            g.setColour(juce::Colour(0x553f4837));
+            for (int step = 1; step < Session::steps; ++step)
+            {
+                const auto x = xFor(clip.position.start + step * (clip.position.end - clip.position.start) / Session::steps);
+                if (x > noteArea.getX() && x < noteArea.getRight())
+                    g.drawVerticalLine(static_cast<int>(x), noteArea.getY(), noteArea.getBottom());
+            }
+            for (const auto& note : clip.midiNotes)
+            {
+                const auto x1 = xFor(note.start);
+                const auto x2 = xFor(note.end);
+                const auto w = std::max(3.0f, x2 - x1);
+                const auto pitchScale = static_cast<float>(note.pitch - Session::lowestNote)
+                    / static_cast<float>(std::max(1, Session::pitches - 1));
+                const auto h = std::max(4.0f, noteArea.getHeight() / Session::pitches - 1.0f);
+                const auto y = noteArea.getBottom() - h - pitchScale * (noteArea.getHeight() - h);
+                const juce::Rectangle<float> noteBox {x1, y, w, h};
+                if (!noteBox.intersects(visible)) continue;
+                g.setColour(juce::Colour(0xffc6d58c));
+                g.fillRoundedRectangle(noteBox, 2.0f);
+                g.setColour(juce::Colour(0xffe8f1bd));
+                g.drawRoundedRectangle(noteBox.reduced(0.5f), 2.0f, 1.0f);
+            }
+            if (clip.midiNotes.empty())
+            {
+                g.setColour(juce::Colour(0xff9daa7e));
+                g.drawText("Edit notes below", noteArea, juce::Justification::centredLeft, true);
+            }
         }
     }
     if (!hasAudio)
@@ -173,7 +201,8 @@ void Arrangement::resized()
     fitButton.setBounds(152, 3, 44, 26);
     zoomOut.setBounds(204, 3, 32, 26);
     zoomIn.setBounds(240, 3, 32, 26);
-    snap.setBounds(282, 3, 112, 26);
+    splitButton.setBounds(282, 3, 58, 26);
+    snap.setBounds(350, 3, 112, 26);
     for (int i = 0; i < 2; ++i)
     {
         mute[i].setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
@@ -197,7 +226,7 @@ void Arrangement::sync()
         for (auto* clip : tracks[track]->getClips())
         {
             const auto p = clip->getPosition();
-            ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, clip->getSpeedRatio(), track};
+            ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(), track};
             if (dynamic_cast<te::WaveAudioClip*>(clip))
             {
                 const auto file = clip->getSourceFileReference().getFile();
@@ -206,6 +235,15 @@ void Arrangement::sync()
                 auto& waveform = waveforms[key];
                 if (!waveform) waveform = std::make_unique<Waveform>(*this, file);
                 view.waveform = waveform.get();
+            }
+            else if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
+            {
+                for (auto* note : midi->getSequence().getNotes())
+                {
+                    const auto noteStart = session.edit->tempoSequence.toTime(note->getStartBeat()).inSeconds();
+                    const auto noteEnd = session.edit->tempoSequence.toTime(note->getStartBeat() + note->getLengthBeats()).inSeconds();
+                    view.midiNotes.push_back({view.position.start + noteStart, view.position.start + noteEnd, note->getNoteNumber()});
+                }
             }
             songEnd = std::max(songEnd, view.position.end);
             clips.push_back(view);
@@ -353,6 +391,11 @@ void Arrangement::mouseWheelMove(const juce::MouseEvent& event, const juce::Mous
 
 bool Arrangement::keyPressed(const juce::KeyPress& key)
 {
+    if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'E')
+    {
+        splitSelectedAtPlayhead();
+        return true;
+    }
     if (key.getKeyCode() == juce::KeyPress::escapeKey && dragging)
     {
         cancelDrag();
@@ -369,6 +412,14 @@ bool Arrangement::keyPressed(const juce::KeyPress& key)
 }
 
 void Arrangement::cancelDrag() { dragging = false; }
+
+void Arrangement::splitSelectedAtPlayhead()
+{
+    cancelDrag();
+    const auto result = session.splitAudioClip(selected, playheadTime(session.edit->getTransport()));
+    if (result.failed() && status) status(result.getErrorMessage());
+}
+
 void Arrangement::changeListenerCallback(juce::ChangeBroadcaster*) { cancelDrag(); sync(); }
 void Arrangement::editWillChange() { cancelDrag(); clips.clear(); waveforms.clear(); selected = {}; }
 void Arrangement::editDidChange() { sync(); fit(); }

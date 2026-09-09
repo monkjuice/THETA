@@ -3,6 +3,7 @@
 #include "ProjectFiles.h"
 #include "Theme.h"
 #include "Arrangement.h"
+#include "BrowserPanel.h"
 #include "StartupScreen.h"
 #include <stdexcept>
 
@@ -14,12 +15,13 @@ class ControlWindow final : public juce::Component,
                             private juce::Timer
 {
 public:
-    explicit ControlWindow(Session& s) : session(s), grid(s), arrangement(s), files(s)
+    explicit ControlWindow(Session& s) : session(s), browser(s), grid(s), arrangement(s), files(s)
     {
         setOpaque(true);
         files.status = [this](const juce::String& message) { status.setText(message, juce::dontSendNotification); };
         files.loadingChanged = [this](bool loading) { setEnabled(!loading); };
         arrangement.status = files.status;
+        browser.status = files.status;
         open.onClick = [this] { files.open(); };
         save.onClick = [this] { files.save(); };
         title.setText("THETA", juce::dontSendNotification);
@@ -80,7 +82,7 @@ public:
         };
         for (auto* component : std::initializer_list<juce::Component*>{
                  &title, &status, &position, &gainLabel, &gain, &play, &stop, &import, &settings,
-                 &grid, &arrangement, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
+                 &browser, &grid, &arrangement, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
         session.addChangeListener(this);
@@ -114,6 +116,10 @@ public:
 
     void resized() override
     {
+        constexpr int browserWidth = 244;
+        constexpr int gap = 18;
+        const auto editorX = browserWidth + gap;
+        const auto editorW = getWidth() - editorX - 24;
         title.setBounds(24, 20, 200, 38);
         documentName.setBounds(190, 26, getWidth() - 530, 30);
         settings.setBounds(getWidth() - 152, 26, 128, 30);
@@ -128,12 +134,13 @@ public:
         redo.setBounds(604, 119, 60, 30);
         clear.setBounds(672, 119, 88, 30);
         position.setBounds(getWidth() - 165, 116, 140, 36);
-        arrangement.setBounds(24, 174, getWidth() - 48, 246);
-        patternLabel.setBounds(24, 430, getWidth() - 48, 24);
-        grid.setBounds(24, 464, getWidth() - 48, getHeight() - 590);
-        hint.setBounds(24, getHeight() - 117, getWidth() - 48, 28);
-        gainLabel.setBounds(40, getHeight() - 66, 140, 28);
-        gain.setBounds(180, getHeight() - 66, getWidth() - 220, 30);
+        browser.setBounds(0, 104, browserWidth, getHeight() - 104);
+        arrangement.setBounds(editorX, 174, editorW, 246);
+        patternLabel.setBounds(editorX, 430, editorW, 24);
+        grid.setBounds(editorX, 464, editorW, getHeight() - 590);
+        hint.setBounds(editorX, getHeight() - 117, editorW, 28);
+        gainLabel.setBounds(editorX + 16, getHeight() - 66, 140, 28);
+        gain.setBounds(editorX + 156, getHeight() - 66, editorW - 156, 30);
     }
 
     bool keyPressed(const juce::KeyPress& key) override
@@ -218,6 +225,7 @@ private:
     Session& session;
     juce::Label title, status, position, gainLabel, hint, documentName, patternLabel;
     juce::Slider gain;
+    BrowserPanel browser;
     StepGrid grid;
     Arrangement arrangement;
     juce::Slider tempo;

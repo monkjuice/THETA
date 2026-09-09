@@ -9,6 +9,14 @@ namespace theta
 class Session : public juce::ChangeBroadcaster
 {
 public:
+    enum class PatternPreset
+    {
+        WarmPulse,
+        AcidSteps,
+        HouseKit,
+        BreakKit,
+        MinimalKit
+    };
     struct Listener
     {
         virtual ~Listener() = default;
@@ -33,6 +41,7 @@ public:
     void beginNoteGesture();
     void endNoteGesture();
     void clearPattern();
+    void applyPatternPreset(PatternPreset);
     double tempo() const;
     void setTempo(double bpm);
     void undo();
@@ -40,6 +49,7 @@ public:
     void refreshLoop();
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
     juce::Result editAudioClip(te::EditItemID, ClipGeometry, ClipGesture);
+    juce::Result splitAudioClip(te::EditItemID, double splitTimeSeconds);
     void deleteAudioClip(te::EditItemID);
     void toggleTrackMute(int track);
     void toggleTrackSolo(int track);

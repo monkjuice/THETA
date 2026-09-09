@@ -25,12 +25,18 @@ public:
 private:
     friend int runArrangementTest();
     struct Waveform;
+    struct MidiNoteView
+    {
+        double start = 0.0, end = 0.0;
+        int pitch = 0;
+    };
     struct ClipView
     {
         te::EditItemID id;
         juce::String name;
         ClipGeometry position;
         Waveform* waveform = nullptr;
+        std::vector<MidiNoteView> midiNotes;
         double speed = 1.0;
         int track = 0;
     };
@@ -38,6 +44,7 @@ private:
     void updateScroll();
     void zoom(double factor, double anchor);
     void cancelDrag();
+    void splitSelectedAtPlayhead();
     void updatePlayhead();
     float xFor(double seconds) const;
     double timeAt(float x) const;
@@ -54,7 +61,7 @@ private:
     juce::AudioThumbnailCache thumbnailCache {32};
     std::map<juce::String, std::unique_ptr<Waveform>> waveforms;
     std::vector<ClipView> clips;
-    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, snap {"Snap 1/16"};
+    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, snap {"Snap 1/16"};
     std::array<juce::TextButton, 2> mute, solo;
     juce::ScrollBar scroll {false};
     juce::VBlankAttachment vblank;

@@ -1,0 +1,43 @@
+#pragma once
+#include "Session.h"
+#include <array>
+#include <optional>
+#include <vector>
+
+namespace theta
+{
+class BrowserPanel final : public juce::Component,
+                           private juce::ListBoxModel
+{
+public:
+    explicit BrowserPanel(Session&);
+    void paint(juce::Graphics&) override;
+    void resized() override;
+    std::function<void(juce::String)> status;
+
+private:
+    struct Item
+    {
+        juce::String category;
+        juce::String name;
+        juce::String detail;
+        std::optional<Session::PatternPreset> preset;
+    };
+
+    int getNumRows() override;
+    void paintListBoxItem(int row, juce::Graphics&, int width, int height, bool selected) override;
+    void listBoxItemClicked(int row, const juce::MouseEvent&) override;
+    void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override;
+    void rebuildRows();
+    void applyRow(int row);
+
+    Session& session;
+    juce::Label title, categoriesTitle, soundsTitle;
+    juce::TextEditor search;
+    juce::ListBox list {"Browser", this};
+    juce::String selectedCategory = "Sounds";
+    std::vector<Item> items;
+    std::vector<int> rows;
+    std::array<juce::TextButton, 5> categories;
+};
+}

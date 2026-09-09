@@ -111,6 +111,45 @@ void Session::clearPattern()
     sendSynchronousChangeMessage();
 }
 
+void Session::applyPatternPreset(PatternPreset preset)
+{
+    struct Note { int step, pitch, length; };
+    const Note* notes = nullptr;
+    int count = 0;
+    juce::String name;
+
+    static constexpr Note warmPulse[] {{0, 48, 2}, {4, 55, 2}, {8, 60, 2}, {12, 55, 2}};
+    static constexpr Note acidSteps[] {{0, 48, 1}, {3, 51, 1}, {6, 55, 1}, {7, 58, 1}, {10, 55, 1}, {13, 63, 1}, {15, 58, 1}};
+    static constexpr Note houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
+                                      {2, 58, 1}, {6, 58, 1}, {10, 58, 1}, {14, 58, 1}};
+    static constexpr Note breakKit[] {{0, 48, 1}, {3, 48, 1}, {8, 48, 1}, {11, 48, 1}, {4, 53, 1}, {10, 53, 1},
+                                      {1, 58, 1}, {3, 58, 1}, {6, 58, 1}, {9, 58, 1}, {12, 58, 1}, {15, 58, 1}};
+    static constexpr Note minimalKit[] {{0, 48, 1}, {7, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1}, {2, 58, 1}, {10, 58, 1}, {14, 58, 1}};
+
+    switch (preset)
+    {
+        case PatternPreset::WarmPulse:  notes = warmPulse;  count = static_cast<int>(std::size(warmPulse));  name = "Warm pulse"; break;
+        case PatternPreset::AcidSteps:  notes = acidSteps;  count = static_cast<int>(std::size(acidSteps));  name = "Acid steps"; break;
+        case PatternPreset::HouseKit:   notes = houseKit;   count = static_cast<int>(std::size(houseKit));   name = "House kit"; break;
+        case PatternPreset::BreakKit:   notes = breakKit;   count = static_cast<int>(std::size(breakKit));   name = "Break kit"; break;
+        case PatternPreset::MinimalKit: notes = minimalKit; count = static_cast<int>(std::size(minimalKit)); name = "Minimal kit"; break;
+    }
+
+    edit->getUndoManager().beginNewTransaction("Load " + name);
+    auto& sequence = pattern().getSequence();
+    sequence.removeAllNotes(&edit->getUndoManager());
+    for (int i = 0; i < count; ++i)
+        sequence.addNote(notes[i].pitch, tracktion::core::BeatPosition::fromBeats(notes[i].step * 0.25),
+                         tracktion::core::BeatDuration::fromBeats(std::max(1, notes[i].length) * 0.225), 100, 0,
+                         &edit->getUndoManager());
+    pattern().setName(name);
+    markModified();
+    edit->getUndoManager().beginNewTransaction();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+}
+
 double Session::tempo() const { return edit->tempoSequence.getTempo(0)->getBpm(); }
 
 void Session::setTempo(double bpm)
@@ -248,6 +287,37 @@ juce::Result Session::editAudioClip(te::EditItemID id, ClipGeometry next, ClipGe
     refreshLoop();
     edit->getUndoManager().beginNewTransaction();
     markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::splitAudioClip(te::EditItemID id, double splitTimeSeconds)
+{
+    auto* clip = findAudioClip(id);
+    if (!clip) return juce::Result::fail("Select an audio clip to split.");
+    if (!std::isfinite(splitTimeSeconds)) return juce::Result::fail("Invalid split position.");
+
+    const auto old = clip->getPosition();
+    const auto split = tracktion::core::TimePosition::fromSeconds(splitTimeSeconds);
+    constexpr double minimumSeconds = 0.01;
+    if (split <= old.time.getStart() + tracktion::core::TimeDuration::fromSeconds(minimumSeconds)
+        || split >= old.time.getEnd() - tracktion::core::TimeDuration::fromSeconds(minimumSeconds))
+        return juce::Result::fail("Move the playhead inside the selected audio clip before splitting.");
+
+    auto* track = te::getAudioTracks(*edit)[1];
+    const auto file = clip->getSourceFileReference().getFile();
+    edit->getUndoManager().beginNewTransaction("Split audio clip");
+    auto right = track->insertWaveClip(clip->getName() + " split", file,
+        {{split, old.time.getEnd()}, old.offset + (split - old.time.getStart())}, false);
+    if (right == nullptr)
+        return juce::Result::fail("The right-hand split clip could not be created.");
+
+    clip->setPosition({{old.time.getStart(), split}, old.offset});
+    refreshLoop();
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
     sendSynchronousChangeMessage();
     return juce::Result::ok();
 }
