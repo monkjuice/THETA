@@ -82,6 +82,12 @@ void BrowserPanel::resized()
     list.setBounds(12, y + 34, getWidth() - 24, getHeight() - y - 46);
 }
 
+void BrowserPanel::focusSearch()
+{
+    search.grabKeyboardFocus();
+    search.selectAll();
+}
+
 int BrowserPanel::getNumRows()
 {
     return static_cast<int>(rows.size());

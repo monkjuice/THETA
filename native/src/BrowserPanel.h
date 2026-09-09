@@ -13,6 +13,7 @@ public:
     explicit BrowserPanel(Session&);
     void paint(juce::Graphics&) override;
     void resized() override;
+    void focusSearch();
     std::function<void(juce::String)> status;
 
 private:

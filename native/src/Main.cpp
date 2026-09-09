@@ -180,6 +180,11 @@ public:
             files.open();
             return true;
         }
+        if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'F')
+        {
+            browser.focusSearch();
+            return true;
+        }
         if (key.getKeyCode() == juce::KeyPress::spaceKey)
         {
             session.togglePlayback();
