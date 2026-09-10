@@ -67,6 +67,19 @@ DrumDevice* findDrumDevice(te::AudioTrack& track)
     return nullptr;
 }
 
+te::AutomatableParameter* activeParameterAt(te::Plugin& plugin, int index)
+{
+    int active = 0;
+    for (auto* parameter : plugin.getAutomatableParameters())
+        if (parameter != nullptr && parameter->isParameterActive())
+        {
+            if (active == index)
+                return parameter;
+            ++active;
+        }
+    return nullptr;
+}
+
 juce::Result ensurePlugin(te::Edit& edit, te::AudioTrack& track, const juce::String& type,
                           int insertIndex, te::Plugin*& plugin, bool& changed)
 {
@@ -474,6 +487,79 @@ std::vector<Session::DeviceSlot> Session::deviceSlots(int track) const
                          !coreStarterDevice && type != UtilityDevice::xmlTypeName});
     }
     return slots;
+}
+
+std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int slot) const
+{
+    std::vector<DeviceParameter> parameters;
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return parameters;
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr) return parameters;
+
+    for (auto* parameter : plugin->getAutomatableParameters())
+    {
+        if (parameter == nullptr || !parameter->isParameterActive())
+            continue;
+        const auto range = parameter->getValueRange();
+        if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
+            continue;
+        parameters.push_back({parameter->getParameterShortName(18),
+                              parameter->getCurrentValueAsStringWithLabel(),
+                              parameter->getCurrentValue(),
+                              range.getStart(),
+                              range.getEnd(),
+                              parameter->isDiscrete()});
+    }
+    return parameters;
+}
+
+juce::Result Session::beginDeviceParameterGesture(int track, int slot, int parameterIndex)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return juce::Result::fail("Select a device first.");
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr) return juce::Result::fail("Select a device first.");
+    auto* parameter = activeParameterAt(*plugin, parameterIndex);
+    if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
+    parameter->parameterChangeGestureBegin();
+    return juce::Result::ok();
+}
+
+juce::Result Session::setDeviceParameter(int track, int slot, int parameterIndex, float value)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return juce::Result::fail("Select a device first.");
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr) return juce::Result::fail("Select a device first.");
+    auto* parameter = activeParameterAt(*plugin, parameterIndex);
+    if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
+    const auto range = parameter->getValueRange();
+    const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
+    parameter->setParameter(next, juce::sendNotification);
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::endDeviceParameterGesture(int track, int slot, int parameterIndex)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return juce::Result::fail("Select a device first.");
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr) return juce::Result::fail("Select a device first.");
+    auto* parameter = activeParameterAt(*plugin, parameterIndex);
+    if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
+    parameter->parameterChangeGestureEnd();
+    edit->getUndoManager().beginNewTransaction();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 juce::Result Session::toggleDeviceEnabled(int track, int slot)

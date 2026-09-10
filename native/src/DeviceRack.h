@@ -25,13 +25,18 @@ private:
     void paintListBoxItem(int row, juce::Graphics&, int width, int height, bool selected) override;
     void selectedRowsChanged(int lastRowSelected) override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
+    void rebuildParameterControls();
     void sync();
 
     Session& session;
     int selectedTrack = 0, selectedSlot = 0;
+    bool syncing = false;
     std::vector<Session::DeviceSlot> slots;
+    std::vector<Session::DeviceParameter> parameters;
     juce::Label title;
     juce::TextButton pattern {"Pattern"}, audio {"Audio 1"}, bypass {"Bypass"}, remove {"Delete"};
     juce::ListBox list {"Devices", this};
+    juce::OwnedArray<juce::Label> parameterLabels, parameterValues;
+    juce::OwnedArray<juce::Slider> parameterSliders;
 };
 }

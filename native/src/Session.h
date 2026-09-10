@@ -39,6 +39,15 @@ public:
         bool enabled = true;
         bool removable = false;
     };
+    struct DeviceParameter
+    {
+        juce::String name;
+        juce::String valueText;
+        float value = 0.0f;
+        float minimum = 0.0f;
+        float maximum = 1.0f;
+        bool discrete = false;
+    };
     struct Listener
     {
         virtual ~Listener() = default;
@@ -75,6 +84,10 @@ public:
     juce::Result addAudioTrack();
     juce::Result removeAudioTrack(int track);
     std::vector<DeviceSlot> deviceSlots(int track) const;
+    std::vector<DeviceParameter> deviceParameters(int track, int slot) const;
+    juce::Result beginDeviceParameterGesture(int track, int slot, int parameter);
+    juce::Result setDeviceParameter(int track, int slot, int parameter, float value);
+    juce::Result endDeviceParameterGesture(int track, int slot, int parameter);
     juce::Result toggleDeviceEnabled(int track, int slot);
     juce::Result deleteDevice(int track, int slot);
     double tempo() const;

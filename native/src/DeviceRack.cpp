@@ -91,7 +91,30 @@ void DeviceRack::resized()
     audio.setBounds(156, 5, 30, 24);
     bypass.setBounds(getWidth() - 76, 5, 30, 24);
     remove.setBounds(getWidth() - 40, 5, 30, 24);
-    list.setBounds(12, 34, getWidth() - 24, getHeight() - 42);
+    const auto paramRows = std::min(6, static_cast<int>(parameters.size()));
+    const auto parameterHeight = paramRows > 0 ? paramRows * 34 + 12 : 0;
+    list.setBounds(12, 34, getWidth() - 24, std::max(60, getHeight() - 42 - parameterHeight));
+    auto y = list.getBottom() + 8;
+    for (int i = 0; i < parameterSliders.size(); ++i)
+    {
+        auto* name = parameterLabels[i];
+        auto* slider = parameterSliders[i];
+        auto* value = parameterValues[i];
+        if (i >= 6)
+        {
+            name->setVisible(false);
+            slider->setVisible(false);
+            value->setVisible(false);
+            continue;
+        }
+        name->setVisible(true);
+        slider->setVisible(true);
+        value->setVisible(true);
+        name->setBounds(12, y, 92, 26);
+        value->setBounds(getWidth() - 86, y, 74, 26);
+        slider->setBounds(110, y + 2, std::max(40, getWidth() - 204), 22);
+        y += 34;
+    }
 }
 
 int DeviceRack::getNumRows()
@@ -140,6 +163,65 @@ void DeviceRack::itemDropped(const juce::DragAndDropTarget::SourceDetails& detai
     }
 }
 
+void DeviceRack::rebuildParameterControls()
+{
+    while (parameterLabels.size() < static_cast<int>(parameters.size()))
+    {
+        const auto index = parameterLabels.size();
+        auto* name = parameterLabels.add(new juce::Label());
+        auto* value = parameterValues.add(new juce::Label());
+        auto* slider = parameterSliders.add(new juce::Slider());
+        name->setColour(juce::Label::textColourId, juce::Colour(0xffdfe6ea));
+        name->setFont(juce::FontOptions(12.0f));
+        value->setColour(juce::Label::textColourId, juce::Colour(0xffb7c1ca));
+        value->setFont(juce::FontOptions(12.0f));
+        value->setJustificationType(juce::Justification::centredRight);
+        slider->setSliderStyle(juce::Slider::LinearHorizontal);
+        slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        slider->setColour(juce::Slider::trackColourId, juce::Colour(0xffc6d58c));
+        slider->setColour(juce::Slider::backgroundColourId, juce::Colour(0xff263139));
+        slider->setColour(juce::Slider::thumbColourId, juce::Colour(0xff4bb0d2));
+        slider->onDragStart = [this, index]
+        {
+            const auto result = session.beginDeviceParameterGesture(selectedTrack, selectedSlot, index);
+            if (result.failed() && status) status(result.getErrorMessage());
+        };
+        slider->onValueChange = [this, index, slider]
+        {
+            if (syncing) return;
+            const auto result = session.setDeviceParameter(selectedTrack, selectedSlot, index, static_cast<float>(slider->getValue()));
+            if (result.failed() && status) status(result.getErrorMessage());
+        };
+        slider->onDragEnd = [this, index]
+        {
+            const auto result = session.endDeviceParameterGesture(selectedTrack, selectedSlot, index);
+            if (result.failed() && status) status(result.getErrorMessage());
+        };
+        addAndMakeVisible(name);
+        addAndMakeVisible(value);
+        addAndMakeVisible(slider);
+    }
+
+    syncing = true;
+    for (int i = 0; i < parameterLabels.size(); ++i)
+    {
+        const auto visible = i < static_cast<int>(parameters.size());
+        parameterLabels[i]->setVisible(visible);
+        parameterValues[i]->setVisible(visible);
+        parameterSliders[i]->setVisible(visible);
+        if (!visible) continue;
+        const auto& parameter = parameters[static_cast<size_t>(i)];
+        parameterLabels[i]->setText(parameter.name, juce::dontSendNotification);
+        parameterValues[i]->setText(parameter.valueText, juce::dontSendNotification);
+        parameterSliders[i]->setRange(parameter.minimum, parameter.maximum, parameter.discrete ? 1.0 : 0.0);
+        parameterSliders[i]->setValue(parameter.value, juce::dontSendNotification);
+        parameterSliders[i]->setTooltip(parameter.name + ": " + parameter.valueText);
+    }
+    syncing = false;
+    resized();
+    repaint();
+}
+
 void DeviceRack::changeListenerCallback(juce::ChangeBroadcaster*)
 {
     sync();
@@ -163,11 +245,13 @@ void DeviceRack::sync()
     audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     slots = session.deviceSlots(selectedTrack);
     selectedSlot = juce::jlimit(0, std::max(0, static_cast<int>(slots.size()) - 1), selectedSlot);
+    parameters = session.deviceParameters(selectedTrack, selectedSlot);
     list.updateContent();
     if (!slots.empty())
         list.selectRow(selectedSlot, juce::dontSendNotification);
     bypass.setEnabled(!slots.empty());
     remove.setEnabled(!slots.empty() && slots[static_cast<size_t>(selectedSlot)].removable);
     bypass.setButtonText(!slots.empty() && !slots[static_cast<size_t>(selectedSlot)].enabled ? juce::String(L"\u23fb") : juce::String(L"\u23fb"));
+    rebuildParameterControls();
 }
 }

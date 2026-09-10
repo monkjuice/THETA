@@ -31,6 +31,23 @@ int runPatternTest()
         require(effectTrack->pluginList.size() == initialAudioPluginCount + 1, "Undo restores deleted audio effect");
         session.undo();
         require(effectTrack->pluginList.size() == initialAudioPluginCount, "Undo removes inserted audio effect");
+
+        {
+            Session parameterSession;
+            auto* parameterTrack = te::getAudioTracks(*parameterSession.edit)[1];
+            require(parameterSession.addAudioEffect(Session::AudioEffect::Reverb).wasOk(), "Audio FX browser action inserts Reverb");
+            const auto reverbSlot = static_cast<int>(parameterTrack->pluginList.size()) - 1;
+            auto reverbParameters = parameterSession.deviceParameters(1, reverbSlot);
+            require(!reverbParameters.empty(), "Inserted Reverb exposes editable parameters");
+            const auto oldReverbValue = reverbParameters.front().value;
+            const auto newReverbValue = oldReverbValue == reverbParameters.front().minimum
+                ? reverbParameters.front().maximum : reverbParameters.front().minimum;
+            require(parameterSession.beginDeviceParameterGesture(1, reverbSlot, 0).wasOk(), "Device rack starts parameter gestures");
+            require(parameterSession.setDeviceParameter(1, reverbSlot, 0, newReverbValue).wasOk(), "Device rack edits effect parameters");
+            require(parameterSession.endDeviceParameterGesture(1, reverbSlot, 0).wasOk(), "Device rack ends parameter gestures");
+            reverbParameters = parameterSession.deviceParameters(1, reverbSlot);
+            require(std::abs(reverbParameters.front().value - newReverbValue) < 0.0001f, "Edited effect parameter value is reflected in the rack");
+        }
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");
         session.beginNoteGesture();
