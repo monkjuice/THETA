@@ -6,6 +6,7 @@
 #include "BrowserPanel.h"
 #include "DeviceRack.h"
 #include "StartupScreen.h"
+#include <cmath>
 #include <stdexcept>
 
 namespace theta
@@ -26,6 +27,8 @@ public:
         arrangement.trackSelected = [this](int track) { rack.selectTrack(track); };
         browser.status = files.status;
         rack.status = files.status;
+        browserToggle.onClick = [this] { browserOpen = !browserOpen; resized(); repaint(); };
+        rackToggle.onClick = [this] { rackOpen = !rackOpen; resized(); repaint(); };
         open.onClick = [this] { files.open(); };
         save.onClick = [this] { files.save(); };
         title.setText("THETA", juce::dontSendNotification);
@@ -108,7 +111,8 @@ public:
         };
         for (auto* component : std::initializer_list<juce::Component*>{
                  &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &import, &settings,
-                 &browser, &grid, &arrangement, &rack, &tempo, &undo, &redo, &clear, &hint, &open, &save, &documentName, &patternLabel})
+                 &browser, &browserToggle, &rackToggle, &grid, &arrangement, &rack, &tempo, &undo, &redo, &clear, &hint, &open, &save,
+                 &documentName, &patternLabel})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
         session.addChangeListener(this);
@@ -136,16 +140,31 @@ public:
     void paint(juce::Graphics& g) override
     {
         g.fillAll(juce::Colour(0xff171a1e));
+        const auto bottomX = (browserOpen ? browserWidth : 0) + 18;
         g.setColour(juce::Colour(0xff24282d));
-        g.fillRect(262, getHeight() - 78, getWidth() - 286, 54);
+        g.fillRect(bottomX, getHeight() - 78, getWidth() - bottomX - 24, 54);
+        if (browserOpen)
+        {
+            g.setColour(juce::Colour(0xff3a434b));
+            g.fillRect(browserWidth, 104, 4, getHeight() - 104);
+        }
+        if (rackOpen)
+        {
+            g.setColour(juce::Colour(0xff3a434b));
+            g.fillRect(rackSplitterBounds());
+        }
     }
 
     void resized() override
     {
-        constexpr int browserWidth = 244;
         constexpr int gap = 18;
-        const auto editorX = browserWidth + gap;
+        const auto leftWidth = browserOpen ? browserWidth : 0;
+        const auto editorX = leftWidth + gap;
         const auto editorW = getWidth() - editorX - 24;
+        const auto lowerTop = 464;
+        const auto bottomPanelTop = getHeight() - 78;
+        const auto lowerH = std::max(112, bottomPanelTop - lowerTop - 18);
+        const auto lowerW = rackOpen ? std::max(300, editorW - rackWidth - gap) : editorW;
         title.setBounds(24, 20, 200, 38);
         documentName.setBounds(190, 26, getWidth() - 530, 30);
         settings.setBounds(getWidth() - 152, 26, 128, 30);
@@ -160,17 +179,60 @@ public:
         redo.setBounds(editorX + 494, 119, 58, 30);
         clear.setBounds(editorX + 562, 119, 78, 30);
         position.setBounds(getWidth() - 165, 116, 140, 36);
+        browser.setVisible(browserOpen);
         browser.setBounds(0, 104, browserWidth, getHeight() - 104);
+        browserToggle.setButtonText(browserOpen ? "<" : ">");
+        browserToggle.setBounds(leftWidth + 4, 108, 24, 24);
         arrangement.setBounds(editorX, 174, editorW, 246);
-        patternLabel.setBounds(editorX, 430, editorW, 24);
-        grid.setBounds(editorX, 464, editorW, getHeight() - 684);
-        rack.setBounds(editorX, getHeight() - 236, editorW, 112);
+        patternLabel.setBounds(editorX, 430, lowerW, 24);
+        grid.setBounds(editorX, lowerTop, lowerW, lowerH);
+        rack.setVisible(rackOpen);
+        rack.setBounds(editorX + lowerW + gap, lowerTop, rackWidth, lowerH);
+        rackToggle.setButtonText(rackOpen ? ">" : "<");
+        rackToggle.setBounds(getWidth() - 52, 430, 28, 24);
         hint.setBounds(editorX, getHeight() - 117, editorW, 28);
         const auto half = (editorW - 28) / 2;
         gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
         gain.setBounds(editorX + 112, getHeight() - 66, half - 112, 30);
         audioGainLabel.setBounds(editorX + half + 28, getHeight() - 66, 100, 28);
         audioGain.setBounds(editorX + half + 128, getHeight() - 66, editorW - half - 150, 30);
+    }
+
+    void mouseMove(const juce::MouseEvent& event) override
+    {
+        setMouseCursor(isOverSplitter(event.position) ? juce::MouseCursor::LeftRightResizeCursor
+                                                      : juce::MouseCursor::NormalCursor);
+    }
+
+    void mouseDown(const juce::MouseEvent& event) override
+    {
+        resizingBrowser = browserOpen && std::abs(event.x - browserWidth) <= 5 && event.y >= 104;
+        resizingRack = rackOpen && rackSplitterBounds().expanded(4, 0).contains(event.getPosition());
+        resizeStartX = event.x;
+        resizeStartBrowserWidth = browserWidth;
+        resizeStartRackWidth = rackWidth;
+    }
+
+    void mouseDrag(const juce::MouseEvent& event) override
+    {
+        if (resizingBrowser)
+        {
+            browserWidth = juce::jlimit(180, 360, resizeStartBrowserWidth + event.x - resizeStartX);
+            resized();
+            repaint();
+        }
+        else if (resizingRack)
+        {
+            rackWidth = juce::jlimit(220, std::max(220, getWidth() - browserWidth - 420), resizeStartRackWidth - (event.x - resizeStartX));
+            resized();
+            repaint();
+        }
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        resizingBrowser = false;
+        resizingRack = false;
     }
 
     bool keyPressed(const juce::KeyPress& key) override
@@ -261,6 +323,18 @@ private:
             position.setText(text, juce::dontSendNotification);
     }
 
+    juce::Rectangle<int> rackSplitterBounds() const
+    {
+        if (!rackOpen) return {};
+        return {rack.getX() - 10, rack.getY(), 4, rack.getHeight()};
+    }
+
+    bool isOverSplitter(juce::Point<float> point) const
+    {
+        return (browserOpen && std::abs(point.x - static_cast<float>(browserWidth)) <= 5.0f && point.y >= 104.0f)
+            || (rackOpen && rackSplitterBounds().expanded(4, 0).toFloat().contains(point));
+    }
+
     Session& session;
     juce::Label title, status, position, gainLabel, audioGainLabel, hint, documentName, patternLabel;
     juce::Slider gain, audioGain;
@@ -271,10 +345,14 @@ private:
     juce::Slider tempo;
     juce::TextButton undo {"Undo"}, redo {"Redo"}, clear {"Clear"};
     juce::TextButton play {"Play"}, stop {"Stop"}, import {"Add audio"}, settings {"Audio settings"};
+    juce::TextButton browserToggle {"<"}, rackToggle {">"};
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> audioSettings;
     juce::TextButton open {"Open"}, save {"Save"};
     ProjectFiles files;
+    int browserWidth = 244, rackWidth = 312;
+    int resizeStartX = 0, resizeStartBrowserWidth = 244, resizeStartRackWidth = 312;
+    bool browserOpen = true, rackOpen = true, resizingBrowser = false, resizingRack = false;
 };
 
 class Application final : public juce::JUCEApplication, private juce::Timer

@@ -1,7 +1,22 @@
 #include "DeviceRack.h"
+#include <optional>
 
 namespace theta
 {
+namespace
+{
+std::optional<Session::AudioEffect> effectFromBrowserDrop(const juce::String& description)
+{
+    if (!description.startsWith("theta-browser:effect:")) return std::nullopt;
+    const auto id = description.fromLastOccurrenceOf(":", false, false);
+    if (id == "Equaliser")  return Session::AudioEffect::Equaliser;
+    if (id == "Reverb")     return Session::AudioEffect::Reverb;
+    if (id == "Delay")      return Session::AudioEffect::Delay;
+    if (id == "Compressor") return Session::AudioEffect::Compressor;
+    return std::nullopt;
+}
+}
+
 DeviceRack::DeviceRack(Session& s) : session(s)
 {
     setOpaque(true);
@@ -43,6 +58,12 @@ void DeviceRack::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1b2025));
     g.setColour(juce::Colour(0xff303840));
     g.drawRect(getLocalBounds());
+    if (selectedTrack > 0)
+    {
+        g.setColour(juce::Colour(0xff697680));
+        g.setFont(juce::FontOptions(11.0f));
+        g.drawText("Drop Audio FX here", getWidth() - 190, 6, 92, 20, juce::Justification::centredRight, true);
+    }
 }
 
 void DeviceRack::resized()
@@ -80,6 +101,19 @@ void DeviceRack::selectedRowsChanged(int lastRowSelected)
     sync();
 }
 
+bool DeviceRack::isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails& details)
+{
+    return effectFromBrowserDrop(details.description.toString()).has_value();
+}
+
+void DeviceRack::itemDropped(const juce::DragAndDropTarget::SourceDetails& details)
+{
+    const auto effect = effectFromBrowserDrop(details.description.toString());
+    if (!effect) return;
+    const auto result = session.addAudioEffect(*effect, selectedTrack);
+    if (status) status(result.wasOk() ? "Added effect to " + session.trackName(selectedTrack) : result.getErrorMessage());
+}
+
 void DeviceRack::changeListenerCallback(juce::ChangeBroadcaster*)
 {
     sync();
@@ -87,15 +121,20 @@ void DeviceRack::changeListenerCallback(juce::ChangeBroadcaster*)
 
 void DeviceRack::selectTrack(int track)
 {
-    selectedTrack = track;
-    pattern.setToggleState(track == 0, juce::dontSendNotification);
-    audio.setToggleState(track == 1, juce::dontSendNotification);
+    selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), track);
+    pattern.setToggleState(selectedTrack == 0, juce::dontSendNotification);
+    audio.setButtonText(selectedTrack > 0 ? session.trackName(selectedTrack) : "Audio 1");
+    audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     selectedSlot = 0;
     sync();
 }
 
 void DeviceRack::sync()
 {
+    selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), selectedTrack);
+    pattern.setToggleState(selectedTrack == 0, juce::dontSendNotification);
+    audio.setButtonText(selectedTrack > 0 ? session.trackName(selectedTrack) : "Audio 1");
+    audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     slots = session.deviceSlots(selectedTrack);
     selectedSlot = juce::jlimit(0, std::max(0, static_cast<int>(slots.size()) - 1), selectedSlot);
     list.updateContent();

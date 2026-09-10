@@ -6,6 +6,7 @@
 namespace theta
 {
 class DeviceRack final : public juce::Component,
+                         public juce::DragAndDropTarget,
                          private juce::ChangeListener,
                          private juce::ListBoxModel
 {
@@ -15,6 +16,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     void selectTrack(int track);
+    bool isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails&) override;
+    void itemDropped(const juce::DragAndDropTarget::SourceDetails&) override;
     std::function<void(juce::String)> status;
 
 private:

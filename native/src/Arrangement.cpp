@@ -142,7 +142,8 @@ void Arrangement::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffbbc4cc));
     g.drawText("ARRANGEMENT", 10, 0, 138, 30, juce::Justification::centredLeft);
     g.setColour(juce::Colour(0xff8a969f));
-    g.drawText("Drag clips to move / edges to trim / split / duplicate", 740, 0, getWidth() - 750, 30, juce::Justification::centredLeft);
+    g.drawText("Drop browser items or files / drag clips to move / trim edges",
+               740, 0, getWidth() - 750, 30, juce::Justification::centredLeft);
     for (int track = 0; track < session.trackCount(); ++track)
     {
         const auto row = lane(track);
@@ -432,17 +433,9 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
 void Arrangement::mouseDrag(const juce::MouseEvent& event)
 {
     if (!dragging) return;
-    const auto old = preview;
     const auto anchor = gesture == ClipGesture::trimRight ? original.end : original.start;
     preview = previewClipEdit(original, gesture, snapped(anchor + timeAt(event.position.x) - dragTime, event.mods.isAltDown()), sourceDuration);
-    const auto row = lane(selectedTrack);
-    const auto invalidate = [this, row](ClipGeometry p)
-    {
-        repaint(juce::Rectangle<float>(xFor(p.start) - 2.0f, row.getY(), xFor(p.end) - xFor(p.start) + 4.0f, row.getHeight())
-            .getIntersection(row).getSmallestIntegerContainer());
-    };
-    invalidate(old);
-    invalidate(preview);
+    repaint(lane(selectedTrack).getSmallestIntegerContainer());
 }
 
 void Arrangement::mouseUp(const juce::MouseEvent& event)
