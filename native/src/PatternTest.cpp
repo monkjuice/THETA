@@ -119,6 +119,13 @@ int runPatternTest()
         require(session.synth->ampRelease->getCurrentValue() < 0.4f && session.synth->chorusMix->getCurrentValue() == 0.0f
                 && static_cast<int>(session.synth->state.getProperty("voices")) == 1,
                 "Sub bass preset shapes the 4OSC patch for clean mono low end");
+        auto synthMacros = session.deviceParameters(0, 0);
+        require(synthMacros.size() == 6 && synthMacros[0].name == "Attack" && synthMacros[1].name == "Decay"
+                && synthMacros[2].name == "Sustain" && synthMacros[3].name == "Release",
+                "4OSC rack exposes musical envelope macros first");
+        const auto previousAttack = session.synth->ampAttack->getCurrentValue();
+        require(session.setDeviceParameter(0, 0, 0, previousAttack + 0.05f).wasOk(), "4OSC Attack macro can be edited from the rack");
+        require(session.synth->ampAttack->getCurrentValue() > previousAttack, "4OSC Attack macro writes to the synth envelope");
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
                 "Reese bass preset loads sustained electronic bass notes");

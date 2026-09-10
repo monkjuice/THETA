@@ -336,6 +336,41 @@ te::AutomatableParameter* activeParameterAt(te::Plugin& plugin, int index)
     return nullptr;
 }
 
+te::AutomatableParameter* fourOscMacroParameterAt(te::FourOscPlugin& synth, int index)
+{
+    switch (index)
+    {
+        case 0: return synth.ampAttack;
+        case 1: return synth.ampDecay;
+        case 2: return synth.ampSustain;
+        case 3: return synth.ampRelease;
+        case 4: return synth.filterFreq;
+        case 5: return synth.legato;
+    }
+    return nullptr;
+}
+
+juce::String fourOscMacroName(int index)
+{
+    switch (index)
+    {
+        case 0: return "Attack";
+        case 1: return "Decay";
+        case 2: return "Sustain";
+        case 3: return "Release";
+        case 4: return "Filter";
+        case 5: return "Glide";
+    }
+    return {};
+}
+
+te::AutomatableParameter* exposedParameterAt(te::Plugin& plugin, int index)
+{
+    if (auto* synthPlugin = dynamic_cast<te::FourOscPlugin*>(&plugin))
+        return fourOscMacroParameterAt(*synthPlugin, index);
+    return activeParameterAt(plugin, index);
+}
+
 tracktion::core::TimeRange firstFreeDuplicateRange(te::Clip& source)
 {
     const auto old = source.getPosition().time;
@@ -969,6 +1004,24 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
     auto* plugin = tracks[track]->pluginList[slot];
     if (plugin == nullptr) return parameters;
 
+    if (auto* synthPlugin = dynamic_cast<te::FourOscPlugin*>(plugin))
+    {
+        for (int i = 0; i < 6; ++i)
+            if (auto* parameter = fourOscMacroParameterAt(*synthPlugin, i))
+            {
+                const auto range = parameter->getValueRange();
+                if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
+                    continue;
+                parameters.push_back({fourOscMacroName(i),
+                                      parameter->getCurrentValueAsStringWithLabel(),
+                                      parameter->getCurrentValue(),
+                                      range.getStart(),
+                                      range.getEnd(),
+                                      parameter->isDiscrete()});
+            }
+        return parameters;
+    }
+
     for (auto* parameter : plugin->getAutomatableParameters())
     {
         if (parameter == nullptr || !parameter->isParameterActive())
@@ -993,7 +1046,7 @@ juce::Result Session::beginDeviceParameterGesture(int track, int slot, int param
         return juce::Result::fail("Select a device first.");
     auto* plugin = tracks[track]->pluginList[slot];
     if (plugin == nullptr) return juce::Result::fail("Select a device first.");
-    auto* parameter = activeParameterAt(*plugin, parameterIndex);
+    auto* parameter = exposedParameterAt(*plugin, parameterIndex);
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
     parameter->parameterChangeGestureBegin();
     return juce::Result::ok();
@@ -1006,7 +1059,7 @@ juce::Result Session::setDeviceParameter(int track, int slot, int parameterIndex
         return juce::Result::fail("Select a device first.");
     auto* plugin = tracks[track]->pluginList[slot];
     if (plugin == nullptr) return juce::Result::fail("Select a device first.");
-    auto* parameter = activeParameterAt(*plugin, parameterIndex);
+    auto* parameter = exposedParameterAt(*plugin, parameterIndex);
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
     const auto range = parameter->getValueRange();
     const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
@@ -1023,7 +1076,7 @@ juce::Result Session::endDeviceParameterGesture(int track, int slot, int paramet
         return juce::Result::fail("Select a device first.");
     auto* plugin = tracks[track]->pluginList[slot];
     if (plugin == nullptr) return juce::Result::fail("Select a device first.");
-    auto* parameter = activeParameterAt(*plugin, parameterIndex);
+    auto* parameter = exposedParameterAt(*plugin, parameterIndex);
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
     parameter->parameterChangeGestureEnd();
     edit->getUndoManager().beginNewTransaction();
