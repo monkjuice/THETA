@@ -22,8 +22,8 @@ PresetPattern presetPattern(Session::PatternPreset preset)
     static constexpr PresetNote warmPulse[] {{0, 48, 2}, {4, 55, 2}, {8, 60, 2}, {12, 55, 2}};
     static constexpr PresetNote acidSteps[] {{0, 48, 1}, {3, 51, 1}, {6, 55, 1}, {7, 58, 1}, {10, 55, 1}, {13, 63, 1}, {15, 58, 1}};
     static constexpr PresetNote arpRun[] {{0, 48, 16}, {0, 52, 16}, {0, 55, 16}, {0, 60, 16}};
-    static constexpr PresetNote chordPad[] {{0, 48, 16}, {0, 55, 16}, {0, 60, 16}, {0, 64, 16},
-                                            {8, 50, 8}, {8, 57, 8}, {8, 62, 8}, {8, 65, 8}};
+    static constexpr PresetNote chordPad[] {{0, 48, 7}, {0, 55, 7}, {0, 60, 7}, {0, 64, 7},
+                                            {8, 50, 7}, {8, 57, 7}, {8, 62, 7}, {8, 65, 7}};
     static constexpr PresetNote sirenLead[] {{0, 48, 1}, {1, 55, 1}, {2, 60, 1}, {3, 67, 1}, {4, 72, 2}, {7, 67, 1},
                                              {8, 60, 1}, {9, 55, 1}, {10, 48, 1}, {12, 60, 1}, {14, 67, 1}, {15, 72, 1}};
     static constexpr PresetNote houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
@@ -152,26 +152,26 @@ void setPluginParameter(te::AutomatableParameter::Ptr parameter, float value)
 
 void applyChordPadPatch(te::FourOscPlugin& synth, juce::UndoManager& undoManager)
 {
-    setPluginParameter(synth.ampAttack, 0.32f);
-    setPluginParameter(synth.ampDecay, 1.1f);
-    setPluginParameter(synth.ampSustain, 92.0f);
-    setPluginParameter(synth.ampRelease, 2.8f);
+    setPluginParameter(synth.ampAttack, 0.18f);
+    setPluginParameter(synth.ampDecay, 0.55f);
+    setPluginParameter(synth.ampSustain, 78.0f);
+    setPluginParameter(synth.ampRelease, 0.85f);
     setPluginParameter(synth.ampVelocity, 55.0f);
-    setPluginParameter(synth.filterAttack, 0.2f);
-    setPluginParameter(synth.filterDecay, 1.0f);
-    setPluginParameter(synth.filterSustain, 72.0f);
-    setPluginParameter(synth.filterRelease, 2.3f);
+    setPluginParameter(synth.filterAttack, 0.12f);
+    setPluginParameter(synth.filterDecay, 0.45f);
+    setPluginParameter(synth.filterSustain, 62.0f);
+    setPluginParameter(synth.filterRelease, 0.75f);
     setPluginParameter(synth.filterFreq, 78.0f);
     setPluginParameter(synth.filterResonance, 12.0f);
     setPluginParameter(synth.filterAmount, 0.08f);
     setPluginParameter(synth.chorusSpeed, 0.65f);
     setPluginParameter(synth.chorusDepth, 7.5f);
     setPluginParameter(synth.chorusWidth, 0.9f);
-    setPluginParameter(synth.chorusMix, 0.32f);
-    setPluginParameter(synth.reverbSize, 0.72f);
-    setPluginParameter(synth.reverbDamping, 0.45f);
+    setPluginParameter(synth.chorusMix, 0.24f);
+    setPluginParameter(synth.reverbSize, 0.48f);
+    setPluginParameter(synth.reverbDamping, 0.62f);
     setPluginParameter(synth.reverbWidth, 0.95f);
-    setPluginParameter(synth.reverbMix, 0.22f);
+    setPluginParameter(synth.reverbMix, 0.11f);
     setPluginParameter(synth.masterLevel, -9.0f);
 
     synth.state.setProperty("voiceMode", 2, &undoManager);

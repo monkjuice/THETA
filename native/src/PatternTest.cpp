@@ -110,9 +110,9 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::ChordPad);
         require(!session.isPatternDrums() && session.hasNote(0, 48) && session.hasNote(0, 64) && session.hasNote(8, 65),
                 "Chord pad preset loads sustained synth chords");
-        require(session.synth->ampRelease->getCurrentValue() > 2.0f && session.synth->chorusMix->getCurrentValue() > 0.2f
-                && session.synth->reverbMix->getCurrentValue() > 0.15f,
-                "Chord pad preset shapes the 4OSC patch for sustain");
+        require(session.synth->ampRelease->getCurrentValue() > 0.5f && session.synth->ampRelease->getCurrentValue() < 1.2f
+                && session.synth->chorusMix->getCurrentValue() > 0.2f && session.synth->reverbMix->getCurrentValue() < 0.15f,
+                "Chord pad preset shapes the 4OSC patch for controlled sustain");
         session.applyPatternPreset(Session::PatternPreset::SirenLead);
         require(!session.isPatternDrums() && session.hasNote(4, 72) && session.hasNote(10, 48),
                 "Siren lead preset loads a rising and falling synth line");
