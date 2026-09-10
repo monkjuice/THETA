@@ -263,10 +263,14 @@ void DeviceRack::resized()
     open.setBounds(getWidth() - 112, 5, 30, 24);
     bypass.setBounds(getWidth() - 76, 5, 30, 24);
     remove.setBounds(getWidth() - 40, 5, 30, 24);
-    const auto paramRows = std::min(6, static_cast<int>(parameters.size()));
-    const auto parameterHeight = paramRows > 0 ? paramRows * 34 + 12 : 0;
+    const auto paramCount = std::min(6, static_cast<int>(parameters.size()));
+    const auto parameterHeight = paramCount > 0 ? 172 : 0;
     list.setBounds(12, 34, getWidth() - 24, std::max(60, getHeight() - 42 - parameterHeight));
-    auto y = list.getBottom() + 8;
+    const auto parameterArea = juce::Rectangle<int>(12, list.getBottom() + 8, getWidth() - 24, parameterHeight).reduced(2, 0);
+    const auto columns = paramCount > 3 ? 3 : std::max(1, paramCount);
+    const auto rows = paramCount > 3 ? 2 : 1;
+    const auto cellWidth = columns > 0 ? parameterArea.getWidth() / columns : parameterArea.getWidth();
+    const auto cellHeight = rows > 0 ? parameterArea.getHeight() / rows : parameterArea.getHeight();
     for (int i = 0; i < parameterSliders.size(); ++i)
     {
         auto* name = parameterLabels[i];
@@ -282,10 +286,15 @@ void DeviceRack::resized()
         name->setVisible(true);
         slider->setVisible(true);
         value->setVisible(true);
-        name->setBounds(12, y, 92, 26);
-        value->setBounds(getWidth() - 86, y, 74, 26);
-        slider->setBounds(110, y + 2, std::max(40, getWidth() - 204), 22);
-        y += 34;
+        const auto col = i % columns;
+        const auto row = i / columns;
+        const juce::Rectangle<int> cell(parameterArea.getX() + col * cellWidth,
+                                        parameterArea.getY() + row * cellHeight,
+                                        cellWidth, cellHeight);
+        const auto knobSize = std::min({64, std::max(42, cell.getWidth() - 28), std::max(42, cell.getHeight() - 28)});
+        name->setBounds(cell.getX() + 4, cell.getY(), cell.getWidth() - 8, 18);
+        slider->setBounds(cell.withSizeKeepingCentre(knobSize, knobSize).translated(0, 4));
+        value->setBounds(cell.getX() + 4, cell.getBottom() - 20, cell.getWidth() - 8, 18);
     }
 }
 
@@ -367,13 +376,14 @@ void DeviceRack::rebuildParameterControls()
         auto* slider = parameterSliders.add(new juce::Slider());
         name->setColour(juce::Label::textColourId, juce::Colour(0xffdfe6ea));
         name->setFont(juce::FontOptions(12.0f));
+        name->setJustificationType(juce::Justification::centred);
         value->setColour(juce::Label::textColourId, juce::Colour(0xffb7c1ca));
-        value->setFont(juce::FontOptions(12.0f));
-        value->setJustificationType(juce::Justification::centredRight);
-        slider->setSliderStyle(juce::Slider::LinearHorizontal);
+        value->setFont(juce::FontOptions(11.0f));
+        value->setJustificationType(juce::Justification::centred);
+        slider->setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         slider->setColour(juce::Slider::trackColourId, juce::Colour(0xffc6d58c));
-        slider->setColour(juce::Slider::backgroundColourId, juce::Colour(0xff263139));
+        slider->setColour(juce::Slider::backgroundColourId, juce::Colour(0xff242b31));
         slider->setColour(juce::Slider::thumbColourId, juce::Colour(0xff4bb0d2));
         slider->onDragStart = [this, index]
         {
