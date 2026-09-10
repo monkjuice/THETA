@@ -27,7 +27,7 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
 
 StepGrid::~StepGrid()
 {
-    if (drawing) session.endNoteGesture();
+    if (gesture != Gesture::none) session.endNoteGesture();
     session.removeChangeListener(this);
 }
 
@@ -68,6 +68,18 @@ void StepGrid::paint(juce::Graphics& g)
             g.fillRect(bounds);
         }
     }
+    if (!session.isPatternDrums())
+    {
+        const auto maxLowest = 127 - Session::pitches + 1;
+        const auto thumbHeight = std::max(18.0f, (getHeight() - headerHeight) * (static_cast<float>(Session::pitches) / 128.0f));
+        const auto thumbTravel = std::max(1.0f, getHeight() - headerHeight - thumbHeight);
+        const auto thumbY = headerHeight + (maxLowest - lowestVisiblePitch) / static_cast<float>(maxLowest) * thumbTravel;
+        const juce::Rectangle<float> thumb(getWidth() - 5.0f, thumbY, 3.0f, thumbHeight);
+        g.setColour(juce::Colour(0x55313b44));
+        g.fillRect(juce::Rectangle<float>(getWidth() - 6.0f, headerHeight + 2.0f, 4.0f, getHeight() - headerHeight - 4.0f));
+        g.setColour(juce::Colour(0xaa8cc5d2));
+        g.fillRoundedRectangle(thumb, 1.5f);
+    }
     if (playhead >= 0)
     {
         g.setColour(playheadColour);
@@ -89,11 +101,20 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
     const auto index = hit(event.position);
     if (index < 0) return;
     grabKeyboardFocus();
-    drawing = true;
+    lastHit = index;
+    if (!event.mods.isRightButtonDown() && notes.test(static_cast<size_t>(index)))
+    {
+        gesture = Gesture::move;
+        movingNoteIndex = index;
+        noteMoved = false;
+        session.beginNoteGesture("Move note");
+        return;
+    }
+
+    gesture = Gesture::draw;
     adding = !event.mods.isRightButtonDown() && !notes.test(static_cast<size_t>(index));
     visited.reset();
-    lastHit = index;
-    session.beginNoteGesture();
+    session.beginNoteGesture(adding ? "Draw notes" : "Erase notes");
     apply(index);
 }
 
@@ -102,13 +123,38 @@ void StepGrid::apply(int index)
     if (index < 0 || visited.test(static_cast<size_t>(index))) return;
     visited.set(static_cast<size_t>(index));
     session.setNote(index % Session::steps,
-                    lowestVisiblePitch + Session::pitches - 1 - index / Session::steps, adding);
+                    pitchForIndex(index), adding);
+}
+
+int StepGrid::pitchForIndex(int index) const
+{
+    return lowestVisiblePitch + Session::pitches - 1 - index / Session::steps;
+}
+
+juce::Result StepGrid::moveCurrentNoteTo(int index)
+{
+    if (index < 0 || movingNoteIndex < 0 || index == movingNoteIndex)
+        return juce::Result::ok();
+    const auto result = session.moveNote(movingNoteIndex % Session::steps, pitchForIndex(movingNoteIndex),
+                                         index % Session::steps, pitchForIndex(index));
+    if (result.wasOk())
+    {
+        movingNoteIndex = index;
+        noteMoved = true;
+    }
+    return result;
 }
 
 void StepGrid::mouseDrag(const juce::MouseEvent& event)
 {
-    if (!drawing) return;
+    if (gesture == Gesture::none) return;
     const auto index = hit(event.position);
+    if (gesture == Gesture::move)
+    {
+        moveCurrentNoteTo(index);
+        return;
+    }
+
     // Fill skipped cells for fast horizontal strokes, without toggling a cell
     // twice when the pointer retraces its path.
     if (index >= 0 && lastHit >= 0 && index / Session::steps == lastHit / Session::steps)
@@ -119,12 +165,30 @@ void StepGrid::mouseDrag(const juce::MouseEvent& event)
 
 void StepGrid::mouseUp(const juce::MouseEvent&)
 {
-    if (drawing) session.endNoteGesture();
-    drawing = false;
+    if (gesture == Gesture::move && !noteMoved && movingNoteIndex >= 0)
+        session.setNote(movingNoteIndex % Session::steps, pitchForIndex(movingNoteIndex), false);
+    if (gesture != Gesture::none) session.endNoteGesture();
+    gesture = Gesture::none;
     lastHit = -1;
+    movingNoteIndex = -1;
+    noteMoved = false;
 }
 
-int StepGrid::visibleLowestPitch() const
+void StepGrid::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    if (gesture != Gesture::none || session.isPatternDrums())
+        return;
+    const auto wheelDelta = std::abs(wheel.deltaY) >= std::abs(wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
+    if (std::abs(wheelDelta) < 0.0001f)
+        return;
+    const auto semitones = std::max(1, juce::roundToInt(std::abs(wheelDelta) * 8.0f));
+    lowestVisiblePitch = juce::jlimit(0, 127 - Session::pitches + 1,
+                                      lowestVisiblePitch + (wheelDelta > 0.0f ? semitones : -semitones));
+    manualPitchScroll = true;
+    rebuildVisibleNotes();
+}
+
+int StepGrid::automaticLowestPitch() const
 {
     if (session.isPatternDrums())
         return Session::lowestNote;
@@ -147,22 +211,37 @@ int StepGrid::visibleLowestPitch() const
 
 void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 {
+    const auto previousLowestPitch = lowestVisiblePitch;
+    if (session.isPatternDrums())
+        manualPitchScroll = false;
+    if (!manualPitchScroll)
+        lowestVisiblePitch = automaticLowestPitch();
+    rebuildVisibleNotes();
+    if (previousLowestPitch != lowestVisiblePitch)
+        repaint();
+}
+
+void StepGrid::rebuildVisibleNotes()
+{
     std::bitset<Session::steps * Session::pitches> next;
     const auto nextDrumLabels = session.isPatternDrums();
-    const auto nextLowestPitch = visibleLowestPitch();
     for (auto* note : session.pattern().getSequence().getNotes())
     {
-        const auto row = nextLowestPitch + Session::pitches - 1 - note->getNoteNumber();
+        const auto row = lowestVisiblePitch + Session::pitches - 1 - note->getNoteNumber();
         const auto step = juce::roundToInt(note->getStartBeat().inBeats() * 4.0);
         if (row >= 0 && row < Session::pitches && step >= 0 && step < Session::steps)
             next.set(static_cast<size_t>(row * Session::steps + step));
     }
     const auto changed = next ^ notes;
     notes = next;
-    if (showingDrumLabels != nextDrumLabels || lowestVisiblePitch != nextLowestPitch)
+    if (showingDrumLabels != nextDrumLabels)
     {
         showingDrumLabels = nextDrumLabels;
-        lowestVisiblePitch = nextLowestPitch;
+        repaint();
+        return;
+    }
+    if (manualPitchScroll)
+    {
         repaint();
         return;
     }

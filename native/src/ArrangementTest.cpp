@@ -320,6 +320,27 @@ int runArrangementTest()
         session.setNote(1, 48, true);
         require(session.pattern().getSequence().getNumNotes() == selectedClipNotes + 1,
                 "Note editor writes into the selected non-first MIDI clip");
+        selectionGrid.changeListenerCallback(nullptr);
+        const auto gridEvent = [&selectionGrid](juce::Point<float> down, juce::Point<float> point, bool dragged)
+        {
+            return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
+                juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1.0f, 0, 0, 0, 0,
+                &selectionGrid, &selectionGrid, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
+        };
+        const auto rowForPitch = [&selectionGrid](int pitch)
+        {
+            return selectionGrid.lowestVisiblePitch + Session::pitches - 1 - pitch;
+        };
+        const auto sourceCell = selectionGrid.cell(1, rowForPitch(48)).getCentre();
+        const auto targetCell = selectionGrid.cell(1, rowForPitch(50)).getCentre();
+        selectionGrid.mouseDown(gridEvent(sourceCell, sourceCell, false));
+        selectionGrid.mouseDrag(gridEvent(sourceCell, targetCell, true));
+        selectionGrid.mouseUp(gridEvent(sourceCell, targetCell, true));
+        require(!session.hasNote(1, 48) && session.hasNote(1, 50),
+                "Dragging an existing note vertically changes its pitch");
+        session.undo();
+        require(session.hasNote(1, 48) && !session.hasNote(1, 50),
+                "Undo restores note pitch after a grid drag");
         session.undo();
         const auto audio2DevicesAfterSound = session.deviceSlots(2).size();
         require(view.applyBrowserDrop("theta-browser:instrument:Drums", 2).wasOk(), "Instrument browser rows can be dropped onto non-first tracks");

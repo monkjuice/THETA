@@ -61,7 +61,7 @@ int runPatternTest()
         session.setNote(4, 55, true);
         session.setNote(4, 55, true);
         session.setNote(16, 48, true);
-        session.setNote(0, 72, true);
+        session.setNote(0, 128, true);
         session.endNoteGesture();
         require(sequence.getNumNotes() == 2, "Idempotent draw and grid bounds");
         session.undo();

@@ -73,7 +73,7 @@ public:
     te::MidiClip& pattern() const { return *patternClip; }
     bool hasNote(int step, int pitch) const;
     void setNote(int step, int pitch, bool enabled);
-    void beginNoteGesture();
+    void beginNoteGesture(juce::String actionName = "Draw notes");
     void endNoteGesture();
     void clearPattern();
     void applyPatternPreset(PatternPreset);
@@ -103,6 +103,7 @@ public:
     te::Clip* findClip(te::EditItemID) const;
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
     bool shouldShowClipInArrangement(te::Clip&) const;
+    juce::Result moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch);
     juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture, int targetTrack = -1);
     juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
     juce::Result duplicateClip(te::EditItemID);

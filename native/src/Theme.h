@@ -12,51 +12,68 @@ public:
                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                           juce::Slider& slider) override
     {
-        const auto diameter = static_cast<float>(std::min(width, height)) - 4.0f;
+        const auto diameter = static_cast<float>(std::min(width, height)) - 5.0f;
         const auto area = juce::Rectangle<float>(static_cast<float>(x), static_cast<float>(y),
                                                 static_cast<float>(width), static_cast<float>(height))
                               .withSizeKeepingCentre(diameter, diameter);
         const auto radius = area.getWidth() * 0.5f;
         const auto centre = area.getCentre();
         const auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+        const auto face = slider.findColour(juce::Slider::backgroundColourId);
+        const auto accent = slider.findColour(juce::Slider::trackColourId);
+        const auto marker = slider.findColour(juce::Slider::thumbColourId);
 
-        g.setColour(slider.findColour(juce::Slider::backgroundColourId));
+        g.setColour(juce::Colour(0x33000000));
+        g.fillEllipse(area.translated(0.0f, 1.5f).expanded(1.0f));
+        g.setColour(face.brighter(0.05f));
         g.fillEllipse(area);
-        g.setColour(juce::Colour(0xff11161a));
-        g.drawEllipse(area.reduced(0.5f), 1.0f);
+        g.setColour(face.darker(0.62f));
+        g.fillEllipse(area.reduced(radius * 0.18f));
+        g.setColour(face.brighter(0.55f).withAlpha(0.28f));
+        g.drawEllipse(area.reduced(1.0f), 1.0f);
 
-        const auto arc = area.reduced(3.0f);
+        const auto arc = area.reduced(4.0f);
         juce::Path backgroundArc;
         backgroundArc.addCentredArc(centre.x, centre.y, arc.getWidth() * 0.5f, arc.getHeight() * 0.5f,
                                     0.0f, rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour(slider.findColour(juce::Slider::backgroundColourId).brighter(0.25f));
-        g.strokePath(backgroundArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour(face.brighter(0.32f).withAlpha(0.55f));
+        g.strokePath(backgroundArc, juce::PathStrokeType(2.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
         juce::Path valueArc;
         valueArc.addCentredArc(centre.x, centre.y, arc.getWidth() * 0.5f, arc.getHeight() * 0.5f,
                                0.0f, rotaryStartAngle, angle, true);
-        g.setColour(slider.findColour(juce::Slider::trackColourId));
-        g.strokePath(valueArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour(accent);
+        g.strokePath(valueArc, juce::PathStrokeType(3.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-        g.setColour(juce::Colour(0xffaab7bf));
-        for (const auto tickAngle : {0.0f, juce::MathConstants<float>::halfPi,
-                                     juce::MathConstants<float>::pi, juce::MathConstants<float>::pi * 1.5f})
+        const auto pointAt = [centre](float a, float r)
         {
-            const auto tickCentre = centre + juce::Point<float>(std::sin(tickAngle), -std::cos(tickAngle)) * (radius * 0.43f);
-            const auto horizontal = std::abs(std::sin(tickAngle)) > 0.5f;
-            const juce::Rectangle<float> tick(horizontal ? tickCentre.x - 5.0f : tickCentre.x - 1.0f,
-                                             horizontal ? tickCentre.y - 1.0f : tickCentre.y - 5.0f,
-                                             horizontal ? 10.0f : 2.0f,
-                                             horizontal ? 2.0f : 10.0f);
-            g.fillRect(tick);
+            return centre + juce::Point<float>(std::sin(a), -std::cos(a)) * r;
+        };
+        for (int i = 0; i < 8; ++i)
+        {
+            const auto tickAngle = juce::MathConstants<float>::twoPi * static_cast<float>(i) / 8.0f;
+            const auto major = i % 2 == 0;
+            const auto inner = pointAt(tickAngle, radius * (major ? 0.31f : 0.35f));
+            const auto outer = pointAt(tickAngle, radius * (major ? 0.49f : 0.45f));
+            juce::Path tick;
+            tick.startNewSubPath(inner);
+            tick.lineTo(outer);
+            g.setColour(juce::Colour(0xffb9c4cb).withAlpha(major ? 0.86f : 0.42f));
+            g.strokePath(tick, juce::PathStrokeType(major ? 1.7f : 1.2f,
+                                                    juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::rounded));
         }
 
         juce::Path pointer;
-        pointer.addRectangle(-1.25f, -radius * 0.36f, 2.5f, radius * 0.31f);
-        g.setColour(slider.findColour(juce::Slider::thumbColourId));
-        g.fillPath(pointer, juce::AffineTransform::rotation(angle).translated(centre.x, centre.y));
-        g.setColour(juce::Colour(0xff0c1013));
-        g.drawEllipse(area.reduced(radius * 0.34f), 1.0f);
+        pointer.startNewSubPath(0.0f, -radius * 0.08f);
+        pointer.lineTo(0.0f, -radius * 0.39f);
+        g.setColour(marker);
+        g.strokePath(pointer, juce::PathStrokeType(2.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
+                     juce::AffineTransform::rotation(angle).translated(centre.x, centre.y));
+        g.setColour(juce::Colour(0xff151b20));
+        g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre(centre));
+        g.setColour(marker.withAlpha(0.68f));
+        g.drawEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre(centre), 1.0f);
     }
 
     void drawButtonBackground(juce::Graphics& g, juce::Button& button,

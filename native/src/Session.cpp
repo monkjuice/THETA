@@ -355,13 +355,13 @@ bool Session::hasNote(int step, int pitch) const
     return false;
 }
 
-void Session::beginNoteGesture() { edit->getUndoManager().beginNewTransaction("Draw notes"); }
+void Session::beginNoteGesture(juce::String actionName) { edit->getUndoManager().beginNewTransaction(actionName); }
 void Session::endNoteGesture() { edit->getUndoManager().beginNewTransaction(); }
 
 void Session::setNote(int step, int pitch, bool enabled)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    if (step < 0 || step >= steps || pitch < lowestNote || pitch >= lowestNote + pitches)
+    if (step < 0 || step >= steps || pitch < 0 || pitch > 127)
         return;
     auto& sequence = pattern().getSequence();
     auto* undoManager = &edit->getUndoManager();
@@ -385,6 +385,41 @@ void Session::setNote(int step, int pitch, bool enabled)
         markModified();
     }
     sendSynchronousChangeMessage();
+}
+
+juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    if (sourceStep < 0 || sourceStep >= steps || targetStep < 0 || targetStep >= steps
+        || sourcePitch < 0 || sourcePitch > 127
+        || targetPitch < 0 || targetPitch > 127)
+        return juce::Result::fail("Move notes inside the visible pitch grid.");
+    if (sourceStep == targetStep && sourcePitch == targetPitch)
+        return juce::Result::ok();
+
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    auto* moving = static_cast<te::MidiNote*>(nullptr);
+    for (auto* note : sequence.getNotes())
+    {
+        const auto step = juce::roundToInt(note->getStartBeat().inBeats() * 4.0);
+        if (step == targetStep && note->getNoteNumber() == targetPitch)
+            return juce::Result::fail("That note cell is already occupied.");
+        if (step == sourceStep && note->getNoteNumber() == sourcePitch)
+            moving = note;
+    }
+    if (moving == nullptr)
+        return juce::Result::fail("Select a note to move.");
+
+    const auto targetStart = tracktion::core::BeatPosition::fromBeats(targetStep * 0.25);
+    const auto maximumLength = tracktion::core::BeatDuration::fromBeats(4.0 - targetStart.inBeats());
+    if (maximumLength <= tracktion::core::BeatDuration())
+        return juce::Result::fail("Move notes inside the clip.");
+    moving->setStartAndLength(targetStart, std::min(moving->getLengthBeats(), maximumLength), undoManager);
+    moving->setNoteNumber(targetPitch, undoManager);
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 void Session::clearPattern()
