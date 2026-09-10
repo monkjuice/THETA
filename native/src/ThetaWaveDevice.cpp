@@ -195,8 +195,6 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
 
     SCOPED_REALTIME_CHECK
     auto& buffer = *context.destBuffer;
-    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
-        buffer.clear(channel, context.bufferStartSample, context.bufferNumSamples);
 
     if (context.bufferForMidiMessages != nullptr)
         for (const auto& midi : *context.bufferForMidiMessages)
@@ -233,9 +231,9 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
         const auto left = std::clamp(filterL - side * widthParam->getCurrentValue() * 0.18f, -0.98f, 0.98f);
         const auto right = std::clamp(filterR + side * widthParam->getCurrentValue() * 0.18f, -0.98f, 0.98f);
         if (buffer.getNumChannels() > 0)
-            buffer.setSample(0, frame, left);
+            buffer.setSample(0, frame, std::clamp(buffer.getSample(0, frame) + left, -0.98f, 0.98f));
         if (buffer.getNumChannels() > 1)
-            buffer.setSample(1, frame, right);
+            buffer.setSample(1, frame, std::clamp(buffer.getSample(1, frame) + right, -0.98f, 0.98f));
     }
 }
 

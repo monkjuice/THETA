@@ -1,5 +1,6 @@
 #include "Arrangement.h"
 #include "Playhead.h"
+#include <limits>
 #include <optional>
 #include <set>
 
@@ -504,6 +505,41 @@ double Arrangement::snapped(double seconds, bool bypass) const
     return snap.getToggleState() && !bypass ? std::round(seconds / unit) * unit : seconds;
 }
 
+double Arrangement::snappedClipMoveStart(double desiredStart, double length, int targetTrack, bool bypass) const
+{
+    if (bypass || !snap.getToggleState())
+        return desiredStart;
+
+    const auto desiredEnd = desiredStart + length;
+    auto bestStart = desiredStart;
+    auto bestPixels = std::numeric_limits<float>::max();
+    constexpr auto edgeSnapPixels = 14.0f;
+
+    for (const auto& clip : clips)
+    {
+        if (clip.id == selected || clip.track != targetTrack)
+            continue;
+        for (const auto edge : {clip.position.start, clip.position.end})
+        {
+            const auto startPixels = std::abs(xFor(edge) - xFor(desiredStart));
+            if (startPixels <= edgeSnapPixels && startPixels < bestPixels)
+            {
+                bestPixels = startPixels;
+                bestStart = edge;
+            }
+
+            const auto endPixels = std::abs(xFor(edge) - xFor(desiredEnd));
+            if (endPixels <= edgeSnapPixels && endPixels < bestPixels)
+            {
+                bestPixels = endPixels;
+                bestStart = edge - length;
+            }
+        }
+    }
+
+    return std::max(0.0, bestPixels < std::numeric_limits<float>::max() ? bestStart : snapped(desiredStart, false));
+}
+
 int Arrangement::hit(juce::Point<float> point) const
 {
     if (point.x < headerWidth) return -1;
@@ -626,16 +662,22 @@ void Arrangement::mouseDrag(const juce::MouseEvent& event)
     }
     if (!dragging) return;
     const auto anchor = gesture == ClipGesture::trimRight ? original.end : original.start;
-    preview = previewClipEdit(original, gesture, snapped(anchor + timeAt(event.position.x) - dragTime, event.mods.isAltDown()), sourceDuration);
+    auto targetTrack = previewTrack;
     if (gesture == ClipGesture::move)
     {
         if (const auto target = trackAt(event.position.y); target >= 0)
-            previewTrack = target;
+            targetTrack = target;
         else if (session.trackCount() > 0 && event.position.y > lane(session.trackCount() - 1).getBottom())
-            previewTrack = session.trackCount();
+            targetTrack = session.trackCount();
         else
-            previewTrack = originalTrack;
+            targetTrack = originalTrack;
     }
+    const auto rawStart = anchor + timeAt(event.position.x) - dragTime;
+    const auto editTime = gesture == ClipGesture::move
+        ? snappedClipMoveStart(rawStart, original.end - original.start, targetTrack, event.mods.isAltDown())
+        : snapped(rawStart, event.mods.isAltDown());
+    preview = previewClipEdit(original, gesture, editTime, sourceDuration);
+    previewTrack = targetTrack;
     repaint(lane(originalTrack).getUnion(lane(juce::jlimit(0, session.trackCount() - 1, previewTrack))).getSmallestIntegerContainer());
 }
 

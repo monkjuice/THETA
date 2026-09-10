@@ -206,6 +206,10 @@ int runArrangementTest()
         view.snapSize.setSelectedId(1, juce::dontSendNotification);
         view.duplicateSelected();
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 2, "Duplicate creates a second audio clip");
+        auto* duplicate = te::getAudioTracks(*session.edit)[1]->getClips().getLast();
+        const auto originalEnd = clip->getPosition().time.getEnd().inSeconds();
+        require(close(duplicate->getPosition().time.getStart().inSeconds(), originalEnd),
+                "Duplicate places audio clips exactly after the source clip when space is available");
         session.undo();
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Undo duplicate restores one audio clip");
         clip = session.findAudioClip(id);
@@ -239,6 +243,41 @@ int runArrangementTest()
             view.mouseDrag(event(down, to, true));
             view.mouseUp(event(down, to, true));
         };
+        view.selected = id;
+        view.duplicateSelected();
+        auto* snapDuplicate = te::getAudioTracks(*session.edit)[1]->getClips().getLast();
+        const auto snapDuplicateID = snapDuplicate->itemID;
+        require(session.editClip(snapDuplicateID, {1.35, 2.35, snapDuplicate->getPosition().offset.inSeconds()}, ClipGesture::move).wasOk(),
+                "Can move duplicate away before testing clip-edge snap");
+        view.sync();
+        view.selected = snapDuplicateID;
+        drag({view.xFor(1.85), view.lane(1).getCentreY()}, {view.xFor(1.46), view.lane(1).getCentreY()});
+        require(close(session.findAudioClip(snapDuplicateID)->getPosition().time.getStart().inSeconds(), originalEnd),
+                "Dragging a clip near a neighbor edge snaps it flush instead of overlapping");
+        session.undo();
+        session.undo();
+        session.undo();
+        require(session.editClip(id, {0.0, 0.5, 0.0}, ClipGesture::trimRight).wasOk(),
+                "Can trim the source audio clip before testing trimmed edge snap");
+        view.sync();
+        view.selected = id;
+        view.duplicateSelected();
+        auto* trimmedDuplicate = te::getAudioTracks(*session.edit)[1]->getClips().getLast();
+        const auto trimmedDuplicateID = trimmedDuplicate->itemID;
+        require(close(trimmedDuplicate->getPosition().time.getStart().inSeconds(), 0.5),
+                "Duplicate places trimmed audio clips directly after the visible clip end");
+        require(session.editClip(trimmedDuplicateID, {1.35, 1.85, trimmedDuplicate->getPosition().offset.inSeconds()}, ClipGesture::move).wasOk(),
+                "Can move trimmed duplicate away before testing edge snap");
+        view.sync();
+        view.selected = trimmedDuplicateID;
+        drag({view.xFor(1.6), view.lane(1).getCentreY()}, {view.xFor(0.77), view.lane(1).getCentreY()});
+        require(close(session.findAudioClip(trimmedDuplicateID)->getPosition().time.getStart().inSeconds(), 0.5),
+                "Dragging a trimmed clip near a neighbor edge snaps it flush instead of overlapping");
+        session.undo();
+        session.undo();
+        session.undo();
+        session.undo();
+        view.selected = id;
         const auto rulerY = view.rulerTop + 8.0f;
         drag({view.xFor(0.5), rulerY}, {view.xFor(1.5), rulerY});
         auto loopRange = session.edit->getTransport().getLoopRange();
@@ -353,6 +392,19 @@ int runArrangementTest()
         session.undo();
         require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr, "Undo restores the clip to its original track");
         require(te::getAudioTracks(*session.edit)[2]->findClipForID(id) == nullptr, "Undo removes the clip from the drag target track");
+        view.sync();
+        session.applyPatternPreset(Session::PatternPreset::WavePluck);
+        view.sync();
+        view.selected = id;
+        drag({view.xFor(0.2), view.lane(1).getCentreY()}, {view.xFor(0.5), view.lane(0).getCentreY()});
+        require(te::getAudioTracks(*session.edit)[0]->findClipForID(id) != nullptr,
+                "Dragging an audio clip onto an instrument lane moves it there");
+        require(renderClipRms(*session.findAudioClip(id)) > 0.01f,
+                "Audio moved onto a Theta Wave instrument lane still renders audible audio");
+        session.undo();
+        session.undo();
+        require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr,
+                "Undo restores audio after an instrument-lane move");
         view.sync();
         session.togglePlayback();
         require(session.edit->getTransport().isPlaying(), "Transport starts before cross-track clip drag");

@@ -68,6 +68,7 @@ private:
     float xFor(double seconds) const;
     double timeAt(float x) const;
     double snapped(double seconds, bool bypass) const;
+    double snappedClipMoveStart(double desiredStart, double length, int targetTrack, bool bypass) const;
     LoopGesture loopGestureAt(juce::Point<float>) const;
     juce::Rectangle<float> lane(int track) const;
     float laneHeight() const;

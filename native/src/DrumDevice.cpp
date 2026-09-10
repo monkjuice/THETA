@@ -123,9 +123,6 @@ void DrumDevice::applyToBuffer(const te::PluginRenderContext& context)
         return;
 
     SCOPED_REALTIME_CHECK
-    for (int channel = 0; channel < context.destBuffer->getNumChannels(); ++channel)
-        context.destBuffer->clear(channel, context.bufferStartSample, context.bufferNumSamples);
-
     if (context.bufferForMidiMessages != nullptr)
         for (const auto& midi : *context.bufferForMidiMessages)
             if (midi.isNoteOn())
@@ -139,7 +136,7 @@ void DrumDevice::applyToBuffer(const te::PluginRenderContext& context)
                 sample += render(voice);
         sample = std::clamp(sample, -0.95f, 0.95f);
         for (int channel = 0; channel < context.destBuffer->getNumChannels(); ++channel)
-            context.destBuffer->setSample(channel, frame, sample);
+            context.destBuffer->setSample(channel, frame, std::clamp(context.destBuffer->getSample(channel, frame) + sample, -0.95f, 0.95f));
     }
 }
 
