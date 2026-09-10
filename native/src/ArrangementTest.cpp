@@ -231,6 +231,15 @@ int runArrangementTest()
         drag({466.5f, 180}, {413.25f, 180});
         require(close(clip->getPosition().time.getEnd().inSeconds(), 1.25), "Right handle trims end");
         require(close(clip->getPosition().offset.inSeconds(), 0.25), "Right trim preserves source offset");
+        drag({view.xFor(1.25) - 2.0f, 180}, {view.xFor(1.5), 180});
+        require(close(clip->getPosition().time.getEnd().inSeconds(), 1.5), "Right handle expands audio to available source end");
+        drag({view.xFor(0.75) + 2.0f, 180}, {view.xFor(0.5), 180});
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.5), "Left handle expands audio to available source start");
+        require(close(clip->getPosition().offset.inSeconds(), 0.0), "Left expansion rewinds source offset");
+        session.undo();
+        session.undo();
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.75), "Undo restores left expansion");
+        require(close(clip->getPosition().time.getEnd().inSeconds(), 1.25), "Undo restores right expansion");
         const auto originalPosition = clip->getPosition();
         view.mouseDown(event({360, 180}, {360, 180}, false));
         view.mouseDrag(event({360, 180}, {500, 180}, true));

@@ -257,8 +257,9 @@ void Arrangement::sync()
         for (auto* clip : tracks[track]->getClips())
         {
             const auto p = clip->getPosition();
-            ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(), track};
-            if (dynamic_cast<te::WaveAudioClip*>(clip))
+            ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(),
+                           p.offset.inSeconds() + p.time.getLength().inSeconds(), track};
+            if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
             {
                 const auto file = clip->getSourceFileReference().getFile();
                 const auto key = file.getFullPathName();
@@ -266,6 +267,7 @@ void Arrangement::sync()
                 auto& waveform = waveforms[key];
                 if (!waveform) waveform = std::make_unique<Waveform>(*this, file);
                 view.waveform = waveform.get();
+                view.sourceDuration = audio->getSourceLength().inSeconds() / std::max(0.0001, view.speed);
             }
             else if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
             {
@@ -386,8 +388,7 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     selectTrack(clip.track);
     repaint();
     original = preview = clip.position;
-    sourceDuration = clip.waveform && clip.waveform->thumbnail.getTotalLength() > 0.0
-        ? clip.waveform->thumbnail.getTotalLength() / clip.speed : original.offset + original.end - original.start;
+    sourceDuration = clip.sourceDuration;
     const auto box = bounds(clip);
     const auto handleWidth = std::min(7.0f, box.getWidth() * 0.25f);
     gesture = event.position.x - box.getX() < handleWidth ? ClipGesture::trimLeft

@@ -43,6 +43,7 @@ private:
         Waveform* waveform = nullptr;
         std::vector<MidiNoteView> midiNotes;
         double speed = 1.0;
+        double sourceDuration = 0.0;
         int track = 0;
     };
     void sync();
