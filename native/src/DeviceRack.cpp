@@ -66,7 +66,7 @@ void DeviceRack::paintListBoxItem(int row, juce::Graphics& g, int width, int hei
     const auto& slot = slots[static_cast<size_t>(row)];
     g.fillAll(selected ? juce::Colour(0xff34424a) : juce::Colour(row % 2 == 0 ? 0xff20262b : 0xff242a30));
     g.setColour(slot.enabled ? juce::Colour(0xffc6d58c) : juce::Colour(0xff6e7780));
-    g.fillRoundedRectangle(8.0f, height * 0.5f - 4.0f, 8.0f, 8.0f, 1.5f);
+    g.fillRect(8, height / 2 - 4, 8, 8);
     g.setFont(juce::FontOptions(13.0f));
     g.setColour(slot.enabled ? juce::Colour(0xffe5ebef) : juce::Colour(0xff9aa4ad));
     g.drawText(slot.name, 24, 0, width / 2 - 24, height, juce::Justification::centredLeft, true);

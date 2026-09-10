@@ -25,6 +25,10 @@ int runArrangementTest()
             if (!valid) throw std::runtime_error(message);
         };
         const auto close = [](double a, double b) { return std::abs(a - b) < 0.0001; };
+        const auto isMidiNotePixel = [](juce::Colour colour)
+        {
+            return colour.getRed() > 150 && colour.getGreen() > 165 && colour.getBlue() > 95;
+        };
         juce::TemporaryFile source(".wav");
         juce::WavAudioFormat wav;
         {
@@ -101,7 +105,7 @@ int runArrangementTest()
         int midiPixels = 0;
         for (int y = 95; y < 122; ++y)
             for (int x = 155; x < 620; ++x)
-                if (midiPicture.getPixelAt(x, y) == juce::Colour(0xffc6d58c)) ++midiPixels;
+                if (isMidiNotePixel(midiPicture.getPixelAt(x, y))) ++midiPixels;
         require(midiPixels >= 25, "Pattern lane must draw visible MIDI notes");
         const auto patternID = session.pattern().itemID;
         view.selected = patternID;

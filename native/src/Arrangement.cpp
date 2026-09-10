@@ -152,9 +152,9 @@ void Arrangement::paint(juce::Graphics& g)
         juce::Graphics::ScopedSaveState scope(g);
         g.reduceClipRegion(lane(clip.track).getSmallestIntegerContainer());
         g.setColour(juce::Colour(clip.track == 0 ? 0xff414c34 : 0xff284b59));
-        g.fillRoundedRectangle(box, 3.0f);
+        g.fillRect(box);
         g.setColour(juce::Colour(clip.id == selected ? 0xffdce9b1 : 0xff617985));
-        g.drawRoundedRectangle(box.reduced(0.5f), 3.0f, clip.id == selected ? 2.0f : 1.0f);
+        g.drawRect(box.reduced(0.5f), clip.id == selected ? 2.0f : 1.0f);
         g.setColour(juce::Colour(0xffe0e7ec));
         g.drawText(clip.name, visible.reduced(6.0f, 0).withHeight(23.0f), juce::Justification::centredLeft, true);
         if (clip.waveform)
@@ -197,9 +197,9 @@ void Arrangement::paint(juce::Graphics& g)
                 const juce::Rectangle<float> noteBox {x1, y, w, h};
                 if (!noteBox.intersects(visible)) continue;
                 g.setColour(juce::Colour(0xffc6d58c));
-                g.fillRoundedRectangle(noteBox, 2.0f);
+                g.fillRect(noteBox);
                 g.setColour(juce::Colour(0xffe8f1bd));
-                g.drawRoundedRectangle(noteBox.reduced(0.5f), 2.0f, 1.0f);
+                g.drawRect(noteBox.reduced(0.5f), 1.0f);
             }
             if (clip.midiNotes.empty())
             {

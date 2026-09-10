@@ -64,7 +64,7 @@ void StepGrid::paint(juce::Graphics& g)
             if (!dirty.intersects(bounds)) continue;
             const bool active = notes.test(static_cast<size_t>(row * Session::steps + step));
             g.setColour(juce::Colour(active ? 0xffc6d58c : (step / 4 % 2 == 0 ? 0xff2a3139 : 0xff252c33)));
-            g.fillRoundedRectangle(bounds, 3.0f);
+            g.fillRect(bounds);
         }
     }
     if (playhead >= 0)

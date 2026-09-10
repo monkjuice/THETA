@@ -136,7 +136,7 @@ public:
     {
         g.fillAll(juce::Colour(0xff171a1e));
         g.setColour(juce::Colour(0xff24282d));
-        g.fillRoundedRectangle(262.0f, static_cast<float>(getHeight() - 78), static_cast<float>(getWidth() - 286), 54.0f, 8.0f);
+        g.fillRect(262, getHeight() - 78, getWidth() - 286, 54);
     }
 
     void resized() override

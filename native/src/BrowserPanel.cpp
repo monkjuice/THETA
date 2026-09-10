@@ -113,7 +113,7 @@ void BrowserPanel::paintListBoxItem(int row, juce::Graphics& g, int width, int h
     const auto& item = items[static_cast<size_t>(rows[static_cast<size_t>(row)])];
     g.fillAll(selected ? juce::Colour(0xff34424a) : juce::Colour(row % 2 == 0 ? 0xff20262c : 0xff242a31));
     g.setColour(item.preset ? juce::Colour(0xffc6d58c) : item.effect ? juce::Colour(0xffffb15f) : juce::Colour(0xff8cc5d2));
-    g.fillRoundedRectangle(8.0f, height * 0.5f - 4.0f, 8.0f, 8.0f, 1.5f);
+    g.fillRect(8, height / 2 - 4, 8, 8);
     g.setFont(juce::FontOptions(14.0f));
     g.setColour(juce::Colour(0xffe5ebef));
     g.drawText(item.name, 24, 3, width - 30, 17, juce::Justification::centredLeft, true);
