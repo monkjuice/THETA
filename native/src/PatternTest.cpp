@@ -71,6 +71,8 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::HouseKit);
         require(sequence.getNumNotes() == 10, "Drum kit preset loads notes");
         require(!session.synth->isEnabled() && session.drums->isEnabled(), "Drum kit preset enables drum instrument");
+        session.panicReset();
+        require(!session.edit->getTransport().isPlaying(), "Panic reset stops playback");
         session.undo();
         require(sequence.getNumNotes() == 2, "Undo restores notes before preset load");
         require(session.synth->isEnabled() && !session.drums->isEnabled(), "Undo restores synth instrument");

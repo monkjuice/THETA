@@ -104,12 +104,19 @@ public:
         };
         play.onClick = [this] { session.togglePlayback(); };
         stop.onClick = [this] { session.stop(); };
+        panic.onClick = [this]
+        {
+            session.panicReset();
+            logStatus("Panic reset: stopped transport, reset plugins, restarted audio device");
+        };
         import.onClick = [this] { chooseAudio(); };
         play.setButtonText(L"\u25b6");
         stop.setButtonText(L"\u25a0");
+        panic.setButtonText("!");
         import.setButtonText(L"\uff0b");
-        play.setTooltip("Play");
-        stop.setTooltip("Stop");
+        play.setTooltip("Play or pause");
+        stop.setTooltip("Stop and return to start");
+        panic.setTooltip("Panic reset audio");
         import.setTooltip("Add audio");
         settings.onClick = [this]
         {
@@ -129,7 +136,7 @@ public:
             audioSettings = options.launchAsync();
         };
         for (auto* component : std::initializer_list<juce::Component*>{
-                 &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &import, &settings,
+                 &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &panic, &import, &settings,
                  &browser, &browserToggle, &rackToggle, &grid, &arrangement, &rack, &tempo, &undo, &redo, &clear, &hint, &open, &save,
                  &documentName, &patternLabel})
             addAndMakeVisible(component);
@@ -197,11 +204,12 @@ public:
         status.setBounds(24, 68, getWidth() - 48, 28);
         play.setBounds(editorX, 116, 38, 36);
         stop.setBounds(editorX + 46, 116, 38, 36);
-        import.setBounds(editorX + 100, 116, 38, 36);
-        tempo.setBounds(editorX + 160, 119, 122, 30);
-        undo.setBounds(editorX + 302, 119, 34, 30);
-        redo.setBounds(editorX + 342, 119, 34, 30);
-        clear.setBounds(editorX + 386, 119, 34, 30);
+        panic.setBounds(editorX + 92, 116, 38, 36);
+        import.setBounds(editorX + 138, 116, 38, 36);
+        tempo.setBounds(editorX + 198, 119, 122, 30);
+        undo.setBounds(editorX + 340, 119, 34, 30);
+        redo.setBounds(editorX + 380, 119, 34, 30);
+        clear.setBounds(editorX + 424, 119, 34, 30);
         position.setBounds(getWidth() - 165, 116, 140, 36);
         browser.setVisible(browserOpen);
         browser.setBounds(0, 104, browserWidth, getHeight() - 104);
@@ -350,7 +358,9 @@ private:
 
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
-        play.setButtonText(session.edit->getTransport().isPlaying() ? juce::String(L"\u275a\u275a") : juce::String(L"\u25b6"));
+        const auto playing = session.edit->getTransport().isPlaying();
+        play.setButtonText(playing ? juce::String(L"\u275a\u275a") : juce::String(L"\u25b6"));
+        play.setTooltip(playing ? "Pause" : "Play");
         tempo.setValue(session.tempo(), juce::dontSendNotification);
         if (!gain.isMouseButtonDown())
             gain.setValue(session.utility->gain().getCurrentValue(), juce::dontSendNotification);
@@ -402,7 +412,7 @@ private:
     DeviceRack rack;
     juce::Slider tempo;
     juce::TextButton undo {"Undo"}, redo {"Redo"}, clear {"Clear"};
-    juce::TextButton play {"Play"}, stop {"Stop"}, import {"Add audio"}, settings {"Audio settings"};
+    juce::TextButton play {"Play"}, stop {"Stop"}, panic {"Panic"}, import {"Add audio"}, settings {"Audio settings"};
     juce::TextButton browserToggle {"<"}, rackToggle {">"};
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> audioSettings;

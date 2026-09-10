@@ -88,6 +88,18 @@ bool effectTypeAndName(Session::AudioEffect effect, const char*& type, juce::Str
     return type != nullptr;
 }
 
+void resetPluginList(te::PluginList* list)
+{
+    if (list == nullptr)
+        return;
+    for (auto* plugin : *list)
+        if (plugin != nullptr)
+        {
+            plugin->midiPanic();
+            plugin->reset();
+        }
+}
+
 void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoManager& undoManager)
 {
     auto& sequence = clip.getSequence();
@@ -305,6 +317,27 @@ void Session::stop()
 {
     edit->getTransport().stop(false, false);
     edit->getTransport().setPosition({});
+}
+
+void Session::panicReset()
+{
+    te::TransportControl::stopAllTransports(engine, false, true);
+    auto& transport = edit->getTransport();
+    transport.stop(false, true);
+    transport.setPosition({});
+
+    for (auto* track : te::getAudioTracks(*edit))
+    {
+        resetPluginList(&track->pluginList);
+        for (auto* clip : track->getClips())
+            resetPluginList(clip->getPluginList());
+    }
+
+    transport.freePlaybackContext();
+    engine.getDeviceManager().deviceManager.closeAudioDevice();
+    engine.getDeviceManager().deviceManager.restartLastAudioDevice();
+    transport.ensureContextAllocated(true);
+    sendSynchronousChangeMessage();
 }
 
 bool Session::hasNote(int step, int pitch) const
