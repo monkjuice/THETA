@@ -19,7 +19,7 @@ juce_add_gui_app(ThetaNative
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 juce_add_binary_data(ThetaNativeAssets
-    SOURCES assets/Korg-M1-Clap.wav)
+    SOURCES assets/HandClap-01_09.flac)
 target_sources(ThetaNative PRIVATE
     src/Main.cpp src/Session.cpp src/StepGrid.cpp src/Arrangement.cpp src/ProjectFiles.cpp src/Playhead.cpp
     src/BrowserPanel.cpp src/DeviceRack.cpp src/DrumDevice.cpp src/UtilityDevice.cpp src/ThetaSpaceDevice.cpp src/ThetaArpDevice.cpp

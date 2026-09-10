@@ -148,11 +148,12 @@ void DrumDevice::loadClapSample()
     if (clapSample.getNumSamples() > 0)
         return;
 
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::AudioFormatReader> reader(wav.createReaderFor(
-        new juce::MemoryInputStream(BinaryData::KorgM1Clap_wav,
-                                    static_cast<size_t>(BinaryData::KorgM1Clap_wavSize), false),
-        true));
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(
+        std::make_unique<juce::MemoryInputStream>(BinaryData::HandClap01_09_flac,
+                                                  static_cast<size_t>(BinaryData::HandClap01_09_flacSize),
+                                                  false)));
     if (reader == nullptr || reader->lengthInSamples <= 0)
         return;
 
