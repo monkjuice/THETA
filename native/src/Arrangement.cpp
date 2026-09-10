@@ -276,7 +276,8 @@ void Arrangement::paint(juce::Graphics& g)
         g.setColour(juce::Colour(clip.id == selected ? 0xffdce9b1 : 0xff617985));
         g.drawRect(box.reduced(0.5f), clip.id == selected ? 2.0f : 1.0f);
         g.setColour(juce::Colour(0xffe0e7ec));
-        g.drawText(clip.name, visible.reduced(6.0f, 0).withHeight(23.0f), juce::Justification::centredLeft, true);
+        if (visible.getWidth() >= 24.0f)
+            g.drawText(clip.name, visible.reduced(6.0f, 0).withHeight(23.0f), juce::Justification::centredLeft, true);
         if (clip.clipPlugins > 0)
         {
             const auto badge = visible.withSizeKeepingCentre(28.0f, 16.0f).withRightX(visible.getRight() - 5.0f).withY(visible.getY() + 5.0f);
@@ -307,6 +308,8 @@ void Arrangement::paint(juce::Graphics& g)
         }
         else
         {
+            juce::Graphics::ScopedSaveState clipContentScope(g);
+            g.reduceClipRegion(visible.getSmallestIntegerContainer());
             const auto noteArea = box.withTop(box.getY() + 28.0f).reduced(6.0f, 5.0f);
             g.setColour(juce::Colour(0x553f4837));
             for (int step = 1; step < Session::steps; ++step)

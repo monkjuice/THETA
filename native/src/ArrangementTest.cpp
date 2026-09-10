@@ -140,6 +140,17 @@ int runArrangementTest()
                 if (isMidiNotePixel(midiPicture.getPixelAt(x, y))) ++midiPixels;
         require(midiPixels >= 25, "Pattern lane must draw visible MIDI notes");
         const auto patternID = session.pattern().itemID;
+        require(session.editClip(patternID, {0.0, 0.25, 0.0}, ClipGesture::trimRight).wasOk(),
+                "Can create a very short MIDI clip for paint clipping");
+        view.sync();
+        auto shortMidiPicture = view.createComponentSnapshot(view.getLocalBounds());
+        int escapedMidiPixels = 0;
+        for (int y = 95; y < 122; ++y)
+            for (int x = static_cast<int>(view.xFor(0.25)) + 4; x < 620; ++x)
+                if (isMidiNotePixel(shortMidiPicture.getPixelAt(x, y))) ++escapedMidiPixels;
+        require(escapedMidiPixels == 0, "Short MIDI clips must clip note bars to the visible clip bounds");
+        session.undo();
+        view.sync();
         view.selected = patternID;
         view.duplicateSelected();
         require(te::getAudioTracks(*session.edit)[0]->getClips().size() == 2, "Duplicate creates a second MIDI pattern clip");
