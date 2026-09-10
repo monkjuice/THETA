@@ -82,12 +82,13 @@ float DrumDevice::render(Voice& voice)
 
     if (voice.type == VoiceType::clap)
     {
-        if (t > 0.42f) { voice.active = false; return 0.0f; }
-        const auto burst = std::exp(-std::fmod(t, 0.031f) * 58.0f);
-        const auto tail = std::exp(-t * 10.0f);
+        if (t > 0.26f) { voice.active = false; return 0.0f; }
+        const auto crack = std::exp(-t * 95.0f);
+        const auto body = (1.0f - std::exp(-t * 240.0f)) * std::exp(-t * 18.0f);
         const auto noise = nextNoise(voice);
-        voice.noise = noise - voice.noise * 0.54f;
-        return voice.noise * (0.45f * burst + 0.24f * tail) * voice.velocity;
+        const auto highPassed = noise - voice.noise * 0.72f;
+        voice.noise = noise;
+        return highPassed * (0.42f * crack + 0.32f * body) * voice.velocity;
     }
 
     if (t > 0.12f) { voice.active = false; return 0.0f; }
