@@ -79,7 +79,7 @@ private:
     juce::AudioThumbnailCache thumbnailCache {32};
     std::map<juce::String, std::unique_ptr<Waveform>> waveforms;
     std::vector<ClipView> clips;
-    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, addTrack {"+ Track"}, removeTrack {"- Track"}, snap {"Clip Snap"};
+    juce::TextButton fitButton, zoomIn, zoomOut, splitButton, duplicateButton, addTrack, removeTrack, snap;
     juce::ComboBox snapSize;
     std::vector<std::unique_ptr<juce::TextButton>> mute, solo;
     juce::ScrollBar scroll {false}, trackScrollBar {true};

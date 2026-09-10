@@ -223,6 +223,14 @@ int runArrangementTest()
         view.sync();
         view.resized();
         require(view.trackScrollBar.isVisible(), "Adding tracks makes the arrangement lanes vertically scrollable");
+        const auto audio2Clips = te::getAudioTracks(*session.edit)[2]->getClips().size();
+        const auto audio2Devices = session.deviceSlots(2).size();
+        view.itemDropped({"theta-browser:preset:WarmPulse", nullptr,
+                          {static_cast<int>(view.xFor(0.5)), static_cast<int>(view.lane(2).getCentreY())}});
+        require(te::getAudioTracks(*session.edit)[2]->getClips().size() == audio2Clips + 1,
+                "Dragging a browser sound onto Audio 2 creates the clip on Audio 2");
+        require(session.deviceSlots(2).size() > audio2Devices, "Dropped browser sound adds an instrument to the target track");
+        session.undo();
         require(session.removeAudioTrack(2).wasOk(), "Can remove the extra audio track");
         require(session.trackCount() == 2, "Removing extra audio track restores starter track count");
         view.filesDropped(dropped, static_cast<int>(view.xFor(1.0)), view.getHeight() - 3);

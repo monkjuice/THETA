@@ -76,6 +76,22 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     session.listeners.add(this);
     scroll.addListener(this);
     trackScrollBar.addListener(this);
+    fitButton.setButtonText(L"\u26f6");
+    zoomOut.setButtonText(L"\u2212");
+    zoomIn.setButtonText(L"+");
+    splitButton.setButtonText(L"\u2702");
+    duplicateButton.setButtonText(L"\u2398");
+    addTrack.setButtonText(L"+");
+    removeTrack.setButtonText(L"\u2212");
+    snap.setButtonText(L"\u25c7");
+    fitButton.setTooltip("Fit arrangement");
+    zoomOut.setTooltip("Zoom out");
+    zoomIn.setTooltip("Zoom in");
+    splitButton.setTooltip("Split selected clip");
+    duplicateButton.setTooltip("Duplicate selected clip");
+    addTrack.setTooltip("Add track");
+    removeTrack.setTooltip("Remove selected track");
+    snap.setTooltip("Toggle clip snap");
     snap.setClickingTogglesState(true);
     snap.setToggleState(true, juce::dontSendNotification);
     fitButton.onClick = [this] { fit(); };
@@ -271,15 +287,15 @@ void Arrangement::paint(juce::Graphics& g)
 
 void Arrangement::resized()
 {
-    fitButton.setBounds(152, 3, 44, 26);
-    zoomOut.setBounds(204, 3, 32, 26);
-    zoomIn.setBounds(240, 3, 32, 26);
-    splitButton.setBounds(282, 3, 58, 26);
-    duplicateButton.setBounds(348, 3, 52, 26);
-    addTrack.setBounds(410, 3, 70, 26);
-    removeTrack.setBounds(486, 3, 70, 26);
-    snap.setBounds(566, 3, 82, 26);
-    snapSize.setBounds(654, 3, 74, 26);
+    fitButton.setBounds(152, 3, 32, 26);
+    zoomOut.setBounds(190, 3, 32, 26);
+    zoomIn.setBounds(226, 3, 32, 26);
+    splitButton.setBounds(268, 3, 34, 26);
+    duplicateButton.setBounds(308, 3, 34, 26);
+    addTrack.setBounds(352, 3, 34, 26);
+    removeTrack.setBounds(392, 3, 34, 26);
+    snap.setBounds(436, 3, 34, 26);
+    snapSize.setBounds(476, 3, 74, 26);
     syncTrackControls();
     for (int i = 0; i < session.trackCount(); ++i)
     {
@@ -664,11 +680,11 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
     {
         const auto preset = patternPresetFromId(id);
         if (!preset) return juce::Result::fail("That browser item cannot be loaded here.");
-        const auto result = insertPreset ? session.insertPatternPreset(*preset, startSeconds)
+        const auto result = insertPreset ? session.insertPatternPreset(*preset, std::max(0, track), startSeconds)
                                          : juce::Result::ok();
         if (result.failed()) return result;
         if (!insertPreset) session.applyPatternPreset(*preset);
-        selectTrack(0);
+        selectTrack(insertPreset ? std::max(0, track) : 0);
         if (status) status(insertPreset ? "Added pattern clip from browser" : "Loaded browser preset on Pattern 1");
         return juce::Result::ok();
     }

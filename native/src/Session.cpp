@@ -45,6 +45,14 @@ void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoMan
                          &undoManager);
     clip.setName(preset.name);
 }
+
+bool trackHasPlugin(te::AudioTrack& track, const juce::String& type)
+{
+    for (auto* plugin : track.pluginList)
+        if (plugin != nullptr && plugin->getPluginType() == type)
+            return true;
+    return false;
+}
 }
 
 Session::Session()
@@ -198,19 +206,33 @@ void Session::applyPatternPreset(PatternPreset preset)
     sendSynchronousChangeMessage();
 }
 
-juce::Result Session::insertPatternPreset(PatternPreset preset, double startSeconds)
+juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, double startSeconds)
 {
     if (!std::isfinite(startSeconds) || startSeconds < 0.0)
         return juce::Result::fail("Invalid pattern drop position.");
     const auto tracks = te::getAudioTracks(*edit);
-    if (tracks.isEmpty()) return juce::Result::fail("The pattern track is missing.");
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
+        return juce::Result::fail("Drop clips on a track lane.");
     const auto data = presetPattern(preset);
     const auto start = tracktion::core::TimePosition::fromSeconds(startSeconds);
     const auto end = start + tracktion::core::TimeDuration::fromSeconds(
         edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0)).inSeconds());
     edit->getUndoManager().beginNewTransaction("Add " + data.name);
-    setPatternInstrument(data.useDrums);
-    auto clip = tracks[0]->insertMIDIClip(data.name, {start, end}, nullptr);
+    auto* track = tracks[trackIndex];
+    if (trackIndex == 0)
+        setPatternInstrument(data.useDrums);
+    else
+    {
+        const auto type = data.useDrums ? DrumDevice::xmlTypeName : te::FourOscPlugin::xmlTypeName;
+        if (!trackHasPlugin(*track, type))
+        {
+            auto plugin = edit->getPluginCache().createNewPlugin(type, {});
+            if (plugin == nullptr)
+                return juce::Result::fail("The target track instrument could not be created.");
+            track->pluginList.insertPlugin(plugin, 0, nullptr);
+        }
+    }
+    auto clip = track->insertMIDIClip(data.name, {start, end}, nullptr);
     if (clip == nullptr)
         return juce::Result::fail("The pattern clip could not be added.");
     fillMidiClip(*clip, data, edit->getUndoManager());
@@ -600,8 +622,28 @@ void Session::deleteClip(te::EditItemID id)
 {
     if (auto* clip = findClip(id))
     {
+        const auto deletingPattern = clip == patternClip;
         edit->getUndoManager().beginNewTransaction("Delete audio clip");
         clip->removeFromParent();
+        if (deletingPattern)
+        {
+            patternClip = nullptr;
+            const auto tracks = te::getAudioTracks(*edit);
+            if (!tracks.isEmpty())
+            {
+                for (auto* existing : tracks[0]->getClips())
+                    if (auto* midi = dynamic_cast<te::MidiClip*>(existing))
+                    {
+                        patternClip = midi;
+                        break;
+                    }
+                if (patternClip == nullptr)
+                {
+                    const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
+                    patternClip = tracks[0]->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
+                }
+            }
+        }
         refreshLoop();
         edit->getUndoManager().beginNewTransaction();
         markModified();

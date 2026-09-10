@@ -67,7 +67,6 @@ int runPatternTest()
         session.redo();
         require(std::abs(session.tempo() - 90.0) < 0.001, "Redo tempo");
         require(std::abs(session.edit->getTransport().getLoopRange().getLength().inSeconds() - 8.0 / 3.0) < 0.0001, "Loop follows tempo after redo");
-
         // A small real engine render proves MIDI reaches the synth and Utility.
         // It needs no audio hardware, synthetic large session, or progress UI.
         juce::TemporaryFile output(".wav");
@@ -132,6 +131,10 @@ int runPatternTest()
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Audio clip survives project reopen");
         require(te::getAudioTracks(*session.edit)[1]->getClips()[0]->getSourceFileReference().getFile() == output.getFile(),
                 "Imported audio path survives project reopen");
+        const auto patternTrack = te::getAudioTracks(*session.edit)[0];
+        session.deleteClip(session.pattern().itemID);
+        require(patternTrack->getClips().size() >= 1, "Deleting the last edited pattern keeps an editable clip alive");
+        require(session.pattern().getSequence().getNumNotes() == 0, "Replacement pattern clip is empty and readable");
         return 0;
     }
     catch (const std::exception& error)

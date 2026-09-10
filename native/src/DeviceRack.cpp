@@ -25,6 +25,14 @@ DeviceRack::DeviceRack(Session& s) : session(s)
     title.setFont(juce::FontOptions(13.0f));
     pattern.setClickingTogglesState(true);
     audio.setClickingTogglesState(true);
+    pattern.setButtonText("P");
+    audio.setButtonText("A");
+    bypass.setButtonText(L"\u23fb");
+    remove.setButtonText(L"\u00d7");
+    pattern.setTooltip("Pattern devices");
+    audio.setTooltip("Selected audio track devices");
+    bypass.setTooltip("Bypass or enable selected device");
+    remove.setTooltip("Delete selected device");
     pattern.setRadioGroupId(29, juce::dontSendNotification);
     audio.setRadioGroupId(29, juce::dontSendNotification);
     pattern.onClick = [this] { selectTrack(0); };
@@ -69,10 +77,10 @@ void DeviceRack::paint(juce::Graphics& g)
 void DeviceRack::resized()
 {
     title.setBounds(12, 4, 104, 24);
-    pattern.setBounds(120, 5, 76, 24);
-    audio.setBounds(202, 5, 76, 24);
-    bypass.setBounds(getWidth() - 154, 5, 68, 24);
-    remove.setBounds(getWidth() - 80, 5, 68, 24);
+    pattern.setBounds(120, 5, 30, 24);
+    audio.setBounds(156, 5, 30, 24);
+    bypass.setBounds(getWidth() - 76, 5, 30, 24);
+    remove.setBounds(getWidth() - 40, 5, 30, 24);
     list.setBounds(12, 34, getWidth() - 24, getHeight() - 42);
 }
 
@@ -123,7 +131,7 @@ void DeviceRack::selectTrack(int track)
 {
     selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), track);
     pattern.setToggleState(selectedTrack == 0, juce::dontSendNotification);
-    audio.setButtonText(selectedTrack > 0 ? session.trackName(selectedTrack) : "Audio 1");
+    audio.setButtonText(selectedTrack > 0 ? "A" : "A");
     audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     selectedSlot = 0;
     sync();
@@ -133,7 +141,7 @@ void DeviceRack::sync()
 {
     selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), selectedTrack);
     pattern.setToggleState(selectedTrack == 0, juce::dontSendNotification);
-    audio.setButtonText(selectedTrack > 0 ? session.trackName(selectedTrack) : "Audio 1");
+    audio.setButtonText("A");
     audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     slots = session.deviceSlots(selectedTrack);
     selectedSlot = juce::jlimit(0, std::max(0, static_cast<int>(slots.size()) - 1), selectedSlot);
@@ -142,6 +150,6 @@ void DeviceRack::sync()
         list.selectRow(selectedSlot, juce::dontSendNotification);
     bypass.setEnabled(!slots.empty());
     remove.setEnabled(!slots.empty() && slots[static_cast<size_t>(selectedSlot)].removable);
-    bypass.setButtonText(!slots.empty() && !slots[static_cast<size_t>(selectedSlot)].enabled ? "Enable" : "Bypass");
+    bypass.setButtonText(!slots.empty() && !slots[static_cast<size_t>(selectedSlot)].enabled ? juce::String(L"\u23fb") : juce::String(L"\u23fb"));
 }
 }

@@ -36,7 +36,8 @@ public:
         status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
         audioGainLabel.setText("AUDIO GAIN", juce::dontSendNotification);
-        hint.setText("1 BAR     Draw notes below. Clip Snap controls arrangement drags/nudges; Cmd/Ctrl+E splits, Cmd/Ctrl+D duplicates.", juce::dontSendNotification);
+        hint.setText({}, juce::dontSendNotification);
+        hint.setVisible(false);
         hint.setColour(juce::Label::textColourId, juce::Colour(0xff8d98a3));
         tempo.setSliderStyle(juce::Slider::IncDecButtons);
         tempo.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 90, 30);
@@ -47,6 +48,12 @@ public:
         undo.onClick = [this] { session.undo(); };
         redo.onClick = [this] { session.redo(); };
         clear.onClick = [this] { session.clearPattern(); };
+        undo.setButtonText(L"\u21b6");
+        redo.setButtonText(L"\u21b7");
+        clear.setButtonText(L"\u00d7");
+        undo.setTooltip("Undo");
+        redo.setTooltip("Redo");
+        clear.setTooltip("Clear pattern");
         gain.setSliderStyle(juce::Slider::LinearHorizontal);
         gain.setTextBoxStyle(juce::Slider::TextBoxRight, false, 85, 26);
         gain.setRange(-60.0, 6.0, 0.1);
@@ -92,6 +99,12 @@ public:
         play.onClick = [this] { session.togglePlayback(); };
         stop.onClick = [this] { session.stop(); };
         import.onClick = [this] { chooseAudio(); };
+        play.setButtonText(L"\u25b6");
+        stop.setButtonText(L"\u25a0");
+        import.setButtonText(L"\uff0b");
+        play.setTooltip("Play");
+        stop.setTooltip("Stop");
+        import.setTooltip("Add audio");
         settings.onClick = [this]
         {
             if (audioSettings != nullptr)
@@ -176,13 +189,13 @@ public:
         open.setBounds(getWidth() - 320, 26, 72, 30);
         save.setBounds(getWidth() - 240, 26, 72, 30);
         status.setBounds(24, 68, getWidth() - 48, 28);
-        play.setBounds(editorX, 116, 64, 36);
-        stop.setBounds(editorX + 72, 116, 64, 36);
-        import.setBounds(editorX + 150, 116, 116, 36);
-        tempo.setBounds(editorX + 286, 119, 122, 30);
-        undo.setBounds(editorX + 428, 119, 58, 30);
-        redo.setBounds(editorX + 494, 119, 58, 30);
-        clear.setBounds(editorX + 562, 119, 78, 30);
+        play.setBounds(editorX, 116, 38, 36);
+        stop.setBounds(editorX + 46, 116, 38, 36);
+        import.setBounds(editorX + 100, 116, 38, 36);
+        tempo.setBounds(editorX + 160, 119, 122, 30);
+        undo.setBounds(editorX + 302, 119, 34, 30);
+        redo.setBounds(editorX + 342, 119, 34, 30);
+        clear.setBounds(editorX + 386, 119, 34, 30);
         position.setBounds(getWidth() - 165, 116, 140, 36);
         browser.setVisible(browserOpen);
         browser.setBounds(0, 104, browserWidth, getHeight() - 104);
@@ -200,7 +213,7 @@ public:
         rackToggle.setBounds(getWidth() - 52, arrangementBottom + 10, 28, 24);
         browserToggle.toFront(false);
         rackToggle.toFront(false);
-        hint.setBounds(editorX, getHeight() - 117, editorW, 28);
+        hint.setBounds(0, 0, 0, 0);
         const auto half = (editorW - 28) / 2;
         gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
         gain.setBounds(editorX + 112, getHeight() - 66, half - 112, 30);
@@ -323,7 +336,7 @@ private:
 
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
-        play.setButtonText(session.edit->getTransport().isPlaying() ? "Pause" : "Play");
+        play.setButtonText(session.edit->getTransport().isPlaying() ? juce::String(L"\u275a\u275a") : juce::String(L"\u25b6"));
         tempo.setValue(session.tempo(), juce::dontSendNotification);
         if (!gain.isMouseButtonDown())
             gain.setValue(session.utility->gain().getCurrentValue(), juce::dontSendNotification);
