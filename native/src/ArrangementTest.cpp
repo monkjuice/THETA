@@ -52,6 +52,14 @@ int runArrangementTest()
         view.setLookAndFeel(&theme);
         view.setSize(1000, 246);
         view.fit();
+        view.sync();
+        require(view.clips.empty(), "Fresh startup hides the internal empty Pattern 1 placeholder");
+        session.setNote(0, 48, true);
+        view.sync();
+        require(view.clips.size() == 1, "Drawing the first note makes the startup pattern clip visible");
+        session.undo();
+        view.sync();
+        require(view.clips.empty(), "Undoing the first note hides the empty startup pattern again");
         int notifiedTrack = -1;
         view.trackSelected = [&notifiedTrack](int track) { notifiedTrack = track; };
         require(view.isInterestedInDragSource({"theta-browser:preset:HouseKit", nullptr, {160, 82}}),

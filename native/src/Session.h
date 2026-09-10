@@ -102,6 +102,7 @@ public:
     void refreshLoop();
     te::Clip* findClip(te::EditItemID) const;
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
+    bool shouldShowClipInArrangement(te::Clip&) const;
     juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture);
     juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
     juce::Result duplicateClip(te::EditItemID);

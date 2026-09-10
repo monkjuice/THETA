@@ -349,6 +349,8 @@ void Arrangement::sync()
         solo[static_cast<size_t>(track)]->setToggleState(tracks[track]->isSolo(false), juce::dontSendNotification);
         for (auto* clip : tracks[track]->getClips())
         {
+            if (!session.shouldShowClipInArrangement(*clip))
+                continue;
             const auto p = clip->getPosition();
             ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(),
                            p.offset.inSeconds() + p.time.getLength().inSeconds(), track, clip->getColour(), session.clipPluginCount(clip->itemID)};

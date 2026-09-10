@@ -4,6 +4,8 @@ namespace theta
 {
 namespace
 {
+const juce::Identifier starterPlaceholderID {"thetaStarterPlaceholder"};
+
 struct PresetNote { int step, pitch, length; };
 
 struct PresetPattern
@@ -102,6 +104,7 @@ void resetPluginList(te::PluginList* list)
 
 void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoManager& undoManager)
 {
+    clip.state.removeProperty(starterPlaceholderID, &undoManager);
     auto& sequence = clip.getSequence();
     sequence.removeAllNotes(&undoManager);
     for (int i = 0; i < preset.count; ++i)
@@ -251,7 +254,10 @@ Session::Session()
     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     patternClip = track->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
     if (patternClip != nullptr)
+    {
         patternClip->setColour(presetColour(PatternPreset::WarmPulse));
+        patternClip->state.setProperty(starterPlaceholderID, true, nullptr);
+    }
     patternClipID = patternClip->itemID;
     auto* audioTrack = te::getAudioTracks(*edit)[1];
     audioTrack->setName("Audio 1");
@@ -373,6 +379,7 @@ void Session::setNote(int step, int pitch, bool enabled)
         }
     if (enabled)
     {
+        pattern().state.removeProperty(starterPlaceholderID, undoManager);
         sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(step * 0.25),
                          tracktion::core::BeatDuration::fromBeats(0.225), 100, 0, undoManager);
         markModified();
@@ -385,6 +392,7 @@ void Session::clearPattern()
     if (pattern().getSequence().getNumNotes() == 0) return;
     edit->getUndoManager().beginNewTransaction("Clear pattern");
     pattern().getSequence().removeAllNotes(&edit->getUndoManager());
+    pattern().state.setProperty(starterPlaceholderID, true, &edit->getUndoManager());
     markModified();
     edit->getUndoManager().beginNewTransaction();
     sendSynchronousChangeMessage();
@@ -869,6 +877,7 @@ void Session::ensureEditablePatternClip()
         if (patternClip != nullptr)
         {
             patternClip->setColour(presetColour(PatternPreset::WarmPulse));
+            patternClip->state.setProperty(starterPlaceholderID, true, nullptr);
             patternClipID = patternClip->itemID;
         }
     }
@@ -972,6 +981,15 @@ te::Clip* Session::findClip(te::EditItemID id) const
 te::WaveAudioClip* Session::findAudioClip(te::EditItemID id) const
 {
     return dynamic_cast<te::WaveAudioClip*>(findClip(id));
+}
+
+bool Session::shouldShowClipInArrangement(te::Clip& clip) const
+{
+    auto* midi = dynamic_cast<te::MidiClip*>(&clip);
+    if (midi == nullptr)
+        return true;
+    return !static_cast<bool>(clip.state.getProperty(starterPlaceholderID, false))
+        || midi->getSequence().getNumNotes() > 0;
 }
 
 juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture)
@@ -1085,7 +1103,10 @@ void Session::deleteClip(te::EditItemID id)
                     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
                     patternClip = tracks[0]->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
                     if (patternClip != nullptr)
+                    {
                         patternClip->setColour(presetColour(PatternPreset::WarmPulse));
+                        patternClip->state.setProperty(starterPlaceholderID, true, nullptr);
+                    }
                 }
                 if (patternClip != nullptr)
                     patternClipID = patternClip->itemID;
