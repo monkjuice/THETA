@@ -169,8 +169,9 @@ double Arrangement::timeAt(float x) const
 juce::Rectangle<float> Arrangement::bounds(const ClipView& clip) const
 {
     const auto p = dragging && clip.id == selected ? preview : clip.position;
-    return {xFor(p.start), lane(clip.track).getY() + 5.0f,
-            std::max(1.0f, xFor(p.end) - xFor(p.start)), lane(clip.track).getHeight() - 10.0f};
+    const auto track = dragging && clip.id == selected ? previewTrack : clip.track;
+    return {xFor(p.start), lane(track).getY() + 5.0f,
+            std::max(1.0f, xFor(p.end) - xFor(p.start)), lane(track).getHeight() - 10.0f};
 }
 
 void Arrangement::paint(juce::Graphics& g)
@@ -498,6 +499,7 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     }
     repaint();
     original = preview = clip.position;
+    originalTrack = previewTrack = clip.track;
     sourceDuration = clip.sourceDuration;
     const auto box = bounds(clip);
     const auto handleWidth = std::min(7.0f, box.getWidth() * 0.25f);
@@ -512,7 +514,16 @@ void Arrangement::mouseDrag(const juce::MouseEvent& event)
     if (!dragging) return;
     const auto anchor = gesture == ClipGesture::trimRight ? original.end : original.start;
     preview = previewClipEdit(original, gesture, snapped(anchor + timeAt(event.position.x) - dragTime, event.mods.isAltDown()), sourceDuration);
-    repaint(lane(selectedTrack).getSmallestIntegerContainer());
+    if (gesture == ClipGesture::move)
+    {
+        if (const auto target = trackAt(event.position.y); target >= 0)
+            previewTrack = target;
+        else if (session.trackCount() > 0 && event.position.y > lane(session.trackCount() - 1).getBottom())
+            previewTrack = session.trackCount();
+        else
+            previewTrack = originalTrack;
+    }
+    repaint(lane(originalTrack).getUnion(lane(juce::jlimit(0, session.trackCount() - 1, previewTrack))).getSmallestIntegerContainer());
 }
 
 void Arrangement::mouseUp(const juce::MouseEvent& event)
@@ -522,8 +533,10 @@ void Arrangement::mouseUp(const juce::MouseEvent& event)
     {
         mouseDrag(event);
         dragging = false;
-        const auto result = session.editClip(selected, preview, gesture);
+        const auto result = session.editClip(selected, preview, gesture, gesture == ClipGesture::move ? previewTrack : -1);
         if (result.failed() && status) status(result.getErrorMessage());
+        else if (gesture == ClipGesture::move)
+            selectTrack(juce::jlimit(0, std::max(0, session.trackCount() - 1), previewTrack));
     }
     cancelDrag();
     repaint();

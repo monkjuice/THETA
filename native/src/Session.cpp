@@ -992,7 +992,7 @@ bool Session::shouldShowClipInArrangement(te::Clip& clip) const
         || midi->getSequence().getNumNotes() > 0;
 }
 
-juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture)
+juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture, int targetTrack)
 {
     auto* clip = findClip(id);
     if (!clip) return juce::Result::fail("Select a clip first.");
@@ -1000,12 +1000,38 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
         || next.start < 0.0 || next.end <= next.start || next.offset < -1.0e-8
         || next.end > te::Edit::getMaximumEditEnd().inSeconds())
         return juce::Result::fail("Invalid clip position.");
+    const auto tracks = te::getAudioTracks(*edit);
+    auto* oldTrack = clip->getClipTrack();
+    const auto oldTrackIndex = tracks.indexOf(dynamic_cast<te::AudioTrack*>(oldTrack));
+    if (targetTrack < 0 || gesture != ClipGesture::move)
+        targetTrack = oldTrackIndex;
+    if (targetTrack < 0 || targetTrack > tracks.size())
+        return juce::Result::fail("Drop the clip on a track lane.");
     const auto old = clip->getPosition();
     if (std::abs(old.time.getStart().inSeconds() - next.start) < 1.0e-8
         && std::abs(old.time.getEnd().inSeconds() - next.end) < 1.0e-8
-        && std::abs(old.offset.inSeconds() - next.offset) < 1.0e-8)
+        && std::abs(old.offset.inSeconds() - next.offset) < 1.0e-8
+        && targetTrack == oldTrackIndex)
         return juce::Result::ok();
-    edit->getUndoManager().beginNewTransaction(gesture == ClipGesture::move ? "Move audio clip" : "Trim audio clip");
+    edit->getUndoManager().beginNewTransaction(gesture == ClipGesture::move ? "Move clip" : "Trim clip");
+    if (targetTrack == tracks.size())
+    {
+        auto newTrack = edit->insertNewAudioTrack(te::TrackInsertPoint::getEndOfTracks(*edit), nullptr, false);
+        if (newTrack == nullptr)
+            return juce::Result::fail("Could not create a track for the moved clip.");
+        newTrack->setName("Audio " + juce::String(tracks.size()));
+        auto audioDevice = edit->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
+        newTrack->pluginList.insertPlugin(audioDevice, 0, nullptr);
+        targetTrack = tracks.size();
+    }
+    const auto refreshedTracks = te::getAudioTracks(*edit);
+    if (targetTrack != oldTrackIndex)
+    {
+        auto* target = refreshedTracks[targetTrack];
+        te::Clip::Ptr clipRef(clip);
+        if (!target->addClip(clipRef))
+            return juce::Result::fail("The clip could not be moved to that track.");
+    }
     clip->setPosition({{tracktion::core::TimePosition::fromSeconds(next.start),
                        tracktion::core::TimePosition::fromSeconds(next.end)},
                        tracktion::core::TimeDuration::fromSeconds(std::max(0.0, next.offset))});
