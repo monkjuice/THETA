@@ -2,6 +2,7 @@
 #include "UtilityDevice.h"
 #include "DrumDevice.h"
 #include "ThetaSpaceDevice.h"
+#include "ThetaArpDevice.h"
 #include "ClipGeometry.h"
 #include <vector>
 
@@ -16,9 +17,12 @@ public:
     {
         WarmPulse,
         AcidSteps,
+        ArpRun,
+        SirenLead,
         HouseKit,
         BreakKit,
-        MinimalKit
+        MinimalKit,
+        ClapKit
     };
     enum class AudioEffect
     {
@@ -33,6 +37,10 @@ public:
         FourOsc,
         Drums,
         Utility
+    };
+    enum class MidiEffect
+    {
+        ThetaArp
     };
     struct DeviceSlot
     {
@@ -84,6 +92,7 @@ public:
     juce::Result addAudioEffect(AudioEffect, int track = 1);
     juce::Result addClipAudioEffect(AudioEffect, te::EditItemID);
     juce::Result addInstrument(Instrument, int track);
+    juce::Result addMidiEffect(MidiEffect, int track);
     int trackCount() const;
     juce::String trackName(int track) const;
     juce::Result addAudioTrack();

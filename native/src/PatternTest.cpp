@@ -53,6 +53,20 @@ int runPatternTest()
             require(thetaParameters.size() >= 6, "Theta Space exposes its macro controls");
             require(parameterSession.setDeviceParameter(1, thetaSlot, 0, thetaParameters.front().maximum).wasOk(),
                     "Theta Space macro controls are editable");
+            require(parameterSession.addInstrument(Session::Instrument::FourOsc, 1).wasOk(), "Audio track can host a synth instrument");
+            require(parameterSession.addMidiEffect(Session::MidiEffect::ThetaArp, 1).wasOk(), "MIDI FX browser action inserts Theta Arp");
+            int arpSlot = -1, synthSlot = -1;
+            for (int i = 0; i < parameterTrack->pluginList.size(); ++i)
+            {
+                auto* plugin = parameterTrack->pluginList[i];
+                if (plugin == nullptr) continue;
+                if (plugin->getPluginType() == ThetaArpDevice::xmlTypeName) arpSlot = i;
+                if (plugin->getPluginType() == te::FourOscPlugin::xmlTypeName) synthSlot = i;
+            }
+            require(arpSlot >= 0 && synthSlot >= 0 && arpSlot < synthSlot,
+                    "Theta Arp is inserted before the target instrument");
+            auto arpParameters = parameterSession.deviceParameters(1, arpSlot);
+            require(arpParameters.size() == 3, "Theta Arp exposes rate, octaves, and gate controls");
         }
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");
@@ -87,6 +101,18 @@ int runPatternTest()
         session.setTempo(90.0);
         require(std::abs(session.pattern().getPosition().time.getLength().inSeconds() - 8.0 / 3.0) < 0.0001, "One-bar clip follows tempo");
         require(session.hasNote(4, 53), "Tempo change preserves note beats");
+        session.applyPatternPreset(Session::PatternPreset::ClapKit);
+        require(session.isPatternDrums() && session.hasNote(4, 56) && session.hasNote(12, 56),
+                "Clap kit preset loads clap notes into the drum editor");
+        session.applyPatternPreset(Session::PatternPreset::ArpRun);
+        require(!session.isPatternDrums() && session.hasNote(0, 48) && session.hasNote(0, 60),
+                "Arp run preset loads a held synth chord");
+        session.applyPatternPreset(Session::PatternPreset::SirenLead);
+        require(!session.isPatternDrums() && session.hasNote(4, 72) && session.hasNote(10, 48),
+                "Siren lead preset loads a rising and falling synth line");
+        session.undo();
+        session.undo();
+        session.undo();
         session.undo();
         require(std::abs(session.tempo() - 120.0) < 0.001, "Undo tempo");
         session.redo();

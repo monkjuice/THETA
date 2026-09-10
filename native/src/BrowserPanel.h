@@ -26,6 +26,7 @@ private:
         std::optional<Session::PatternPreset> preset;
         std::optional<Session::AudioEffect> effect;
         std::optional<Session::Instrument> instrument;
+        std::optional<Session::MidiEffect> midiEffect;
     };
 
     int getNumRows() override;

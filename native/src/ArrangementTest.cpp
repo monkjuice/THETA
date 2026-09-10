@@ -69,6 +69,9 @@ int runArrangementTest()
         const auto patternDevices = session.deviceSlots(0).size();
         require(view.applyBrowserDrop("theta-browser:effect:Reverb", 0).wasOk(), "Audio FX can be dropped on the pattern clip track");
         require(session.deviceSlots(0).size() == patternDevices + 1, "Dropped Reverb appears on the pattern track rack");
+        const auto midiEffectSlots = session.deviceSlots(0).size();
+        require(view.applyBrowserDrop("theta-browser:midi-effect:ThetaArp", 0).wasOk(), "MIDI FX can be dropped on the pattern track");
+        require(session.deviceSlots(0).size() == midiEffectSlots + 1, "Dropped MIDI FX appears in the pattern track rack");
         const auto midiDropDevices = session.deviceSlots(0).size();
         view.itemDropped({"theta-browser:effect:Delay", nullptr, {static_cast<int>(view.xFor(0.25)), 82}});
         require(session.deviceSlots(0).size() == midiDropDevices + 1,
@@ -290,6 +293,15 @@ int runArrangementTest()
         require(session.trackCount() == 3, "Undo removes the track created by a clip drag");
         require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr, "Undo restores the clip after a drag-created track");
         view.sync();
+        require(view.applyBrowserDrop("theta-browser:preset:SirenLead", 2).wasOk(), "Siren lead browser row creates a synth clip");
+        require(te::getAudioTracks(*session.edit)[2]->getClips().getLast()->getName() == "Siren lead",
+                "Dropped siren preset names the new clip");
+        session.undo();
+        require(view.applyBrowserDrop("theta-browser:preset:ClapKit", 2).wasOk(), "Clap kit browser row creates a drum clip");
+        require(session.selectPatternClip(te::getAudioTracks(*session.edit)[2]->getClips().getLast()->itemID).wasOk(),
+                "Dropped clap preset can be selected for note editing");
+        require(session.hasNote(4, 56), "Dropped clap preset selects an editable clip with clap notes");
+        session.undo();
         const auto audio2Clips = te::getAudioTracks(*session.edit)[2]->getClips().size();
         const auto audio2Devices = session.deviceSlots(2).size();
         view.itemDropped({"theta-browser:preset:WarmPulse", nullptr,
@@ -321,10 +333,11 @@ int runArrangementTest()
         require(session.pattern().getSequence().getNumNotes() == selectedClipNotes + 1,
                 "Note editor writes into the selected non-first MIDI clip");
         selectionGrid.changeListenerCallback(nullptr);
-        const auto gridEvent = [&selectionGrid](juce::Point<float> down, juce::Point<float> point, bool dragged)
+        const auto gridEvent = [&selectionGrid](juce::Point<float> down, juce::Point<float> point, bool dragged,
+                                                juce::ModifierKeys mods = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier))
         {
             return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
-                juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1.0f, 0, 0, 0, 0,
+                mods, 1.0f, 0, 0, 0, 0,
                 &selectionGrid, &selectionGrid, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
         };
         const auto rowForPitch = [&selectionGrid](int pitch)
@@ -333,14 +346,25 @@ int runArrangementTest()
         };
         const auto sourceCell = selectionGrid.cell(1, rowForPitch(48)).getCentre();
         const auto targetCell = selectionGrid.cell(1, rowForPitch(50)).getCentre();
-        selectionGrid.mouseDown(gridEvent(sourceCell, sourceCell, false));
-        selectionGrid.mouseDrag(gridEvent(sourceCell, targetCell, true));
-        selectionGrid.mouseUp(gridEvent(sourceCell, targetCell, true));
+        const auto shiftLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier);
+        selectionGrid.mouseDown(gridEvent(sourceCell, sourceCell, false, shiftLeft));
+        selectionGrid.mouseDrag(gridEvent(sourceCell, targetCell, true, shiftLeft));
+        selectionGrid.mouseUp(gridEvent(sourceCell, targetCell, true, shiftLeft));
         require(!session.hasNote(1, 48) && session.hasNote(1, 50),
-                "Dragging an existing note vertically changes its pitch");
+                "Shift-dragging an existing note vertically changes its pitch");
         session.undo();
         require(session.hasNote(1, 48) && !session.hasNote(1, 50),
                 "Undo restores note pitch after a grid drag");
+        selectionGrid.changeListenerCallback(nullptr);
+        const auto eraseCellA = selectionGrid.cell(1, rowForPitch(48)).getCentre();
+        const auto eraseCellB = selectionGrid.cell(3, rowForPitch(48)).getCentre();
+        selectionGrid.mouseDown(gridEvent(eraseCellA, eraseCellA, false));
+        selectionGrid.mouseDrag(gridEvent(eraseCellA, eraseCellB, true));
+        selectionGrid.mouseUp(gridEvent(eraseCellA, eraseCellB, true));
+        require(!session.hasNote(1, 48) && !session.hasNote(2, 48) && !session.hasNote(3, 48),
+                "Dragging from an existing note still erases notes under the cursor");
+        session.undo();
+        require(session.hasNote(1, 48), "Undo restores notes erased by a grid stroke");
         session.undo();
         const auto audio2DevicesAfterSound = session.deviceSlots(2).size();
         require(view.applyBrowserDrop("theta-browser:instrument:Drums", 2).wasOk(), "Instrument browser rows can be dropped onto non-first tracks");

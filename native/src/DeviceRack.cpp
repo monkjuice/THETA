@@ -27,6 +27,14 @@ std::optional<Session::Instrument> instrumentFromBrowserDrop(const juce::String&
     if (id == "Utility") return Session::Instrument::Utility;
     return std::nullopt;
 }
+
+std::optional<Session::MidiEffect> midiEffectFromBrowserDrop(const juce::String& description)
+{
+    if (!description.startsWith("theta-browser:midi-effect:")) return std::nullopt;
+    const auto id = description.fromLastOccurrenceOf(":", false, false);
+    if (id == "ThetaArp") return Session::MidiEffect::ThetaArp;
+    return std::nullopt;
+}
 }
 
 class DeviceRack::FloatingDeviceWindow final : public juce::DocumentWindow
@@ -242,7 +250,7 @@ void DeviceRack::paint(juce::Graphics& g)
     {
         g.setColour(juce::Colour(0xff697680));
         g.setFont(juce::FontOptions(11.0f));
-        g.drawText("Drop Audio FX here", getWidth() - 190, 6, 92, 20, juce::Justification::centredRight, true);
+        g.drawText("Drop FX here", getWidth() - 190, 6, 92, 20, juce::Justification::centredRight, true);
     }
 }
 
@@ -323,7 +331,9 @@ void DeviceRack::openSelectedDevice()
 bool DeviceRack::isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails& details)
 {
     const auto description = details.description.toString();
-    return effectFromBrowserDrop(description).has_value() || instrumentFromBrowserDrop(description).has_value();
+    return effectFromBrowserDrop(description).has_value()
+        || instrumentFromBrowserDrop(description).has_value()
+        || midiEffectFromBrowserDrop(description).has_value();
 }
 
 void DeviceRack::itemDropped(const juce::DragAndDropTarget::SourceDetails& details)
@@ -338,6 +348,11 @@ void DeviceRack::itemDropped(const juce::DragAndDropTarget::SourceDetails& detai
     {
         const auto result = session.addInstrument(*instrument, selectedTrack);
         if (status) status(result.wasOk() ? "Added instrument to " + session.trackName(selectedTrack) : result.getErrorMessage());
+    }
+    else if (const auto midiEffect = midiEffectFromBrowserDrop(description))
+    {
+        const auto result = session.addMidiEffect(*midiEffect, selectedTrack);
+        if (status) status(result.wasOk() ? "Added MIDI FX to " + session.trackName(selectedTrack) : result.getErrorMessage());
     }
 }
 

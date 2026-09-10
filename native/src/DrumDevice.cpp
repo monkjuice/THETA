@@ -1,4 +1,5 @@
 #include "DrumDevice.h"
+#include <cmath>
 
 namespace theta
 {
@@ -31,6 +32,7 @@ bool DrumDevice::hasNameForMidiNoteNumber(int note, int midiChannel, juce::Strin
     juce::ignoreUnused(midiChannel);
     if (note == 48) name = "Kick";
     else if (note == 53) name = "Snare";
+    else if (note == 56) name = "Clap";
     else if (note == 58) name = "Hat";
     else return false;
     return true;
@@ -39,7 +41,7 @@ bool DrumDevice::hasNameForMidiNoteNumber(int note, int midiChannel, juce::Strin
 void DrumDevice::trigger(int note, float velocity)
 {
     auto& voice = voices[nextVoice++ % voices.size()];
-    voice.type = note < 52 ? VoiceType::kick : note < 57 ? VoiceType::snare : VoiceType::hat;
+    voice.type = note < 52 ? VoiceType::kick : note == 56 ? VoiceType::clap : note < 57 ? VoiceType::snare : VoiceType::hat;
     voice.active = true;
     voice.age = 0.0f;
     voice.velocity = std::clamp(velocity, 0.0f, 1.0f);
@@ -76,6 +78,16 @@ float DrumDevice::render(Voice& voice)
         const auto bodyEnv = std::exp(-t * 18.0f);
         voice.phase += juce::MathConstants<float>::twoPi * 185.0f * dt;
         return (nextNoise(voice) * noiseEnv * 0.62f + std::sin(voice.phase) * bodyEnv * 0.28f) * voice.velocity;
+    }
+
+    if (voice.type == VoiceType::clap)
+    {
+        if (t > 0.42f) { voice.active = false; return 0.0f; }
+        const auto burst = std::exp(-std::fmod(t, 0.031f) * 58.0f);
+        const auto tail = std::exp(-t * 10.0f);
+        const auto noise = nextNoise(voice);
+        voice.noise = noise - voice.noise * 0.54f;
+        return voice.noise * (0.45f * burst + 0.24f * tail) * voice.velocity;
     }
 
     if (t > 0.12f) { voice.active = false; return 0.0f; }

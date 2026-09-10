@@ -20,19 +20,26 @@ PresetPattern presetPattern(Session::PatternPreset preset)
 {
     static constexpr PresetNote warmPulse[] {{0, 48, 2}, {4, 55, 2}, {8, 60, 2}, {12, 55, 2}};
     static constexpr PresetNote acidSteps[] {{0, 48, 1}, {3, 51, 1}, {6, 55, 1}, {7, 58, 1}, {10, 55, 1}, {13, 63, 1}, {15, 58, 1}};
+    static constexpr PresetNote arpRun[] {{0, 48, 16}, {0, 52, 16}, {0, 55, 16}, {0, 60, 16}};
+    static constexpr PresetNote sirenLead[] {{0, 48, 1}, {1, 55, 1}, {2, 60, 1}, {3, 67, 1}, {4, 72, 2}, {7, 67, 1},
+                                             {8, 60, 1}, {9, 55, 1}, {10, 48, 1}, {12, 60, 1}, {14, 67, 1}, {15, 72, 1}};
     static constexpr PresetNote houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
                                             {2, 58, 1}, {6, 58, 1}, {10, 58, 1}, {14, 58, 1}};
     static constexpr PresetNote breakKit[] {{0, 48, 1}, {3, 48, 1}, {8, 48, 1}, {11, 48, 1}, {4, 53, 1}, {10, 53, 1},
                                             {1, 58, 1}, {3, 58, 1}, {6, 58, 1}, {9, 58, 1}, {12, 58, 1}, {15, 58, 1}};
     static constexpr PresetNote minimalKit[] {{0, 48, 1}, {7, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1}, {2, 58, 1}, {10, 58, 1}, {14, 58, 1}};
+    static constexpr PresetNote clapKit[] {{0, 48, 1}, {4, 56, 1}, {8, 48, 1}, {12, 56, 1}, {2, 58, 1}, {6, 58, 1}, {10, 58, 1}, {14, 58, 1}};
 
     switch (preset)
     {
         case Session::PatternPreset::WarmPulse:  return {warmPulse,  static_cast<int>(std::size(warmPulse)),  "Warm pulse", false};
         case Session::PatternPreset::AcidSteps:  return {acidSteps,  static_cast<int>(std::size(acidSteps)),  "Acid steps", false};
+        case Session::PatternPreset::ArpRun:     return {arpRun,     static_cast<int>(std::size(arpRun)),     "Arp run", false};
+        case Session::PatternPreset::SirenLead:  return {sirenLead,  static_cast<int>(std::size(sirenLead)),  "Siren lead", false};
         case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true};
         case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true};
         case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true};
+        case Session::PatternPreset::ClapKit:    return {clapKit,    static_cast<int>(std::size(clapKit)),    "Clap kit", true};
     }
     return {};
 }
@@ -43,9 +50,12 @@ juce::Colour presetColour(Session::PatternPreset preset)
     {
         case Session::PatternPreset::WarmPulse:  return juce::Colour(0xff4f7d8f);
         case Session::PatternPreset::AcidSteps:  return juce::Colour(0xff2f6e78);
+        case Session::PatternPreset::ArpRun:     return juce::Colour(0xff77659a);
+        case Session::PatternPreset::SirenLead:  return juce::Colour(0xff8f4f67);
         case Session::PatternPreset::HouseKit:   return juce::Colour(0xff657844);
         case Session::PatternPreset::BreakKit:   return juce::Colour(0xff6f7f43);
         case Session::PatternPreset::MinimalKit: return juce::Colour(0xff506d45);
+        case Session::PatternPreset::ClapKit:    return juce::Colour(0xff8a7a42);
     }
     return juce::Colour(0xff4b6671);
 }
@@ -234,6 +244,7 @@ Session::Session()
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
     engine.getPluginManager().createBuiltInType<DrumDevice>();
     engine.getPluginManager().createBuiltInType<ThetaSpaceDevice>();
+    engine.getPluginManager().createBuiltInType<ThetaArpDevice>();
     edit = te::createEmptyEdit(engine, {});
     edit->state.setProperty("thetaFormatVersion", 1, nullptr);
     edit->tempoSequence.getTempo(0)->setBpm(120.0);
@@ -642,6 +653,47 @@ juce::Result Session::addInstrument(Instrument instrument, int trackIndex)
     edit->getUndoManager().beginNewTransaction();
     if (changed)
         markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::addMidiEffect(MidiEffect effect, int trackIndex)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
+        return juce::Result::fail("Drop MIDI FX on an instrument track.");
+
+    const char* type = nullptr;
+    juce::String name;
+    switch (effect)
+    {
+        case MidiEffect::ThetaArp: type = ThetaArpDevice::xmlTypeName; name = "Theta Arp"; break;
+    }
+
+    auto* track = tracks[trackIndex];
+    edit->getUndoManager().beginNewTransaction("Add " + name);
+    auto plugin = edit->getPluginCache().createNewPlugin(type, {});
+    if (plugin == nullptr)
+        return juce::Result::fail(name + " could not be created.");
+
+    int insertIndex = 0;
+    for (int i = 0; i < track->pluginList.size(); ++i)
+    {
+        auto* existing = track->pluginList[i];
+        if (existing != nullptr && (existing->getPluginType() == te::FourOscPlugin::xmlTypeName
+                                    || existing->getPluginType() == DrumDevice::xmlTypeName))
+        {
+            insertIndex = i;
+            break;
+        }
+        insertIndex = i + 1;
+    }
+
+    track->pluginList.insertPlugin(plugin, juce::jlimit(0, track->pluginList.size(), insertIndex), nullptr);
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
     if (edit->getTransport().isPlaying())
         edit->restartPlayback();
     sendSynchronousChangeMessage();

@@ -10,6 +10,7 @@ juce::String drumLaneName(int pitch)
 {
     if (pitch == 48) return "Kick";
     if (pitch == 53) return "Snare";
+    if (pitch == 56) return "Clap";
     if (pitch == 58) return "Hat";
     return juce::MidiMessage::getMidiNoteName(pitch, true, true, 4);
 }
@@ -52,7 +53,7 @@ void StepGrid::paint(juce::Graphics& g)
     {
         const auto pitch = lowestVisiblePitch + Session::pitches - 1 - row;
         const bool black = juce::MidiMessage::isMidiNoteBlack(pitch);
-        const bool namedDrum = session.isPatternDrums() && (pitch == 48 || pitch == 53 || pitch == 58);
+        const bool namedDrum = session.isPatternDrums() && (pitch == 48 || pitch == 53 || pitch == 56 || pitch == 58);
         auto key = cell(0, row).withX(0).withWidth(labelWidth - 4);
         g.setColour(juce::Colour(namedDrum ? 0xff3a3325 : black ? 0xff15191e : 0xff30373e));
         g.fillRect(key.reduced(0, 1));
@@ -102,7 +103,7 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
     if (index < 0) return;
     grabKeyboardFocus();
     lastHit = index;
-    if (!event.mods.isRightButtonDown() && notes.test(static_cast<size_t>(index)))
+    if (event.mods.isShiftDown() && !event.mods.isRightButtonDown() && notes.test(static_cast<size_t>(index)))
     {
         gesture = Gesture::move;
         movingNoteIndex = index;

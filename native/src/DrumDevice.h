@@ -29,7 +29,7 @@ public:
     bool hasNameForMidiNoteNumber(int note, int midiChannel, juce::String& name) override;
 
 private:
-    enum class VoiceType { kick, snare, hat };
+    enum class VoiceType { kick, snare, clap, hat };
     struct Voice
     {
         VoiceType type = VoiceType::kick;

@@ -38,7 +38,7 @@ public:
         open.onClick = [this] { files.open(); };
         save.onClick = [this] { files.save(); };
         title.setText("THETA", juce::dontSendNotification);
-        title.setFont(juce::FontOptions(26.0f));
+        title.setFont(juce::FontOptions(22.0f));
         logStatus("PATTERN 1  /  4OSC     Draw notes, then press Play");
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
         audioGainLabel.setText("AUDIO GAIN", juce::dontSendNotification);
@@ -146,7 +146,7 @@ public:
         session.edit->getUndoManager().addChangeListener(this);
         patternLabel.setText("PATTERN 1  /  NOTE EDITOR", juce::dontSendNotification);
         patternLabel.setColour(juce::Label::textColourId, juce::Colour(0xffb8c4aa));
-        setSize(1120, 840);
+        setSize(1120, 760);
         changeListenerCallback(nullptr);
         // This updates a text readout only. Pointer events and control painting
         // are not throttled to this timer; there is no full-window repaint loop.
@@ -168,11 +168,11 @@ public:
         g.fillAll(juce::Colour(0xff171a1e));
         const auto bottomX = (browserOpen ? browserWidth : 0) + 18;
         g.setColour(juce::Colour(0xff24282d));
-        g.fillRect(bottomX, getHeight() - 78, getWidth() - bottomX - 24, 54);
+        g.fillRect(bottomX, getHeight() - 64, getWidth() - bottomX - 24, 44);
         if (browserOpen)
         {
             g.setColour(juce::Colour(0xff3a434b));
-            g.fillRect(browserWidth, 104, 4, getHeight() - 104);
+            g.fillRect(browserWidth, browserTop, 4, getHeight() - browserTop);
         }
         if (rackOpen)
         {
@@ -189,32 +189,32 @@ public:
         const auto leftWidth = browserOpen ? browserWidth : 0;
         const auto editorX = leftWidth + gap;
         const auto editorW = getWidth() - editorX - 24;
-        const auto arrangementTop = 174;
-        arrangementHeight = juce::jlimit(160, std::max(160, getHeight() - 420), arrangementHeight);
+        const auto arrangementTop = 132;
+        arrangementHeight = juce::jlimit(150, std::max(150, getHeight() - 350), arrangementHeight);
         const auto arrangementBottom = arrangementTop + arrangementHeight;
-        const auto lowerTop = arrangementBottom + 44;
-        const auto bottomPanelTop = getHeight() - 78;
-        const auto lowerH = std::max(112, bottomPanelTop - lowerTop - 18);
+        const auto lowerTop = arrangementBottom + 34;
+        const auto bottomPanelTop = getHeight() - 64;
+        const auto lowerH = std::max(112, bottomPanelTop - lowerTop - 14);
         const auto lowerW = rackOpen ? std::max(300, editorW - rackWidth - gap) : editorW;
-        title.setBounds(24, 20, 200, 38);
-        documentName.setBounds(190, 26, getWidth() - 530, 30);
-        settings.setBounds(getWidth() - 152, 26, 128, 30);
-        open.setBounds(getWidth() - 320, 26, 72, 30);
-        save.setBounds(getWidth() - 240, 26, 72, 30);
-        status.setBounds(24, 68, getWidth() - 48, 28);
-        play.setBounds(editorX, 116, 38, 36);
-        stop.setBounds(editorX + 46, 116, 38, 36);
-        panic.setBounds(editorX + 92, 116, 38, 36);
-        import.setBounds(editorX + 138, 116, 38, 36);
-        tempo.setBounds(editorX + 198, 119, 122, 30);
-        undo.setBounds(editorX + 340, 119, 34, 30);
-        redo.setBounds(editorX + 380, 119, 34, 30);
-        clear.setBounds(editorX + 424, 119, 34, 30);
-        position.setBounds(getWidth() - 165, 116, 140, 36);
+        title.setBounds(24, 10, 150, 30);
+        documentName.setBounds(190, 10, getWidth() - 530, 30);
+        settings.setBounds(getWidth() - 152, 12, 128, 28);
+        open.setBounds(getWidth() - 320, 12, 72, 28);
+        save.setBounds(getWidth() - 240, 12, 72, 28);
+        status.setBounds(24, 42, getWidth() - 48, 24);
+        play.setBounds(editorX, 82, 38, 34);
+        stop.setBounds(editorX + 46, 82, 38, 34);
+        panic.setBounds(editorX + 92, 82, 38, 34);
+        import.setBounds(editorX + 138, 82, 38, 34);
+        tempo.setBounds(editorX + 198, 84, 122, 30);
+        undo.setBounds(editorX + 340, 84, 34, 30);
+        redo.setBounds(editorX + 380, 84, 34, 30);
+        clear.setBounds(editorX + 424, 84, 34, 30);
+        position.setBounds(getWidth() - 165, 82, 140, 34);
         browser.setVisible(browserOpen);
-        browser.setBounds(0, 104, browserWidth, getHeight() - 104);
+        browser.setBounds(0, browserTop, browserWidth, getHeight() - browserTop);
         browserToggle.setButtonText(browserOpen ? "<" : ">");
-        browserToggle.setBounds(leftWidth + 4, 108, 24, 24);
+        browserToggle.setBounds(leftWidth + 4, browserTop + 4, 24, 24);
         arrangement.setBounds(editorX, arrangementTop, editorW, arrangementHeight);
         patternLabel.setBounds(editorX, arrangementBottom + 10, lowerW, 24);
         grid.setBounds(editorX, lowerTop, lowerW, lowerH);
@@ -229,10 +229,10 @@ public:
         rackToggle.toFront(false);
         hint.setBounds(0, 0, 0, 0);
         const auto half = (editorW - 28) / 2;
-        gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
-        gain.setBounds(editorX + 112, getHeight() - 66, half - 112, 30);
-        audioGainLabel.setBounds(editorX + half + 28, getHeight() - 66, 100, 28);
-        audioGain.setBounds(editorX + half + 128, getHeight() - 66, editorW - half - 150, 30);
+        gainLabel.setBounds(editorX + 16, getHeight() - 54, 100, 26);
+        gain.setBounds(editorX + 112, getHeight() - 54, half - 112, 28);
+        audioGainLabel.setBounds(editorX + half + 28, getHeight() - 54, 100, 26);
+        audioGain.setBounds(editorX + half + 128, getHeight() - 54, editorW - half - 150, 28);
     }
 
     void mouseMove(const juce::MouseEvent& event) override
@@ -244,7 +244,7 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override
     {
-        resizingBrowser = browserOpen && std::abs(event.x - browserWidth) <= 5 && event.y >= 104;
+        resizingBrowser = browserOpen && std::abs(event.x - browserWidth) <= 5 && event.y >= browserTop;
         resizingRack = rackOpen && rackSplitterBounds().expanded(4, 0).contains(event.getPosition());
         resizingArrangement = isOverArrangementSplitter(event.position);
         resizeStartX = event.x;
@@ -270,7 +270,7 @@ public:
         }
         else if (resizingArrangement)
         {
-            arrangementHeight = juce::jlimit(160, std::max(160, getHeight() - 420), resizeStartArrangementHeight + event.y - resizeStartY);
+            arrangementHeight = juce::jlimit(150, std::max(150, getHeight() - 350), resizeStartArrangementHeight + event.y - resizeStartY);
             resized();
             repaint();
         }
@@ -394,7 +394,7 @@ private:
 
     bool isOverSplitter(juce::Point<float> point) const
     {
-        return (browserOpen && std::abs(point.x - static_cast<float>(browserWidth)) <= 5.0f && point.y >= 104.0f)
+        return (browserOpen && std::abs(point.x - static_cast<float>(browserWidth)) <= 5.0f && point.y >= static_cast<float>(browserTop))
             || (rackOpen && rackSplitterBounds().expanded(4, 0).toFloat().contains(point));
     }
 
@@ -420,6 +420,7 @@ private:
     ProjectFiles files;
     int browserWidth = 244, rackWidth = 312, arrangementHeight = 246;
     int resizeStartX = 0, resizeStartY = 0, resizeStartBrowserWidth = 244, resizeStartRackWidth = 312, resizeStartArrangementHeight = 246;
+    static constexpr int browserTop = 74;
     bool browserOpen = true, rackOpen = true, resizingBrowser = false, resizingRack = false, resizingArrangement = false;
 };
 
@@ -502,8 +503,8 @@ private:
                 window->setUsingNativeTitleBar(true);
                 window->setContentOwned(new ControlWindow(*session), true);
                 window->setResizable(true, false);
-                window->setResizeLimits(960, 780, 2400, 1600);
-                window->centreWithSize(1120, 840);
+                window->setResizeLimits(960, 680, 2400, 1600);
+                window->centreWithSize(1120, 760);
                 if (startupTest) quit();
                 return;
             }

@@ -18,9 +18,12 @@ std::optional<Session::PatternPreset> patternPresetFromId(const juce::String& id
 {
     if (id == "WarmPulse")  return Session::PatternPreset::WarmPulse;
     if (id == "AcidSteps")  return Session::PatternPreset::AcidSteps;
+    if (id == "ArpRun")     return Session::PatternPreset::ArpRun;
+    if (id == "SirenLead")  return Session::PatternPreset::SirenLead;
     if (id == "HouseKit")   return Session::PatternPreset::HouseKit;
     if (id == "BreakKit")   return Session::PatternPreset::BreakKit;
     if (id == "MinimalKit") return Session::PatternPreset::MinimalKit;
+    if (id == "ClapKit")    return Session::PatternPreset::ClapKit;
     return std::nullopt;
 }
 
@@ -39,6 +42,12 @@ std::optional<Session::Instrument> instrumentFromId(const juce::String& id)
     if (id == "FourOsc") return Session::Instrument::FourOsc;
     if (id == "Drums")   return Session::Instrument::Drums;
     if (id == "Utility") return Session::Instrument::Utility;
+    return std::nullopt;
+}
+
+std::optional<Session::MidiEffect> midiEffectFromId(const juce::String& id)
+{
+    if (id == "ThetaArp") return Session::MidiEffect::ThetaArp;
     return std::nullopt;
 }
 
@@ -693,7 +702,7 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
                 + juce::String(session.clipPluginCount(clip.id)));
             return;
         }
-    if ((kind == "preset" || kind == "effect" || kind == "instrument")
+    if ((kind == "preset" || kind == "effect" || kind == "instrument" || kind == "midi-effect")
         && targetTrack < 0
         && session.trackCount() > 0
         && static_cast<float>(details.localPosition.y) > lane(session.trackCount() - 1).getBottom())
@@ -796,13 +805,25 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
         return juce::Result::ok();
     }
 
+    if (kind == "midi-effect")
+    {
+        const auto effect = midiEffectFromId(id);
+        if (!effect) return juce::Result::fail("That browser item cannot be inserted here.");
+        if (track < 0) return juce::Result::fail("Drop MIDI FX on an instrument track.");
+        const auto result = session.addMidiEffect(*effect, track);
+        if (result.failed()) return result;
+        selectTrack(track);
+        if (status) status("Added MIDI FX to " + session.trackName(track) + " track rack");
+        return juce::Result::ok();
+    }
+
     if (kind == "info")
     {
         if (status) status(id + " is already available in this starter session.");
         return juce::Result::ok();
     }
 
-    return juce::Result::fail("Drop sounds, drums, instruments, or audio effects on the arrangement.");
+    return juce::Result::fail("Drop sounds, drums, instruments, MIDI FX, or audio effects on the arrangement.");
 }
 
 double Arrangement::snapUnitSeconds() const
