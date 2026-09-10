@@ -51,6 +51,7 @@ private:
         juce::Colour colour;
         int clipPlugins = 0;
     };
+    enum class LoopGesture { none, create, move, trimStart, trimEnd };
     void sync();
     void syncTrackControls();
     void updateScroll();
@@ -67,6 +68,7 @@ private:
     float xFor(double seconds) const;
     double timeAt(float x) const;
     double snapped(double seconds, bool bypass) const;
+    LoopGesture loopGestureAt(juce::Point<float>) const;
     juce::Rectangle<float> lane(int track) const;
     float laneHeight() const;
     float laneContentHeight() const;
@@ -94,8 +96,8 @@ private:
     ClipGeometry original, preview;
     int originalTrack = 0, previewTrack = 0;
     double dragTime = 0.0, sourceDuration = 0.0;
-    bool selectingLoop = false;
-    double loopAnchor = 0.0, loopPreviewStart = 0.0, loopPreviewEnd = 0.0;
+    LoopGesture loopGesture = LoopGesture::none;
+    double loopAnchor = 0.0, loopOriginalStart = 0.0, loopOriginalEnd = 0.0, loopPreviewStart = 0.0, loopPreviewEnd = 0.0;
     float playhead = -1.0f;
     static constexpr float headerWidth = 148.0f, rulerTop = 32.0f, lanesTop = 56.0f;
 };

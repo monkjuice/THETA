@@ -151,6 +151,7 @@ int runArrangementTest()
         view.setTopLeftPosition(-10000, -10000);
         view.addToDesktop(0);
         view.setVisible(true);
+        juce::Thread::sleep(1);
        #if JUCE_WINDOWS
         // Exercise the native damage handoff, not just software image painting.
         // Simulate a new position arriving in vblank while earlier damage is
@@ -175,6 +176,7 @@ int runArrangementTest()
         session.stop();
         view.setVisible(false);
         view.removeFromDesktop();
+        juce::Thread::sleep(1);
 
         // Start asynchronous waveform scanning after the deterministic frame check.
         require(session.importAudio(source.getFile()).wasOk(), "Import audio");
@@ -224,10 +226,11 @@ int runArrangementTest()
                 "Dropping an audio effect on an audio clip inserts clip-local FX");
         session.undo();
 
-        const auto event = [&view](juce::Point<float> down, juce::Point<float> point, bool dragged)
+        const auto event = [&view](juce::Point<float> down, juce::Point<float> point, bool dragged,
+                                   juce::ModifierKeys mods = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier))
         {
             return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(), point,
-                juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1.0f, 0, 0, 0, 0,
+                mods, 1.0f, 0, 0, 0, 0,
                 &view, &view, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
         };
         const auto drag = [&view, &event](juce::Point<float> down, juce::Point<float> to)
@@ -246,6 +249,21 @@ int runArrangementTest()
         loopRange = session.edit->getTransport().getLoopRange();
         require(close(loopRange.getStart().inSeconds(), 0.5) && close(loopRange.getEnd().inSeconds(), 1.5),
                 "Manual ruler loop selection is not overwritten by auto loop refresh");
+        drag({view.xFor(1.25), rulerY}, {view.xFor(1.75), rulerY});
+        loopRange = session.edit->getTransport().getLoopRange();
+        require(close(loopRange.getStart().inSeconds(), 1.0) && close(loopRange.getEnd().inSeconds(), 2.0),
+                "Dragging inside the ruler loop moves the range without changing its length");
+        drag({view.xFor(1.0) + 1.0f, rulerY}, {view.xFor(0.75), rulerY});
+        loopRange = session.edit->getTransport().getLoopRange();
+        require(close(loopRange.getStart().inSeconds(), 0.75) && close(loopRange.getEnd().inSeconds(), 2.0),
+                "Dragging the loop start edge expands the loop earlier");
+        drag({view.xFor(2.0) - 1.0f, rulerY}, {view.xFor(1.75), rulerY});
+        loopRange = session.edit->getTransport().getLoopRange();
+        require(close(loopRange.getStart().inSeconds(), 0.75) && close(loopRange.getEnd().inSeconds(), 1.75),
+                "Dragging the loop end edge trims the loop later edge");
+        const auto rightClick = juce::ModifierKeys(juce::ModifierKeys::rightButtonModifier);
+        view.mouseDown(event({view.xFor(1.0), rulerY}, {view.xFor(1.0), rulerY}, false, rightClick));
+        require(!session.hasManualLoopRange(), "Right-clicking the ruler loop clears the manual loop range");
         view.mouseDown(event({view.xFor(0.25), rulerY}, {view.xFor(0.25), rulerY}, false));
         view.mouseUp(event({view.xFor(0.25), rulerY}, {view.xFor(0.25), rulerY}, false));
         require(close(playheadTime(session.edit->getTransport()), 0.25), "Clicking the ruler still seeks the playhead");

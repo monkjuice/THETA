@@ -233,10 +233,10 @@ void Arrangement::paint(juce::Graphics& g)
     }
     {
         const auto loopRange = session.edit->getTransport().getLoopRange();
-        auto start = selectingLoop ? loopPreviewStart : loopRange.getStart().inSeconds();
-        auto end = selectingLoop ? loopPreviewEnd : loopRange.getEnd().inSeconds();
+        auto start = loopGesture != LoopGesture::none ? loopPreviewStart : loopRange.getStart().inSeconds();
+        auto end = loopGesture != LoopGesture::none ? loopPreviewEnd : loopRange.getEnd().inSeconds();
         if (end < start) std::swap(start, end);
-        if ((selectingLoop || session.hasManualLoopRange()) && end - start > 0.02)
+        if ((loopGesture != LoopGesture::none || session.hasManualLoopRange()) && end - start > 0.02)
         {
             const auto x1 = xFor(start);
             const auto x2 = xFor(end);
@@ -512,9 +512,37 @@ int Arrangement::hit(juce::Point<float> point) const
     return -1;
 }
 
+Arrangement::LoopGesture Arrangement::loopGestureAt(juce::Point<float> point) const
+{
+    if (!session.hasManualLoopRange() || point.y < rulerTop || point.y >= lanesTop || point.x < headerWidth)
+        return LoopGesture::none;
+
+    const auto loopRange = session.edit->getTransport().getLoopRange();
+    const auto x1 = xFor(loopRange.getStart().inSeconds());
+    const auto x2 = xFor(loopRange.getEnd().inSeconds());
+    const auto left = std::min(x1, x2);
+    const auto right = std::max(x1, x2);
+    if (point.x < left || point.x > right)
+        return LoopGesture::none;
+
+    const auto handle = std::min(10.0f, std::max(4.0f, (right - left) * 0.3f));
+    if (point.x - left <= handle)
+        return LoopGesture::trimStart;
+    if (right - point.x <= handle)
+        return LoopGesture::trimEnd;
+    return LoopGesture::move;
+}
+
 void Arrangement::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
+    if (event.mods.isRightButtonDown() && loopGestureAt(event.position) != LoopGesture::none)
+    {
+        session.clearManualLoopRange();
+        if (status) status("Loop range cleared");
+        repaint();
+        return;
+    }
     if (!event.mods.isLeftButtonDown()) return;
     for (int track = 0; track < session.trackCount(); ++track)
         if (lane(track).withX(0.0f).contains(event.position))
@@ -524,9 +552,19 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
         }
     if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
     {
-        selectingLoop = true;
-        loopAnchor = snapped(std::max(0.0, timeAt(event.position.x)), event.mods.isAltDown());
-        loopPreviewStart = loopPreviewEnd = loopAnchor;
+        const auto loopRange = session.edit->getTransport().getLoopRange();
+        loopOriginalStart = loopRange.getStart().inSeconds();
+        loopOriginalEnd = loopRange.getEnd().inSeconds();
+        loopPreviewStart = loopOriginalStart;
+        loopPreviewEnd = loopOriginalEnd;
+        loopAnchor = timeAt(event.position.x);
+        loopGesture = loopGestureAt(event.position);
+        if (loopGesture == LoopGesture::none)
+        {
+            loopGesture = LoopGesture::create;
+            loopAnchor = snapped(std::max(0.0, loopAnchor), event.mods.isAltDown());
+            loopPreviewStart = loopPreviewEnd = loopAnchor;
+        }
         repaint();
         return;
     }
@@ -554,11 +592,35 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
 
 void Arrangement::mouseDrag(const juce::MouseEvent& event)
 {
-    if (selectingLoop)
+    if (loopGesture != LoopGesture::none)
     {
-        const auto edge = snapped(std::max(0.0, timeAt(event.position.x)), event.mods.isAltDown());
-        loopPreviewStart = std::min(loopAnchor, edge);
-        loopPreviewEnd = std::max(loopAnchor, edge);
+        constexpr auto minimumLoopSeconds = 0.02;
+        const auto t = std::max(0.0, timeAt(event.position.x));
+        if (loopGesture == LoopGesture::create)
+        {
+            const auto edge = snapped(t, event.mods.isAltDown());
+            loopPreviewStart = std::min(loopAnchor, edge);
+            loopPreviewEnd = std::max(loopAnchor, edge);
+        }
+        else if (loopGesture == LoopGesture::move)
+        {
+            const auto length = loopOriginalEnd - loopOriginalStart;
+            auto start = snapped(loopOriginalStart + t - loopAnchor, event.mods.isAltDown());
+            start = std::max(0.0, start);
+            loopPreviewStart = start;
+            loopPreviewEnd = start + length;
+        }
+        else if (loopGesture == LoopGesture::trimStart)
+        {
+            loopPreviewStart = std::min(snapped(t, event.mods.isAltDown()), loopOriginalEnd - minimumLoopSeconds);
+            loopPreviewStart = std::max(0.0, loopPreviewStart);
+            loopPreviewEnd = loopOriginalEnd;
+        }
+        else if (loopGesture == LoopGesture::trimEnd)
+        {
+            loopPreviewStart = loopOriginalStart;
+            loopPreviewEnd = std::max(snapped(t, event.mods.isAltDown()), loopOriginalStart + minimumLoopSeconds);
+        }
         repaint();
         return;
     }
@@ -579,15 +641,16 @@ void Arrangement::mouseDrag(const juce::MouseEvent& event)
 
 void Arrangement::mouseUp(const juce::MouseEvent& event)
 {
-    if (selectingLoop)
+    if (loopGesture != LoopGesture::none)
     {
         mouseDrag(event);
-        selectingLoop = false;
+        const auto completedGesture = loopGesture;
+        loopGesture = LoopGesture::none;
         if (event.getDistanceFromDragStart() >= 3)
         {
             const auto result = session.setLoopRange(loopPreviewStart, loopPreviewEnd);
             if (result.failed() && status) status(result.getErrorMessage());
-            else if (status) status("Loop range selected");
+            else if (status) status(completedGesture == LoopGesture::create ? "Loop range selected" : "Loop range updated");
         }
         else
         {
@@ -615,8 +678,13 @@ void Arrangement::mouseMove(const juce::MouseEvent& event)
 {
     const auto index = hit(event.position);
     auto pointerStyle = juce::MouseCursor::NormalCursor;
-    if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
+    const auto loopHit = loopGestureAt(event.position);
+    if (loopHit == LoopGesture::trimStart || loopHit == LoopGesture::trimEnd)
         pointerStyle = juce::MouseCursor::LeftRightResizeCursor;
+    else if (loopHit == LoopGesture::move)
+        pointerStyle = juce::MouseCursor::DraggingHandCursor;
+    else if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
+        pointerStyle = juce::MouseCursor::CrosshairCursor;
     else if (index >= 0)
     {
         const auto box = bounds(clips[static_cast<size_t>(index)]);
@@ -787,7 +855,7 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
 void Arrangement::cancelDrag()
 {
     dragging = false;
-    selectingLoop = false;
+    loopGesture = LoopGesture::none;
 }
 
 void Arrangement::selectTrack(int track)

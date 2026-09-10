@@ -119,6 +119,7 @@ public:
     void undo();
     void redo();
     juce::Result setLoopRange(double startSeconds, double endSeconds);
+    void clearManualLoopRange();
     bool hasManualLoopRange() const { return manualLoop; }
     void refreshLoop();
     te::Clip* findClip(te::EditItemID) const;

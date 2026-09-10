@@ -1332,6 +1332,16 @@ juce::Result Session::setLoopRange(double startSeconds, double endSeconds)
     return juce::Result::ok();
 }
 
+void Session::clearManualLoopRange()
+{
+    if (!manualLoop)
+        return;
+    manualLoop = false;
+    refreshLoop();
+    markModified();
+    sendSynchronousChangeMessage();
+}
+
 void Session::undo()
 {
     refreshAfterUndoRedo(edit->getUndoManager().undo());
