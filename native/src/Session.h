@@ -57,7 +57,7 @@ public:
     juce::Result importAudioAt(const juce::File&, int track, double startSeconds);
     void togglePlayback();
     void stop();
-    static constexpr int steps = 16, pitches = 12, lowestNote = 48;
+    static constexpr int steps = 16, pitches = 16, lowestNote = 48;
     te::MidiClip& pattern() const { return *patternClip; }
     bool hasNote(int step, int pitch) const;
     void setNote(int step, int pitch, bool enabled);

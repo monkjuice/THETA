@@ -65,6 +65,8 @@ int runArrangementTest()
         view.itemDropped({"theta-browser:preset:BreakKit", nullptr, {static_cast<int>(view.xFor(1.0)), 82}});
         require(te::getAudioTracks(*session.edit)[0]->getClips().size() == patternClipsBeforeDrop + 1,
                 "Dragging a browser preset to the arrangement adds a pattern clip instead of replacing the first one");
+        require(session.edit->getTransport().getLoopRange().getEnd().inSeconds() >= 3.0,
+                "Loop range follows added clips on the first track");
         session.undo();
         const auto effectSlots = static_cast<int>(session.deviceSlots(1).size());
         require(view.applyBrowserDrop("theta-browser:effect:Delay", 1).wasOk(), "Browser effect drop inserts on the target audio track");
@@ -241,7 +243,7 @@ int runArrangementTest()
         selectionGrid.changeListenerCallback(nullptr);
         const auto selectedGridNotes = selectionGrid.notes;
         require(session.pattern().getSequence().getNumNotes() == 4, "Selected browser synth clip owns its preset notes");
-        require(selectedGridNotes.count() >= 3, "Selected browser synth clip populates the note editor");
+        require(selectedGridNotes.count() == 4, "Selected browser synth clip populates the note editor");
         require(!session.isPatternDrums(), "Selected browser synth clip uses the note editor");
         require(session.selectPatternClip(patternID).wasOk(), "Can switch the editor back to the first pattern clip");
         require(session.selectPatternClip(view.selected).wasOk(), "Can switch the editor back to the non-first MIDI clip");

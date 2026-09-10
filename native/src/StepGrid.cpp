@@ -19,7 +19,7 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
     setOpaque(true);
     setWantsKeyboardFocus(true);
     setTitle("Pattern notes");
-    setDescription("One bar, sixteen steps, MIDI notes 48 to 59. Drag to draw or erase notes.");
+    setDescription("One bar, sixteen steps. Drag to draw or erase notes.");
     session.addChangeListener(this);
     changeListenerCallback(nullptr);
 }
@@ -49,7 +49,7 @@ void StepGrid::paint(juce::Graphics& g)
     }
     for (int row = 0; row < Session::pitches; ++row)
     {
-        const auto pitch = Session::lowestNote + Session::pitches - 1 - row;
+        const auto pitch = lowestVisiblePitch + Session::pitches - 1 - row;
         const bool black = juce::MidiMessage::isMidiNoteBlack(pitch);
         const bool namedDrum = session.isPatternDrums() && (pitch == 48 || pitch == 53 || pitch == 58);
         auto key = cell(0, row).withX(0).withWidth(labelWidth - 4);
@@ -101,7 +101,7 @@ void StepGrid::apply(int index)
     if (index < 0 || visited.test(static_cast<size_t>(index))) return;
     visited.set(static_cast<size_t>(index));
     session.setNote(index % Session::steps,
-                    Session::lowestNote + Session::pitches - 1 - index / Session::steps, adding);
+                    lowestVisiblePitch + Session::pitches - 1 - index / Session::steps, adding);
 }
 
 void StepGrid::mouseDrag(const juce::MouseEvent& event)
@@ -123,22 +123,45 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
     lastHit = -1;
 }
 
+int StepGrid::visibleLowestPitch() const
+{
+    if (session.isPatternDrums())
+        return Session::lowestNote;
+
+    int minPitch = 128, maxPitch = 0;
+    for (auto* note : session.pattern().getSequence().getNotes())
+    {
+        minPitch = std::min(minPitch, note->getNoteNumber());
+        maxPitch = std::max(maxPitch, note->getNoteNumber());
+    }
+
+    if (minPitch > maxPitch)
+        return Session::lowestNote;
+
+    auto base = std::min(Session::lowestNote, minPitch);
+    if (maxPitch >= base + Session::pitches)
+        base = maxPitch - Session::pitches + 1;
+    return juce::jlimit(0, 127 - Session::pitches + 1, base);
+}
+
 void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 {
     std::bitset<Session::steps * Session::pitches> next;
     const auto nextDrumLabels = session.isPatternDrums();
+    const auto nextLowestPitch = visibleLowestPitch();
     for (auto* note : session.pattern().getSequence().getNotes())
     {
-        const auto row = Session::lowestNote + Session::pitches - 1 - note->getNoteNumber();
+        const auto row = nextLowestPitch + Session::pitches - 1 - note->getNoteNumber();
         const auto step = juce::roundToInt(note->getStartBeat().inBeats() * 4.0);
         if (row >= 0 && row < Session::pitches && step >= 0 && step < Session::steps)
             next.set(static_cast<size_t>(row * Session::steps + step));
     }
     const auto changed = next ^ notes;
     notes = next;
-    if (showingDrumLabels != nextDrumLabels)
+    if (showingDrumLabels != nextDrumLabels || lowestVisiblePitch != nextLowestPitch)
     {
         showingDrumLabels = nextDrumLabels;
+        lowestVisiblePitch = nextLowestPitch;
         repaint();
         return;
     }

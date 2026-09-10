@@ -294,6 +294,7 @@ juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, 
     if (clip == nullptr)
         return juce::Result::fail("The pattern clip could not be added.");
     fillMidiClip(*clip, data, edit->getUndoManager());
+    refreshLoop();
     markModified();
     edit->getUndoManager().beginNewTransaction();
     if (edit->getTransport().isPlaying())
@@ -534,11 +535,13 @@ void Session::setTempo(double bpm)
 
 void Session::refreshLoop()
 {
-    auto end = pattern().getPosition().time.getEnd();
+    auto end = tracktion::core::TimePosition::fromSeconds(0.0);
     const auto tracks = te::getAudioTracks(*edit);
-    for (int track = 1; track < tracks.size(); ++track)
-        for (auto* clip : tracks[track]->getClips())
+    for (auto* track : tracks)
+        for (auto* clip : track->getClips())
             end = std::max(end, clip->getPosition().time.getEnd());
+    if (end <= tracktion::core::TimePosition::fromSeconds(0.0))
+        end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     edit->getTransport().setLoopRange({{}, end});
     edit->getTransport().looping = true;
 }
