@@ -10,8 +10,10 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     position.referTo(state, "position", undo, 0.35f);
     shape.referTo(state, "shape", undo, 0.55f);
     motion.referTo(state, "motion", undo, 0.22f);
-    sub.referTo(state, "sub", undo, 0.18f);
     cutoff.referTo(state, "cutoff", undo, 6400.0f);
+    filterEnv.referTo(state, "filterEnv", undo, 0.18f);
+    driveDb.referTo(state, "driveDb", undo, 3.0f);
+    sub.referTo(state, "sub", undo, 0.18f);
     resonance.referTo(state, "resonance", undo, 0.15f);
     attack.referTo(state, "attack", undo, 0.018f);
     decay.referTo(state, "decay", undo, 0.18f);
@@ -25,8 +27,10 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     positionParam = addParam("position", "Position", {0.0f, 1.0f});
     shapeParam = addParam("shape", "Shape", {0.0f, 1.0f});
     motionParam = addParam("motion", "Motion", {0.0f, 1.0f});
-    subParam = addParam("sub", "Sub", {0.0f, 1.0f});
     cutoffParam = addParam("cutoff", "Cutoff", {80.0f, 18000.0f, 0.0f, 0.45f});
+    filterEnvParam = addParam("filterEnv", "Env", {-1.0f, 1.0f});
+    driveParam = addParam("driveDb", "Drive", {0.0f, 24.0f});
+    subParam = addParam("sub", "Sub", {0.0f, 1.0f});
     resonanceParam = addParam("resonance", "Resonance", {0.0f, 1.0f});
     attackParam = addParam("attack", "Attack", {0.001f, 5.0f, 0.0f, 0.35f});
     decayParam = addParam("decay", "Decay", {0.001f, 8.0f, 0.0f, 0.35f});
@@ -38,8 +42,8 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     outputParam = addParam("outputDb", "Output", {-36.0f, 6.0f});
 
     for (auto pair : std::initializer_list<std::pair<te::AutomatableParameter::Ptr*, juce::CachedValue<float>*>>{
-             {&positionParam, &position}, {&shapeParam, &shape}, {&motionParam, &motion}, {&subParam, &sub}, {&cutoffParam, &cutoff},
-             {&resonanceParam, &resonance}, {&attackParam, &attack}, {&decayParam, &decay},
+             {&positionParam, &position}, {&shapeParam, &shape}, {&motionParam, &motion}, {&cutoffParam, &cutoff},
+             {&filterEnvParam, &filterEnv}, {&driveParam, &driveDb}, {&subParam, &sub}, {&resonanceParam, &resonance}, {&attackParam, &attack}, {&decayParam, &decay},
              {&sustainParam, &sustain}, {&releaseParam, &releaseTime}, {&unisonParam, &unison},
              {&detuneParam, &detune}, {&widthParam, &width}, {&outputParam, &outputDb}})
         (*pair.first)->attachToCurrentValue(*pair.second);
@@ -49,8 +53,10 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     positionParam->valueToStringFunction = percentText;
     shapeParam->valueToStringFunction = percentText;
     motionParam->valueToStringFunction = percentText;
-    subParam->valueToStringFunction = percentText;
     cutoffParam->valueToStringFunction = [] (float value) { return juce::String(juce::roundToInt(value)) + "Hz"; };
+    filterEnvParam->valueToStringFunction = percentText;
+    driveParam->valueToStringFunction = [] (float value) { return juce::String(value, 1) + " dB"; };
+    subParam->valueToStringFunction = percentText;
     resonanceParam->valueToStringFunction = percentText;
     attackParam->valueToStringFunction = msText;
     decayParam->valueToStringFunction = msText;
@@ -204,8 +210,8 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
         }
 
     const auto output = juce::Decibels::decibelsToGain(outputParam->getCurrentValue());
-    const auto cutoffHz = std::clamp(cutoffParam->getCurrentValue(), 80.0f, static_cast<float>(sampleRate * 0.45));
-    const auto filterAmount = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * cutoffHz / static_cast<float>(sampleRate));
+    const auto baseCutoffHz = std::clamp(cutoffParam->getCurrentValue(), 80.0f, static_cast<float>(sampleRate * 0.45));
+    const auto drive = juce::Decibels::decibelsToGain(driveParam->getCurrentValue());
     const auto resonancePush = 1.0f + resonanceParam->getCurrentValue() * 1.8f;
 
     for (int frame = context.bufferStartSample; frame < context.bufferStartSample + context.bufferNumSamples; ++frame)
@@ -213,7 +219,14 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
         auto mono = 0.0f;
         for (auto& voice : voices)
             mono += renderVoice(voice);
-        mono = std::tanh(mono * resonancePush) * output;
+        auto envelopePeak = 0.0f;
+        for (const auto& voice : voices)
+            if (voice.active)
+                envelopePeak = std::max(envelopePeak, voice.envelope);
+        const auto cutoffHz = std::clamp(baseCutoffHz * std::pow(2.0f, filterEnvParam->getCurrentValue() * envelopePeak * 4.0f),
+                                         40.0f, static_cast<float>(sampleRate * 0.45));
+        const auto filterAmount = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * cutoffHz / static_cast<float>(sampleRate));
+        mono = std::tanh(mono * drive * resonancePush) * output;
         filterL += (mono - filterL) * filterAmount;
         filterR += (mono - filterR) * filterAmount;
         const auto side = mono - filterL;
@@ -228,7 +241,7 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
 
 void ThetaWaveDevice::restorePluginStateFromValueTree(const juce::ValueTree& source)
 {
-    te::copyPropertiesToCachedValues(source, position, shape, motion, sub, cutoff, resonance, attack, decay, sustain, releaseTime,
+    te::copyPropertiesToCachedValues(source, position, shape, motion, cutoff, filterEnv, driveDb, sub, resonance, attack, decay, sustain, releaseTime,
                                      unison, detune, width, outputDb);
     for (auto* parameter : getAutomatableParameters())
         parameter->updateFromAttachedValue();

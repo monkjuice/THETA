@@ -348,51 +348,57 @@ void applyThetaWavePatch(Session::PatternPreset preset, ThetaWaveDevice& wave)
         set(0, 0.38f);    // Position
         set(1, 0.72f);    // Shape
         set(2, 0.35f);    // Motion
-        set(3, 0.08f);    // Sub
-        set(4, 5200.0f);  // Cutoff
-        set(5, 0.18f);    // Resonance
-        set(6, 0.22f);    // Attack
-        set(7, 0.85f);    // Decay
-        set(8, 0.78f);    // Sustain
-        set(9, 1.15f);    // Release
-        set(10, 3.0f);    // Unison
-        set(11, 0.13f);   // Detune
-        set(12, 0.78f);   // Width
-        set(13, -10.0f);  // Output
+        set(3, 5200.0f);  // Cutoff
+        set(4, 0.22f);    // Env
+        set(5, 4.0f);     // Drive
+        set(6, 0.08f);    // Sub
+        set(7, 0.18f);    // Resonance
+        set(8, 0.22f);    // Attack
+        set(9, 0.85f);    // Decay
+        set(10, 0.78f);   // Sustain
+        set(11, 1.15f);   // Release
+        set(12, 3.0f);    // Unison
+        set(13, 0.13f);   // Detune
+        set(14, 0.78f);   // Width
+        set(15, -12.0f);  // Output
     }
     else if (preset == Session::PatternPreset::WaveBass)
     {
         set(0, 0.58f);
         set(1, 0.34f);
         set(2, 0.12f);
-        set(3, 0.42f);
-        set(4, 2600.0f);
-        set(5, 0.12f);
-        set(6, 0.006f);
-        set(7, 0.16f);
-        set(8, 0.7f);
-        set(9, 0.18f);
-        set(10, 1.0f);
-        set(11, 0.02f);
-        set(12, 0.18f);
-        set(13, -7.0f);
+        set(3, 2600.0f);
+        set(4, -0.08f);
+        set(5, 7.5f);
+        set(6, 0.42f);
+        set(7, 0.12f);
+        set(8, 0.006f);
+        set(9, 0.16f);
+        set(10, 0.7f);
+        set(11, 0.18f);
+        set(12, 1.0f);
+        set(13, 0.02f);
+        set(14, 0.18f);
+        set(15, -10.0f);
     }
     else if (preset == Session::PatternPreset::WavePluck)
     {
         set(0, 0.64f);
         set(1, 0.82f);
         set(2, 0.55f);
-        set(3, 0.1f);
-        set(4, 4200.0f);
-        set(5, 0.28f);
-        set(6, 0.004f);
-        set(7, 0.24f);
-        set(8, 0.18f);
-        set(9, 0.22f);
-        set(10, 2.0f);
-        set(11, 0.06f);
-        set(12, 0.52f);
-        set(13, -8.5f);
+        set(3, 4200.0f);
+        set(4, 0.65f);
+        set(5, 8.0f);
+        set(6, 0.1f);
+        set(7, 0.28f);
+        set(8, 0.004f);
+        set(9, 0.24f);
+        set(10, 0.18f);
+        set(11, 0.22f);
+        set(12, 2.0f);
+        set(13, 0.06f);
+        set(14, 0.52f);
+        set(15, -11.0f);
     }
 }
 

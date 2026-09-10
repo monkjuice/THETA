@@ -41,9 +41,9 @@ private:
     float renderVoice(Voice&);
     float wave(float phase, float motionOffset) const;
 
-    juce::CachedValue<float> position, shape, motion, sub, cutoff, resonance, attack, decay, sustain, releaseTime;
+    juce::CachedValue<float> position, shape, motion, cutoff, filterEnv, driveDb, sub, resonance, attack, decay, sustain, releaseTime;
     juce::CachedValue<float> unison, detune, width, outputDb;
-    te::AutomatableParameter::Ptr positionParam, shapeParam, motionParam, subParam, cutoffParam, resonanceParam;
+    te::AutomatableParameter::Ptr positionParam, shapeParam, motionParam, cutoffParam, filterEnvParam, driveParam, subParam, resonanceParam;
     te::AutomatableParameter::Ptr attackParam, decayParam, sustainParam, releaseParam;
     te::AutomatableParameter::Ptr unisonParam, detuneParam, widthParam, outputParam;
     std::array<Voice, 12> voices;
