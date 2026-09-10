@@ -30,6 +30,7 @@ std::optional<Session::AudioEffect> audioEffectFromId(const juce::String& id)
     if (id == "Reverb")     return Session::AudioEffect::Reverb;
     if (id == "Delay")      return Session::AudioEffect::Delay;
     if (id == "Compressor") return Session::AudioEffect::Compressor;
+    if (id == "ThetaSpace") return Session::AudioEffect::ThetaSpace;
     return std::nullopt;
 }
 
@@ -720,10 +721,12 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
         const auto instrument = instrumentFromId(id);
         if (!instrument) return juce::Result::fail("That browser item cannot be inserted here.");
         if (track < 0) return juce::Result::fail("Drop instruments on a track or clip.");
-        const auto result = session.addInstrument(*instrument, track);
+        const auto result = insertPreset ? session.insertInstrumentClip(*instrument, track, startSeconds)
+                                         : session.addInstrument(*instrument, track);
         if (result.failed()) return result;
         selectTrack(track);
-        if (status) status("Activated instrument on " + session.trackName(track));
+        if (status) status(insertPreset ? "Added instrument clip to " + session.trackName(track)
+                                        : "Activated instrument on " + session.trackName(track));
         return juce::Result::ok();
     }
 
@@ -733,7 +736,7 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
         return juce::Result::ok();
     }
 
-    return juce::Result::fail("Drop sounds, drums, or audio effects on the arrangement.");
+    return juce::Result::fail("Drop sounds, drums, instruments, or audio effects on the arrangement.");
 }
 
 double Arrangement::snapUnitSeconds() const

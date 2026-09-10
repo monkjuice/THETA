@@ -47,6 +47,12 @@ int runPatternTest()
             require(parameterSession.endDeviceParameterGesture(1, reverbSlot, 0).wasOk(), "Device rack ends parameter gestures");
             reverbParameters = parameterSession.deviceParameters(1, reverbSlot);
             require(std::abs(reverbParameters.front().value - newReverbValue) < 0.0001f, "Edited effect parameter value is reflected in the rack");
+            require(parameterSession.addAudioEffect(Session::AudioEffect::ThetaSpace).wasOk(), "Audio FX browser action inserts Theta Space");
+            const auto thetaSlot = static_cast<int>(parameterTrack->pluginList.size()) - 1;
+            auto thetaParameters = parameterSession.deviceParameters(1, thetaSlot);
+            require(thetaParameters.size() >= 6, "Theta Space exposes its macro controls");
+            require(parameterSession.setDeviceParameter(1, thetaSlot, 0, thetaParameters.front().maximum).wasOk(),
+                    "Theta Space macro controls are editable");
         }
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");

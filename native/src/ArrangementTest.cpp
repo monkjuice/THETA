@@ -278,6 +278,14 @@ int runArrangementTest()
         require(view.applyBrowserDrop("theta-browser:instrument:Drums", 2).wasOk(), "Instrument browser rows can be dropped onto non-first tracks");
         require(session.deviceSlots(2).size() == audio2DevicesAfterSound + 1, "Dropped instrument appears on the target track");
         session.undo();
+        const auto instrumentClipCount = te::getAudioTracks(*session.edit)[2]->getClips().size();
+        view.itemDropped({"theta-browser:instrument:FourOsc", nullptr,
+                          {static_cast<int>(view.xFor(1.0)), static_cast<int>(view.lane(2).getCentreY())}});
+        require(te::getAudioTracks(*session.edit)[2]->getClips().size() == instrumentClipCount + 1,
+                "Dragging an instrument onto the arrangement creates an editable MIDI clip");
+        require(session.pattern().itemID == te::getAudioTracks(*session.edit)[2]->getClips().getLast()->itemID,
+                "Dropped instrument clip becomes the note editor target");
+        session.undo();
         require(session.removeAudioTrack(2).wasOk(), "Can remove the extra audio track");
         require(session.trackCount() == 2, "Removing extra audio track restores starter track count");
         view.filesDropped(dropped, static_cast<int>(view.xFor(1.0)), view.getHeight() - 3);

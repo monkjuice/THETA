@@ -165,6 +165,7 @@ Session::Session()
 {
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
     engine.getPluginManager().createBuiltInType<DrumDevice>();
+    engine.getPluginManager().createBuiltInType<ThetaSpaceDevice>();
     edit = te::createEmptyEdit(engine, {});
     edit->state.setProperty("thetaFormatVersion", 1, nullptr);
     edit->tempoSequence.getTempo(0)->setBpm(120.0);
@@ -348,6 +349,49 @@ juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, 
     return juce::Result::ok();
 }
 
+juce::Result Session::insertInstrumentClip(Instrument instrument, int trackIndex, double startSeconds)
+{
+    if (!std::isfinite(startSeconds) || startSeconds < 0.0)
+        return juce::Result::fail("Invalid instrument drop position.");
+    if (instrument == Instrument::Utility)
+        return addInstrument(instrument, trackIndex);
+
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
+        return juce::Result::fail("Drop instruments on a track lane.");
+
+    const auto useDrums = instrument == Instrument::Drums;
+    const auto name = useDrums ? juce::String("Theta Drums") : juce::String("4OSC synth");
+    const auto start = tracktion::core::TimePosition::fromSeconds(startSeconds);
+    const auto end = start + tracktion::core::TimeDuration::fromSeconds(
+        edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0)).inSeconds());
+    auto* track = tracks[trackIndex];
+
+    edit->getUndoManager().beginNewTransaction("Add " + name);
+    if (trackIndex == 0)
+        setPatternInstrument(useDrums);
+    else
+    {
+        bool instrumentChanged = false;
+        const auto result = switchTrackInstrument(*edit, *track, useDrums, instrumentChanged);
+        if (result.failed())
+            return result;
+    }
+
+    auto clip = track->insertMIDIClip(name, {start, end}, nullptr);
+    if (clip == nullptr)
+        return juce::Result::fail("The instrument clip could not be added.");
+    patternClip = clip.get();
+    patternClipID = patternClip->itemID;
+    refreshLoop();
+    markModified();
+    edit->getUndoManager().beginNewTransaction();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
 void Session::setPatternInstrument(bool useDrums)
 {
     if (synth) synth->setEnabled(!useDrums);
@@ -386,6 +430,7 @@ juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
         case AudioEffect::Reverb:     type = te::ReverbPlugin::xmlTypeName;     name = "Reverb"; break;
         case AudioEffect::Delay:      type = te::DelayPlugin::xmlTypeName;      name = "Delay"; break;
         case AudioEffect::Compressor: type = te::CompressorPlugin::xmlTypeName; name = "Compressor"; break;
+        case AudioEffect::ThetaSpace: type = ThetaSpaceDevice::xmlTypeName;     name = "Theta Space"; break;
     }
 
     const auto tracks = te::getAudioTracks(*edit);

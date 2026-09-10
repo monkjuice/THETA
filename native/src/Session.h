@@ -1,6 +1,7 @@
 #pragma once
 #include "UtilityDevice.h"
 #include "DrumDevice.h"
+#include "ThetaSpaceDevice.h"
 #include "ClipGeometry.h"
 #include <vector>
 
@@ -24,7 +25,8 @@ public:
         Equaliser,
         Reverb,
         Delay,
-        Compressor
+        Compressor,
+        ThetaSpace
     };
     enum class Instrument
     {
@@ -75,6 +77,7 @@ public:
     void clearPattern();
     void applyPatternPreset(PatternPreset);
     juce::Result insertPatternPreset(PatternPreset, int track, double startSeconds);
+    juce::Result insertInstrumentClip(Instrument, int track, double startSeconds);
     juce::Result selectPatternClip(te::EditItemID);
     bool isPatternDrums() const;
     juce::Result addAudioEffect(AudioEffect, int track = 1);
