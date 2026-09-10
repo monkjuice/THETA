@@ -364,6 +364,19 @@ juce::String fourOscMacroName(int index)
     return {};
 }
 
+juce::String formatFourOscMacroValue(int index, float value, te::AutomatableParameter& parameter)
+{
+    switch (index)
+    {
+        case 0:
+        case 1:
+        case 3:
+            return juce::String(juce::roundToInt(value * 1000.0f)) + "ms";
+        default:
+            return parameter.getCurrentValueAsStringWithLabel();
+    }
+}
+
 te::AutomatableParameter* exposedParameterAt(te::Plugin& plugin, int index)
 {
     if (auto* synthPlugin = dynamic_cast<te::FourOscPlugin*>(&plugin))
@@ -1013,7 +1026,7 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
                 if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
                     continue;
                 parameters.push_back({fourOscMacroName(i),
-                                      parameter->getCurrentValueAsStringWithLabel(),
+                                      formatFourOscMacroValue(i, parameter->getCurrentValue(), *parameter),
                                       parameter->getCurrentValue(),
                                       range.getStart(),
                                       range.getEnd(),
