@@ -279,6 +279,10 @@ int runArrangementTest()
         StepGrid selectionGrid(session);
         selectionGrid.setSize(1000, 250);
         selectionGrid.changeListenerCallback(nullptr);
+        require(close(selectionGrid.playheadXForTime(0.5), 54.0),
+                "Note editor playhead starts at the selected clip even after bar one");
+        require(close(selectionGrid.playheadXForTime(1.5), 527.0),
+                "Note editor playhead follows selected clip-local beats");
         const auto selectedGridNotes = selectionGrid.notes;
         require(session.pattern().getSequence().getNumNotes() == 4, "Selected browser synth clip owns its preset notes");
         require(selectedGridNotes.count() == 4, "Selected browser synth clip populates the note editor");

@@ -20,6 +20,7 @@ private:
     int hit(juce::Point<float>) const;
     void apply(int index);
     int visibleLowestPitch() const;
+    float playheadXForTime(double seconds) const;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void updatePlayhead();
     Session& session;

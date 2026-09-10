@@ -1,5 +1,6 @@
 #include "StepGrid.h"
 #include "Playhead.h"
+#include <cmath>
 
 namespace theta
 {
@@ -174,14 +175,26 @@ void StepGrid::updatePlayhead()
     float next = -1.0f;
     auto& transport = session.edit->getTransport();
     if (isShowing() && transport.isPlaying())
-    {
-        const auto beat = session.edit->tempoSequence.toBeats(
-            tracktion::core::TimePosition::fromSeconds(playheadTime(transport))).inBeats();
-        if (beat >= 0.0 && beat < 4.0)
-            next = static_cast<float>(labelWidth + beat / 4.0 * (getWidth() - labelWidth));
-    }
+        next = playheadXForTime(playheadTime(transport));
     movePlayhead(*this, playhead, next,
                  getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight)));
+}
+
+float StepGrid::playheadXForTime(double seconds) const
+{
+    const auto& position = session.pattern().getPosition();
+    const auto clipStart = position.time.getStart().inSeconds();
+    const auto clipEnd = position.time.getEnd().inSeconds();
+    if (seconds < clipStart || seconds >= clipEnd)
+        return -1.0f;
+
+    const auto editBeat = session.edit->tempoSequence.toBeats(tracktion::core::TimePosition::fromSeconds(seconds)).inBeats();
+    const auto clipStartBeat = session.edit->tempoSequence.toBeats(position.time.getStart()).inBeats();
+    const auto offsetBeat = position.offset.inSeconds() * session.tempo() / 60.0;
+    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, 4.0);
+    if (localBeat < 0.0)
+        localBeat += 4.0;
+    return static_cast<float>(labelWidth + localBeat / 4.0 * (getWidth() - labelWidth));
 }
 
 void StepGrid::resized() { updatePlayhead(); repaint(); }
