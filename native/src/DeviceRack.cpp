@@ -1,4 +1,5 @@
 #include "DeviceRack.h"
+#include <cmath>
 #include <optional>
 
 namespace theta
@@ -31,7 +32,8 @@ std::optional<Session::Instrument> instrumentFromBrowserDrop(const juce::String&
 class DeviceRack::FloatingDeviceWindow final : public juce::DocumentWindow
 {
 public:
-    class Editor final : public juce::Component
+    class Editor final : public juce::Component,
+                         private juce::Timer
     {
     public:
         Editor(Session& s, int t, int sl) : session(s), track(t), slot(sl)
@@ -39,6 +41,7 @@ public:
             setOpaque(true);
             setSize(680, 430);
             refresh();
+            startTimerHz(30);
         }
 
         void paint(juce::Graphics& g) override
@@ -62,28 +65,37 @@ public:
             g.setColour(juce::Colour(0xff333b45));
             g.drawRect(scope, 1.0f);
             g.setColour(juce::Colour(0x668cc5d2));
-            for (int i = 0; i < 48; ++i)
+            for (int i = 0; i < 56; ++i)
             {
-                const auto x = scope.getX() + 10.0f + i * (scope.getWidth() - 20.0f) / 47.0f;
-                const auto h = 8.0f + std::sin(i * 0.67f) * 14.0f + std::sin(i * 0.21f) * 22.0f;
+                const auto x = scope.getX() + 10.0f + i * (scope.getWidth() - 20.0f) / 55.0f;
+                const auto h = 8.0f
+                    + std::sin(animationPhase + i * 0.67f) * 13.0f
+                    + std::sin(animationPhase * 0.41f + i * 0.21f) * 20.0f;
                 g.drawVerticalLine(static_cast<int>(x), scope.getCentreY() - h, scope.getCentreY() + h);
             }
         }
 
         void resized() override
         {
-            const auto rows = static_cast<int>(sliders.size());
+            const auto count = static_cast<int>(sliders.size());
             const int top = 244;
-            for (int i = 0; i < rows; ++i)
+            for (int i = 0; i < count; ++i)
             {
                 const int col = i % 3;
                 const int row = i / 3;
                 const int x = 36 + col * 210;
                 const int y = top + row * 74;
-                labels[i]->setBounds(x, y, 92, 20);
-                values[i]->setBounds(x + 104, y, 76, 20);
-                sliders[i]->setBounds(x, y + 24, 178, 32);
+                sliders[i]->setBounds(x, y, 82, 58);
+                labels[i]->setBounds(x + 90, y + 4, 94, 22);
+                values[i]->setBounds(x + 90, y + 28, 76, 22);
             }
+        }
+
+        void timerCallback() override
+        {
+            animationPhase += 0.12f;
+            const juce::Rectangle<int> scope(210, 88, 260, 126);
+            repaint(scope.expanded(2));
         }
 
         void refresh()
@@ -102,7 +114,7 @@ public:
                 value->setColour(juce::Label::textColourId, juce::Colour(0xff94a9b4));
                 value->setFont(juce::FontOptions(12.0f));
                 value->setJustificationType(juce::Justification::centredRight);
-                slider->setSliderStyle(juce::Slider::LinearHorizontal);
+                slider->setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
                 slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
                 slider->setColour(juce::Slider::trackColourId, juce::Colour(0xff8cc5d2));
                 slider->setColour(juce::Slider::backgroundColourId, juce::Colour(0xff242b31));
@@ -111,7 +123,12 @@ public:
                 slider->onValueChange = [this, index, slider]
                 {
                     if (!syncing)
+                    {
                         session.setDeviceParameter(track, slot, index, static_cast<float>(slider->getValue()));
+                        const auto next = session.deviceParameters(track, slot);
+                        if (juce::isPositiveAndBelow(index, next.size()))
+                            values[index]->setText(next[static_cast<size_t>(index)].valueText, juce::dontSendNotification);
+                    }
                 };
                 slider->onDragEnd = [this, index]
                 {
@@ -146,6 +163,7 @@ public:
         Session& session;
         int track = 0, slot = 0;
         bool syncing = false;
+        float animationPhase = 0.0f;
         juce::String deviceName;
         std::vector<Session::DeviceParameter> parameters;
         juce::OwnedArray<juce::Label> labels, values;
