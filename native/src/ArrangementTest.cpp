@@ -236,6 +236,18 @@ int runArrangementTest()
         view.sync();
         view.selected = te::getAudioTracks(*session.edit)[2]->getClips().getLast()->itemID;
         require(session.selectPatternClip(view.selected).wasOk(), "Selecting a non-first MIDI clip makes it editable in the note editor");
+        StepGrid selectionGrid(session);
+        selectionGrid.setSize(1000, 250);
+        selectionGrid.changeListenerCallback(nullptr);
+        const auto selectedGridNotes = selectionGrid.notes;
+        require(session.pattern().getSequence().getNumNotes() == 4, "Selected browser synth clip owns its preset notes");
+        require(selectedGridNotes.count() >= 3, "Selected browser synth clip populates the note editor");
+        require(!session.isPatternDrums(), "Selected browser synth clip uses the note editor");
+        require(session.selectPatternClip(patternID).wasOk(), "Can switch the editor back to the first pattern clip");
+        require(session.selectPatternClip(view.selected).wasOk(), "Can switch the editor back to the non-first MIDI clip");
+        selectionGrid.changeListenerCallback(nullptr);
+        require(selectionGrid.notes == selectedGridNotes, "Switching clips preserves the selected clip's note editor pattern");
+        require(!session.isPatternDrums(), "Switching back restores the selected clip's instrument mode");
         const auto selectedClipNotes = session.pattern().getSequence().getNumNotes();
         session.setNote(1, 48, true);
         require(session.pattern().getSequence().getNumNotes() == selectedClipNotes + 1,

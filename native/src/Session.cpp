@@ -46,12 +46,17 @@ void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoMan
     clip.setName(preset.name);
 }
 
-bool trackHasPlugin(te::AudioTrack& track, const juce::String& type)
+te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type)
 {
     for (auto* plugin : track.pluginList)
         if (plugin != nullptr && plugin->getPluginType() == type)
-            return true;
-    return false;
+            return plugin;
+    return nullptr;
+}
+
+bool trackHasPlugin(te::AudioTrack& track, const juce::String& type)
+{
+    return findPlugin(track, type) != nullptr;
 }
 
 DrumDevice* findDrumDevice(te::AudioTrack& track)
@@ -60,6 +65,54 @@ DrumDevice* findDrumDevice(te::AudioTrack& track)
         if (auto* drums = dynamic_cast<DrumDevice*>(plugin))
             return drums;
     return nullptr;
+}
+
+juce::Result ensurePlugin(te::Edit& edit, te::AudioTrack& track, const juce::String& type,
+                          int insertIndex, te::Plugin*& plugin, bool& changed)
+{
+    if ((plugin = findPlugin(track, type)) != nullptr)
+        return juce::Result::ok();
+
+    auto created = edit.getPluginCache().createNewPlugin(type, {});
+    if (created == nullptr)
+        return juce::Result::fail("The target track device could not be created.");
+
+    plugin = created.get();
+    track.pluginList.insertPlugin(created, juce::jlimit(0, track.pluginList.size(), insertIndex), nullptr);
+    changed = true;
+    return juce::Result::ok();
+}
+
+juce::Result switchTrackInstrument(te::Edit& edit, te::AudioTrack& track, bool useDrums, bool& changed)
+{
+    te::Plugin* selected = nullptr;
+    const auto selectedType = useDrums ? juce::String(DrumDevice::xmlTypeName)
+                                      : juce::String(te::FourOscPlugin::xmlTypeName);
+    auto result = ensurePlugin(edit, track, selectedType, 0, selected, changed);
+    if (result.failed())
+        return result;
+
+    if (auto* fourOsc = findPlugin(track, te::FourOscPlugin::xmlTypeName))
+        if (fourOsc->isEnabled() == useDrums)
+        {
+            fourOsc->setEnabled(!useDrums);
+            changed = true;
+        }
+
+    if (auto* drumDevice = findDrumDevice(track))
+        if (drumDevice->isEnabled() != useDrums)
+        {
+            drumDevice->setEnabled(useDrums);
+            changed = true;
+        }
+
+    if (selected != nullptr && !selected->isEnabled())
+    {
+        selected->setEnabled(true);
+        changed = true;
+    }
+
+    return juce::Result::ok();
 }
 }
 
@@ -232,14 +285,10 @@ juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, 
         setPatternInstrument(data.useDrums);
     else
     {
-        const auto type = data.useDrums ? DrumDevice::xmlTypeName : te::FourOscPlugin::xmlTypeName;
-        if (!trackHasPlugin(*track, type))
-        {
-            auto plugin = edit->getPluginCache().createNewPlugin(type, {});
-            if (plugin == nullptr)
-                return juce::Result::fail("The target track instrument could not be created.");
-            track->pluginList.insertPlugin(plugin, 0, nullptr);
-        }
+        bool instrumentChanged = false;
+        const auto result = switchTrackInstrument(*edit, *track, data.useDrums, instrumentChanged);
+        if (result.failed())
+            return result;
     }
     auto clip = track->insertMIDIClip(data.name, {start, end}, nullptr);
     if (clip == nullptr)
@@ -326,16 +375,25 @@ juce::Result Session::addInstrument(Instrument instrument, int trackIndex)
         case Instrument::Drums:   type = DrumDevice::xmlTypeName;        name = "Theta Drums"; break;
         case Instrument::Utility: type = UtilityDevice::xmlTypeName;     name = "Utility"; break;
     }
-    if (trackHasPlugin(*track, type))
-        return juce::Result::fail(name + " is already on " + track->getName() + ".");
 
     edit->getUndoManager().beginNewTransaction("Add " + name);
-    auto plugin = edit->getPluginCache().createNewPlugin(type, {});
-    if (plugin == nullptr)
-        return juce::Result::fail(name + " could not be created.");
-    track->pluginList.insertPlugin(plugin, instrument == Instrument::Utility ? track->pluginList.size() : 0, nullptr);
+    bool changed = false;
+    if (instrument == Instrument::Utility)
+    {
+        te::Plugin* plugin = nullptr;
+        const auto result = ensurePlugin(*edit, *track, type, track->pluginList.size(), plugin, changed);
+        if (result.failed())
+            return juce::Result::fail(name + " could not be created.");
+    }
+    else
+    {
+        const auto result = switchTrackInstrument(*edit, *track, instrument == Instrument::Drums, changed);
+        if (result.failed())
+            return juce::Result::fail(name + " could not be created.");
+    }
     edit->getUndoManager().beginNewTransaction();
-    markModified();
+    if (changed)
+        markModified();
     if (edit->getTransport().isPlaying())
         edit->restartPlayback();
     sendSynchronousChangeMessage();

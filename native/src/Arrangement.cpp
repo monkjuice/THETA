@@ -625,7 +625,8 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
 {
     auto targetTrack = trackAt(static_cast<float>(details.localPosition.y));
     const auto description = details.description.toString();
-    if (browserDropKind(description) == "effect"
+    const auto kind = browserDropKind(description);
+    if ((kind == "preset" || kind == "effect" || kind == "instrument")
         && targetTrack < 0
         && session.trackCount() > 0
         && static_cast<float>(details.localPosition.y) > lane(session.trackCount() - 1).getBottom())
@@ -722,7 +723,7 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
         const auto result = session.addInstrument(*instrument, track);
         if (result.failed()) return result;
         selectTrack(track);
-        if (status) status("Added instrument to " + session.trackName(track));
+        if (status) status("Activated instrument on " + session.trackName(track));
         return juce::Result::ok();
     }
 
