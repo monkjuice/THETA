@@ -4,6 +4,16 @@
 
 namespace theta
 {
+namespace
+{
+bool isSupportedAudioFile(const juce::File& file)
+{
+    const auto extension = file.getFileExtension().toLowerCase();
+    return extension == ".wav" || extension == ".aiff" || extension == ".aif"
+        || extension == ".flac" || extension == ".ogg" || extension == ".mp3";
+}
+}
+
 struct Arrangement::Waveform final : juce::ChangeListener
 {
     Waveform(Arrangement& a, const juce::File& file)
@@ -103,7 +113,7 @@ void Arrangement::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffbbc4cc));
     g.drawText("ARRANGEMENT", 10, 0, 138, 30, juce::Justification::centredLeft);
     g.setColour(juce::Colour(0xff8a969f));
-    g.drawText("Drag audio to move / edges to trim / split / duplicate", 570, 0, getWidth() - 580, 30, juce::Justification::centredLeft);
+    g.drawText("Drag clips to move / edges to trim / split / duplicate", 570, 0, getWidth() - 580, 30, juce::Justification::centredLeft);
     for (int track = 0; track < 2; ++track)
     {
         const auto row = lane(track);
@@ -203,7 +213,7 @@ void Arrangement::paint(juce::Graphics& g)
     if (!hasAudio)
     {
         g.setColour(juce::Colour(0xff75828e));
-        g.drawText("Add audio to see its waveform here", lane(1).reduced(16, 0), juce::Justification::centredLeft);
+        g.drawText("Drop audio here, or use Add audio", lane(1).reduced(16, 0), juce::Justification::centredLeft);
     }
     if (playhead >= headerWidth)
     {
@@ -219,8 +229,8 @@ void Arrangement::resized()
     zoomIn.setBounds(240, 3, 32, 26);
     splitButton.setBounds(282, 3, 58, 26);
     duplicateButton.setBounds(348, 3, 52, 26);
-    snap.setBounds(410, 3, 58, 26);
-    snapSize.setBounds(474, 3, 74, 26);
+    snap.setBounds(410, 3, 82, 26);
+    snapSize.setBounds(498, 3, 74, 26);
     for (int i = 0; i < 2; ++i)
     {
         mute[i].setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
@@ -345,7 +355,6 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     selected = clip.id;
     selectTrack(clip.track);
     repaint();
-    if (clip.track == 0) return;
     original = preview = clip.position;
     sourceDuration = clip.waveform && clip.waveform->thumbnail.getTotalLength() > 0.0
         ? clip.waveform->thumbnail.getTotalLength() / clip.speed : original.offset + original.end - original.start;
@@ -363,7 +372,7 @@ void Arrangement::mouseDrag(const juce::MouseEvent& event)
     const auto old = preview;
     const auto anchor = gesture == ClipGesture::trimRight ? original.end : original.start;
     preview = previewClipEdit(original, gesture, snapped(anchor + timeAt(event.position.x) - dragTime, event.mods.isAltDown()), sourceDuration);
-    const auto row = lane(1);
+    const auto row = lane(selectedTrack);
     const auto invalidate = [this, row](ClipGeometry p)
     {
         repaint(juce::Rectangle<float>(xFor(p.start) - 2.0f, row.getY(), xFor(p.end) - xFor(p.start) + 4.0f, row.getHeight())
@@ -380,7 +389,7 @@ void Arrangement::mouseUp(const juce::MouseEvent& event)
     {
         mouseDrag(event);
         dragging = false;
-        const auto result = session.editAudioClip(selected, preview, gesture);
+        const auto result = session.editClip(selected, preview, gesture);
         if (result.failed() && status) status(result.getErrorMessage());
     }
     cancelDrag();
@@ -391,7 +400,7 @@ void Arrangement::mouseMove(const juce::MouseEvent& event)
 {
     const auto index = hit(event.position);
     auto pointerStyle = juce::MouseCursor::NormalCursor;
-    if (index >= 0 && clips[static_cast<size_t>(index)].track == 1)
+    if (index >= 0)
     {
         const auto box = bounds(clips[static_cast<size_t>(index)]);
         const auto handle = std::min(7.0f, box.getWidth() * 0.25f);
@@ -440,10 +449,36 @@ bool Arrangement::keyPressed(const juce::KeyPress& key)
     if (key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
     {
         cancelDrag();
-        session.deleteAudioClip(selected);
+        session.deleteClip(selected);
         return true;
     }
     return false;
+}
+
+bool Arrangement::isInterestedInFileDrag(const juce::StringArray& files)
+{
+    for (const auto& path : files)
+        if (isSupportedAudioFile(juce::File(path)))
+            return true;
+    return false;
+}
+
+void Arrangement::filesDropped(const juce::StringArray& files, int x, int y)
+{
+    const auto targetTrack = trackAt(static_cast<float>(y));
+    if (targetTrack < 0)
+    {
+        if (status) status("Drop audio on the arrangement lanes.");
+        return;
+    }
+    for (const auto& path : files)
+    {
+        const auto file = juce::File(path);
+        if (!isSupportedAudioFile(file)) continue;
+        const auto result = session.importAudioAt(file, std::max(1, targetTrack), snapped(std::max(0.0, timeAt(static_cast<float>(x))), false));
+        if (result.failed() && status) status(result.getErrorMessage());
+    }
+    fit();
 }
 
 void Arrangement::cancelDrag() { dragging = false; }
@@ -460,27 +495,27 @@ void Arrangement::selectTrack(int track)
 void Arrangement::splitSelectedAtPlayhead()
 {
     cancelDrag();
-    const auto result = session.splitAudioClip(selected, playheadTime(session.edit->getTransport()));
+    const auto result = session.splitClip(selected, playheadTime(session.edit->getTransport()));
     if (result.failed() && status) status(result.getErrorMessage());
 }
 
 void Arrangement::duplicateSelected()
 {
     cancelDrag();
-    const auto result = session.duplicateAudioClip(selected);
+    const auto result = session.duplicateClip(selected);
     if (result.failed() && status) status(result.getErrorMessage());
 }
 
 void Arrangement::nudgeSelected(int direction, bool byBar)
 {
     cancelDrag();
-    auto* clip = session.findAudioClip(selected);
+    auto* clip = session.findClip(selected);
     if (!clip) return;
     const auto old = clip->getPosition();
     const auto delta = (byBar ? 60.0 / session.tempo() * 4.0 : snapUnitSeconds()) * (direction < 0 ? -1.0 : 1.0);
     const auto length = old.time.getLength().inSeconds();
     const auto start = std::max(0.0, old.time.getStart().inSeconds() + delta);
-    const auto result = session.editAudioClip(selected, {start, start + length, old.offset.inSeconds()}, ClipGesture::move);
+    const auto result = session.editClip(selected, {start, start + length, old.offset.inSeconds()}, ClipGesture::move);
     if (result.failed() && status) status(result.getErrorMessage());
 }
 
@@ -494,6 +529,14 @@ double Arrangement::snapUnitSeconds() const
         case 4: return beatSeconds * 4.0;
         default: return beatSeconds * 0.25;
     }
+}
+
+int Arrangement::trackAt(float y) const
+{
+    for (int track = 0; track < 2; ++track)
+        if (lane(track).contains(juce::Point<float>(headerWidth, y)))
+            return track;
+    return -1;
 }
 
 void Arrangement::changeListenerCallback(juce::ChangeBroadcaster*) { cancelDrag(); sync(); }

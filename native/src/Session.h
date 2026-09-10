@@ -48,6 +48,7 @@ public:
     juce::File projectFile;
     juce::ListenerList<Listener> listeners;
     juce::Result importAudio(const juce::File&);
+    juce::Result importAudioAt(const juce::File&, int track, double startSeconds);
     void togglePlayback();
     void stop();
     static constexpr int steps = 16, pitches = 12, lowestNote = 48;
@@ -68,11 +69,12 @@ public:
     void undo();
     void redo();
     void refreshLoop();
+    te::Clip* findClip(te::EditItemID) const;
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
-    juce::Result editAudioClip(te::EditItemID, ClipGeometry, ClipGesture);
-    juce::Result splitAudioClip(te::EditItemID, double splitTimeSeconds);
-    juce::Result duplicateAudioClip(te::EditItemID);
-    void deleteAudioClip(te::EditItemID);
+    juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture);
+    juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
+    juce::Result duplicateClip(te::EditItemID);
+    void deleteClip(te::EditItemID);
     void toggleTrackMute(int track);
     void toggleTrackSolo(int track);
     // Keep the established settings location so existing audio-device choices survive.

@@ -5,6 +5,7 @@
 namespace theta
 {
 class Arrangement final : public juce::Component,
+                          public juce::FileDragAndDropTarget,
                           private juce::ChangeListener,
                           private juce::ScrollBar::Listener,
                           private Session::Listener
@@ -20,6 +21,8 @@ public:
     void mouseMove(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed(const juce::KeyPress&) override;
+    bool isInterestedInFileDrag(const juce::StringArray&) override;
+    void filesDropped(const juce::StringArray&, int x, int y) override;
     void fit();
     std::function<void(juce::String)> status;
     std::function<void(int)> trackSelected;
@@ -50,6 +53,7 @@ private:
     void duplicateSelected();
     void nudgeSelected(int direction, bool byBar);
     void updatePlayhead();
+    int trackAt(float y) const;
     double snapUnitSeconds() const;
     float xFor(double seconds) const;
     double timeAt(float x) const;
@@ -66,7 +70,7 @@ private:
     juce::AudioThumbnailCache thumbnailCache {32};
     std::map<juce::String, std::unique_ptr<Waveform>> waveforms;
     std::vector<ClipView> clips;
-    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, snap {"Snap"};
+    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, snap {"Clip Snap"};
     juce::ComboBox snapSize;
     std::array<juce::TextButton, 2> mute, solo;
     juce::ScrollBar scroll {false};

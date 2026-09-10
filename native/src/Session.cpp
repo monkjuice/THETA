@@ -47,6 +47,25 @@ juce::Result Session::importAudio(const juce::File& file)
     tracktion::core::TimePosition start;
     for (auto* existing : track->getClips())
         start = std::max(start, existing->getPosition().time.getEnd());
+    return importAudioAt(file, 1, start.inSeconds());
+}
+
+juce::Result Session::importAudioAt(const juce::File& file, int trackIndex, double startSeconds)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    if (!std::isfinite(startSeconds) || startSeconds < 0.0)
+        return juce::Result::fail("Invalid audio drop position.");
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
+        return juce::Result::fail("Drop audio on an audio track.");
+
+    te::AudioFile audio(engine, file);
+    const auto duration = audio.getLength();
+    if (duration <= 0.0)
+        return juce::Result::fail("This file could not be read as audio.");
+
+    auto* track = tracks[trackIndex];
+    const auto start = tracktion::core::TimePosition::fromSeconds(startSeconds);
     edit->getUndoManager().beginNewTransaction("Import audio");
     auto clip = track->insertWaveClip(file.getFileNameWithoutExtension(), file,
         {{start, start + tracktion::core::TimeDuration::fromSeconds(duration)}, {}}, false);
@@ -383,17 +402,23 @@ void Session::projectSaved(const juce::ValueTree& snapshot, const juce::File& fi
     sendSynchronousChangeMessage();
 }
 
-te::WaveAudioClip* Session::findAudioClip(te::EditItemID id) const
+te::Clip* Session::findClip(te::EditItemID id) const
 {
-    for (auto* clip : te::getAudioTracks(*edit)[1]->getClips())
-        if (clip->itemID == id) return dynamic_cast<te::WaveAudioClip*>(clip);
+    for (auto* track : te::getAudioTracks(*edit))
+        if (auto* clip = track->findClipForID(id))
+            return clip;
     return nullptr;
 }
 
-juce::Result Session::editAudioClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture)
+te::WaveAudioClip* Session::findAudioClip(te::EditItemID id) const
 {
-    auto* clip = findAudioClip(id);
-    if (!clip) return juce::Result::fail("The audio clip no longer exists.");
+    return dynamic_cast<te::WaveAudioClip*>(findClip(id));
+}
+
+juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture)
+{
+    auto* clip = findClip(id);
+    if (!clip) return juce::Result::fail("Select a clip first.");
     if (!std::isfinite(next.start) || !std::isfinite(next.end) || !std::isfinite(next.offset)
         || next.start < 0.0 || next.end <= next.start || next.offset < -1.0e-8
         || next.end > te::Edit::getMaximumEditEnd().inSeconds())
@@ -414,10 +439,10 @@ juce::Result Session::editAudioClip(te::EditItemID id, ClipGeometry next, ClipGe
     return juce::Result::ok();
 }
 
-juce::Result Session::splitAudioClip(te::EditItemID id, double splitTimeSeconds)
+juce::Result Session::splitClip(te::EditItemID id, double splitTimeSeconds)
 {
-    auto* clip = findAudioClip(id);
-    if (!clip) return juce::Result::fail("Select an audio clip to split.");
+    auto* clip = findClip(id);
+    if (!clip) return juce::Result::fail("Select a clip to split.");
     if (!std::isfinite(splitTimeSeconds)) return juce::Result::fail("Invalid split position.");
 
     const auto old = clip->getPosition();
@@ -425,17 +450,13 @@ juce::Result Session::splitAudioClip(te::EditItemID id, double splitTimeSeconds)
     constexpr double minimumSeconds = 0.01;
     if (split <= old.time.getStart() + tracktion::core::TimeDuration::fromSeconds(minimumSeconds)
         || split >= old.time.getEnd() - tracktion::core::TimeDuration::fromSeconds(minimumSeconds))
-        return juce::Result::fail("Move the playhead inside the selected audio clip before splitting.");
+        return juce::Result::fail("Move the playhead inside the selected clip before splitting.");
 
-    auto* track = te::getAudioTracks(*edit)[1];
-    const auto file = clip->getSourceFileReference().getFile();
     edit->getUndoManager().beginNewTransaction("Split audio clip");
-    auto right = track->insertWaveClip(clip->getName() + " split", file,
-        {{split, old.time.getEnd()}, old.offset + (split - old.time.getStart())}, false);
+    auto* track = clip->getClipTrack();
+    auto* right = track != nullptr ? track->splitClip(*clip, split) : nullptr;
     if (right == nullptr)
         return juce::Result::fail("The right-hand split clip could not be created.");
-
-    clip->setPosition({{old.time.getStart(), split}, old.offset});
     refreshLoop();
     edit->getUndoManager().beginNewTransaction();
     markModified();
@@ -445,15 +466,26 @@ juce::Result Session::splitAudioClip(te::EditItemID id, double splitTimeSeconds)
     return juce::Result::ok();
 }
 
-juce::Result Session::duplicateAudioClip(te::EditItemID id)
+juce::Result Session::duplicateClip(te::EditItemID id)
 {
-    auto* clip = findAudioClip(id);
-    if (!clip) return juce::Result::fail("Select an audio clip to duplicate.");
+    auto* clip = findClip(id);
+    if (!clip) return juce::Result::fail("Select a clip to duplicate.");
     const auto old = clip->getPosition();
-    auto* track = te::getAudioTracks(*edit)[1];
-    edit->getUndoManager().beginNewTransaction("Duplicate audio clip");
-    auto copy = track->insertWaveClip(clip->getName() + " copy", clip->getSourceFileReference().getFile(),
-        {{old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, old.offset}, false);
+    auto* track = clip->getClipTrack();
+    if (track == nullptr) return juce::Result::fail("The selected clip is not on a track.");
+    edit->getUndoManager().beginNewTransaction("Duplicate clip");
+    te::Clip* copy = nullptr;
+    if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
+        copy = track->insertWaveClip(audio->getName() + " copy", audio->getSourceFileReference().getFile(),
+            {{old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, old.offset}, false).get();
+    else if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
+        if (auto midiCopy = track->insertMIDIClip(midi->getName() + " copy",
+            {old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, nullptr))
+        {
+            midiCopy->cloneFrom(midi);
+            midiCopy->setPosition({{old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, old.offset});
+            copy = midiCopy.get();
+        }
     if (copy == nullptr)
         return juce::Result::fail("The duplicate clip could not be created.");
     refreshLoop();
@@ -465,9 +497,9 @@ juce::Result Session::duplicateAudioClip(te::EditItemID id)
     return juce::Result::ok();
 }
 
-void Session::deleteAudioClip(te::EditItemID id)
+void Session::deleteClip(te::EditItemID id)
 {
-    if (auto* clip = findAudioClip(id))
+    if (auto* clip = findClip(id))
     {
         edit->getUndoManager().beginNewTransaction("Delete audio clip");
         clip->removeFromParent();

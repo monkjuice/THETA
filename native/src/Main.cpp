@@ -32,7 +32,7 @@ public:
         status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
         audioGainLabel.setText("AUDIO GAIN", juce::dontSendNotification);
-        hint.setText("1 BAR     Draw notes below. Drag audio above, arrows nudge by the snap grid, Cmd/Ctrl+E splits, Cmd/Ctrl+D duplicates.", juce::dontSendNotification);
+        hint.setText("1 BAR     Draw notes below. Clip Snap controls arrangement drags/nudges; Cmd/Ctrl+E splits, Cmd/Ctrl+D duplicates.", juce::dontSendNotification);
         hint.setColour(juce::Label::textColourId, juce::Colour(0xff8d98a3));
         tempo.setSliderStyle(juce::Slider::IncDecButtons);
         tempo.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 90, 30);
@@ -151,25 +151,25 @@ public:
         open.setBounds(getWidth() - 320, 26, 72, 30);
         save.setBounds(getWidth() - 240, 26, 72, 30);
         status.setBounds(24, 68, getWidth() - 48, 28);
-        play.setBounds(24, 116, 90, 36);
-        stop.setBounds(124, 116, 90, 36);
-        import.setBounds(232, 116, 128, 36);
-        tempo.setBounds(380, 119, 135, 30);
-        undo.setBounds(536, 119, 60, 30);
-        redo.setBounds(604, 119, 60, 30);
-        clear.setBounds(672, 119, 88, 30);
+        play.setBounds(editorX, 116, 64, 36);
+        stop.setBounds(editorX + 72, 116, 64, 36);
+        import.setBounds(editorX + 150, 116, 116, 36);
+        tempo.setBounds(editorX + 286, 119, 122, 30);
+        undo.setBounds(editorX + 428, 119, 58, 30);
+        redo.setBounds(editorX + 494, 119, 58, 30);
+        clear.setBounds(editorX + 562, 119, 78, 30);
         position.setBounds(getWidth() - 165, 116, 140, 36);
         browser.setBounds(0, 104, browserWidth, getHeight() - 104);
         arrangement.setBounds(editorX, 174, editorW, 246);
         patternLabel.setBounds(editorX, 430, editorW, 24);
         grid.setBounds(editorX, 464, editorW, getHeight() - 684);
-        rack.setBounds(editorX, getHeight() - 206, editorW, 82);
+        rack.setBounds(editorX, getHeight() - 236, editorW, 112);
         hint.setBounds(editorX, getHeight() - 117, editorW, 28);
         const auto half = (editorW - 28) / 2;
         gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
         gain.setBounds(editorX + 112, getHeight() - 66, half - 112, 30);
         audioGainLabel.setBounds(editorX + half + 28, getHeight() - 66, 100, 28);
-        audioGain.setBounds(editorX + half + 128, getHeight() - 66, editorW - half - 128, 30);
+        audioGain.setBounds(editorX + half + 128, getHeight() - 66, editorW - half - 150, 30);
     }
 
     bool keyPressed(const juce::KeyPress& key) override

@@ -103,6 +103,12 @@ int runArrangementTest()
             for (int x = 155; x < 620; ++x)
                 if (midiPicture.getPixelAt(x, y) == juce::Colour(0xffc6d58c)) ++midiPixels;
         require(midiPixels >= 25, "Pattern lane must draw visible MIDI notes");
+        const auto patternID = session.pattern().itemID;
+        view.selected = patternID;
+        view.duplicateSelected();
+        require(te::getAudioTracks(*session.edit)[0]->getClips().size() == 2, "Duplicate creates a second MIDI pattern clip");
+        session.undo();
+        require(te::getAudioTracks(*session.edit)[0]->getClips().size() == 1, "Undo duplicate restores one MIDI pattern clip");
 
         // isShowing() requires a visible desktop peer. Keep this tiny navigation
         // check offscreen and remove the peer before exercising clip gestures.
@@ -173,17 +179,28 @@ int runArrangementTest()
                 juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier), 1.0f, 0, 0, 0, 0,
                 &view, &view, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
         };
-        view.mouseDown(event({40, 82}, {40, 82}, false));
-        require(view.selectedTrack == 0, "Clicking the pattern lane selects the pattern track");
-        view.mouseDown(event({40, 180}, {40, 180}, false));
-        require(view.selectedTrack == 1 && notifiedTrack == 1, "Clicking the audio lane selects and broadcasts the audio track");
-        view.selected = id;
         const auto drag = [&view, &event](juce::Point<float> down, juce::Point<float> to)
         {
             view.mouseDown(event(down, down, false));
             view.mouseDrag(event(down, to, true));
             view.mouseUp(event(down, to, true));
         };
+        view.mouseDown(event({40, 82}, {40, 82}, false));
+        require(view.selectedTrack == 0, "Clicking the pattern lane selects the pattern track");
+        view.mouseDown(event({40, 180}, {40, 180}, false));
+        require(view.selectedTrack == 1 && notifiedTrack == 1, "Clicking the audio lane selects and broadcasts the audio track");
+        view.selected = patternID;
+        drag({240, 82}, {301, 82});
+        require(close(session.pattern().getPosition().time.getStart().inSeconds(), 0.25), "Pointer drag moves MIDI pattern clips");
+        session.undo();
+        require(close(session.pattern().getPosition().time.getStart().inSeconds(), 0.0), "Undo restores MIDI pattern move");
+        view.selected = id;
+        juce::StringArray dropped;
+        dropped.add(source.getFile().getFullPathName());
+        view.filesDropped(dropped, static_cast<int>(view.xFor(1.0)), 180);
+        require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 2, "Dropping an audio file on the audio lane imports a clip");
+        session.undo();
+        require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Undo restores dropped audio import");
 
         // Fit is four seconds wide here. Exercise actual component hit testing,
         // gesture preview, and commit rather than calling only the model facade.
