@@ -499,6 +499,7 @@ private:
                 session->engine.getDeviceManager().initialise(0, 2);
             else
             {
+                window->setUsingNativeTitleBar(true);
                 window->setContentOwned(new ControlWindow(*session), true);
                 window->setResizable(true, false);
                 window->setResizeLimits(960, 780, 2400, 1600);
@@ -522,7 +523,7 @@ private:
     {
         Window() : DocumentWindow("Theta", juce::Colour(0xff171a1e), allButtons)
         {
-            setUsingNativeTitleBar(true);
+            setUsingNativeTitleBar(false);
             setResizable(false, false);
         }
         void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
