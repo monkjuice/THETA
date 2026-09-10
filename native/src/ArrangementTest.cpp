@@ -371,6 +371,9 @@ int runArrangementTest()
         require(session.hasNote(1, 48), "Undo restores notes erased by a grid stroke");
         session.undo();
         const auto audio2DevicesAfterSound = session.deviceSlots(2).size();
+        require(view.applyBrowserDrop("theta-browser:effect:ThetaBloom", 2).wasOk(), "Theta Bloom browser row creates an audio effect");
+        require(session.deviceSlots(2).size() == audio2DevicesAfterSound + 1, "Dropped Theta Bloom appears on the target track");
+        session.undo();
         require(view.applyBrowserDrop("theta-browser:instrument:Drums", 2).wasOk(), "Instrument browser rows can be dropped onto non-first tracks");
         require(session.deviceSlots(2).size() == audio2DevicesAfterSound + 1, "Dropped instrument appears on the target track");
         session.undo();

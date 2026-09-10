@@ -35,6 +35,7 @@ std::optional<Session::AudioEffect> audioEffectFromId(const juce::String& id)
     if (id == "Delay")      return Session::AudioEffect::Delay;
     if (id == "Compressor") return Session::AudioEffect::Compressor;
     if (id == "ThetaSpace") return Session::AudioEffect::ThetaSpace;
+    if (id == "ThetaBloom") return Session::AudioEffect::ThetaBloom;
     return std::nullopt;
 }
 

@@ -2,6 +2,7 @@
 #include "UtilityDevice.h"
 #include "DrumDevice.h"
 #include "ThetaSpaceDevice.h"
+#include "ThetaBloomDevice.h"
 #include "ThetaArpDevice.h"
 #include "ClipGeometry.h"
 #include <vector>
@@ -31,7 +32,8 @@ public:
         Reverb,
         Delay,
         Compressor,
-        ThetaSpace
+        ThetaSpace,
+        ThetaBloom
     };
     enum class Instrument
     {

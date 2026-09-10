@@ -65,6 +65,38 @@ int runSelfTest()
             }
         require(clapPeak > 0.0001f && clapPeak < 1.0f);
         session.drums->deinitialise();
+
+        auto bloomPlugin = session.edit->getPluginCache().createNewPlugin(ThetaBloomDevice::xmlTypeName, {});
+        auto* bloom = dynamic_cast<ThetaBloomDevice*>(bloomPlugin.get());
+        require(bloom != nullptr);
+        require(bloom->getAutomatableParameters().size() == 6);
+        bloom->getAutomatableParameterByID("bloom")->setParameter(0.7f, juce::dontSendNotification);
+        bloom->getAutomatableParameterByID("clouds")->setParameter(0.55f, juce::dontSendNotification);
+        bloom->getAutomatableParameterByID("plate")->setParameter(0.42f, juce::dontSendNotification);
+        bloom->initialise({{}, 48000.0, 256});
+        juce::AudioBuffer<float> bloomBuffer(2, 1024);
+        for (int i = 0; i < bloomBuffer.getNumSamples(); ++i)
+        {
+            const auto impulse = i == 0 ? 0.5f : 0.0f;
+            bloomBuffer.setSample(0, i, impulse);
+            bloomBuffer.setSample(1, i, impulse * 0.8f);
+        }
+        te::PluginRenderContext bloomContext(&bloomBuffer, 0, bloomBuffer.getNumSamples(), nullptr, 0.0, {}, false, false, true, false);
+        bloom->applyToBuffer(bloomContext);
+        float bloomEnergy = 0.0f;
+        for (int c = 0; c < bloomBuffer.getNumChannels(); ++c)
+            for (int i = 0; i < bloomBuffer.getNumSamples(); ++i)
+            {
+                const auto sample = bloomBuffer.getSample(c, i);
+                require(std::isfinite(sample));
+                bloomEnergy += std::abs(sample);
+            }
+        require(bloomEnergy > 0.01f);
+        auto bloomState = bloom->state.createCopy();
+        bloomState.setProperty("chorus", 0.25f, nullptr);
+        bloom->restorePluginStateFromValueTree(bloomState);
+        require(std::abs(bloom->getAutomatableParameterByID("chorus")->getCurrentValue() - 0.25f) < 1.0e-5f);
+        bloom->deinitialise();
         return 0;
     }
     catch (const std::exception& error)

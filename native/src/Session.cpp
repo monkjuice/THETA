@@ -101,6 +101,7 @@ bool effectTypeAndName(Session::AudioEffect effect, const char*& type, juce::Str
         case Session::AudioEffect::Delay:      type = te::DelayPlugin::xmlTypeName;      name = "Delay"; break;
         case Session::AudioEffect::Compressor: type = te::CompressorPlugin::xmlTypeName; name = "Compressor"; break;
         case Session::AudioEffect::ThetaSpace: type = ThetaSpaceDevice::xmlTypeName;     name = "Theta Space"; break;
+        case Session::AudioEffect::ThetaBloom: type = ThetaBloomDevice::xmlTypeName;     name = "Theta Bloom"; break;
     }
     return type != nullptr;
 }
@@ -311,6 +312,7 @@ Session::Session()
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
     engine.getPluginManager().createBuiltInType<DrumDevice>();
     engine.getPluginManager().createBuiltInType<ThetaSpaceDevice>();
+    engine.getPluginManager().createBuiltInType<ThetaBloomDevice>();
     engine.getPluginManager().createBuiltInType<ThetaArpDevice>();
     edit = te::createEmptyEdit(engine, {});
     edit->state.setProperty("thetaFormatVersion", 1, nullptr);

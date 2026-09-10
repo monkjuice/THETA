@@ -15,6 +15,7 @@ std::optional<Session::AudioEffect> effectFromBrowserDrop(const juce::String& de
     if (id == "Delay")      return Session::AudioEffect::Delay;
     if (id == "Compressor") return Session::AudioEffect::Compressor;
     if (id == "ThetaSpace") return Session::AudioEffect::ThetaSpace;
+    if (id == "ThetaBloom") return Session::AudioEffect::ThetaBloom;
     return std::nullopt;
 }
 

@@ -30,6 +30,7 @@ juce::String effectId(Session::AudioEffect effect)
         case Session::AudioEffect::Delay:      return "Delay";
         case Session::AudioEffect::Compressor: return "Compressor";
         case Session::AudioEffect::ThetaSpace: return "ThetaSpace";
+        case Session::AudioEffect::ThetaBloom: return "ThetaBloom";
     }
     return {};
 }
@@ -106,6 +107,7 @@ BrowserPanel::BrowserPanel(Session& s) : session(s)
         {"Audio FX", "Delay", "Insert Tracktion delay", std::nullopt, Session::AudioEffect::Delay, std::nullopt, std::nullopt},
         {"Audio FX", "Compressor", "Insert Tracktion compressor", std::nullopt, Session::AudioEffect::Compressor, std::nullopt, std::nullopt},
         {"Audio FX", "Theta Space", "Floating multi FX: smear, drive, width", std::nullopt, Session::AudioEffect::ThetaSpace, std::nullopt, std::nullopt},
+        {"Audio FX", "Theta Bloom", "Chorus, clouds, plate, colour", std::nullopt, Session::AudioEffect::ThetaBloom, std::nullopt, std::nullopt},
         {"MIDI FX", "Theta Arp", "Drop before an instrument to arpeggiate it", std::nullopt, std::nullopt, std::nullopt, Session::MidiEffect::ThetaArp},
         {"MIDI FX", "Snap 1/16", "Grid quantized note entry", std::nullopt, std::nullopt, std::nullopt, std::nullopt}
     };
