@@ -13,6 +13,7 @@ public:
     explicit BrowserPanel(Session&);
     void paint(juce::Graphics&) override;
     void resized() override;
+    bool keyPressed(const juce::KeyPress&) override;
     void focusSearch();
     std::function<void(juce::String)> status;
 
@@ -30,11 +31,13 @@ private:
     void paintListBoxItem(int row, juce::Graphics&, int width, int height, bool selected) override;
     void listBoxItemClicked(int row, const juce::MouseEvent&) override;
     void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override;
+    void selectedRowsChanged(int lastRowSelected) override;
     void rebuildRows();
     void applyRow(int row);
 
     Session& session;
     juce::Label title, categoriesTitle, soundsTitle;
+    juce::TextButton apply {"Apply"};
     juce::TextEditor search;
     juce::ListBox list {"Browser", this};
     juce::String selectedCategory = "Sounds";

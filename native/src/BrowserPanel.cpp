@@ -5,6 +5,7 @@ namespace theta
 BrowserPanel::BrowserPanel(Session& s) : session(s)
 {
     setOpaque(true);
+    setWantsKeyboardFocus(true);
     title.setText("BROWSER", juce::dontSendNotification);
     title.setColour(juce::Label::textColourId, juce::Colour(0xffd5dde4));
     categoriesTitle.setText("Categories", juce::dontSendNotification);
@@ -13,8 +14,10 @@ BrowserPanel::BrowserPanel(Session& s) : session(s)
     soundsTitle.setColour(juce::Label::textColourId, juce::Colour(0xffaeb8c0));
     search.setTextToShowWhenEmpty("Search", juce::Colour(0xff6f7b85));
     search.onTextChange = [this] { rebuildRows(); };
+    search.onReturnKey = [this] { applyRow(list.getSelectedRow()); };
     search.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff262c32));
     search.setColour(juce::TextEditor::outlineColourId, juce::Colour(0xff46515a));
+    apply.onClick = [this] { applyRow(list.getSelectedRow()); };
 
     const std::array labels {"Sounds", "Drums", "Instruments", "Audio FX", "MIDI FX"};
     for (size_t i = 0; i < categories.size(); ++i)
@@ -53,7 +56,7 @@ BrowserPanel::BrowserPanel(Session& s) : session(s)
     list.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xff20262c));
     list.setColour(juce::ListBox::outlineColourId, juce::Colour(0xff323a42));
     list.setMultipleSelectionEnabled(false);
-    for (auto* component : std::initializer_list<juce::Component*>{&title, &categoriesTitle, &soundsTitle, &search, &list})
+    for (auto* component : std::initializer_list<juce::Component*>{&title, &categoriesTitle, &soundsTitle, &search, &apply, &list})
         addAndMakeVisible(component);
     rebuildRows();
 }
@@ -70,7 +73,8 @@ void BrowserPanel::paint(juce::Graphics& g)
 void BrowserPanel::resized()
 {
     title.setBounds(14, 12, getWidth() - 28, 24);
-    search.setBounds(12, 44, getWidth() - 24, 30);
+    search.setBounds(12, 44, getWidth() - 82, 30);
+    apply.setBounds(getWidth() - 64, 44, 52, 30);
     categoriesTitle.setBounds(12, 84, getWidth() - 24, 22);
     int y = 112;
     for (auto& button : categories)
@@ -86,6 +90,16 @@ void BrowserPanel::focusSearch()
 {
     search.grabKeyboardFocus();
     search.selectAll();
+}
+
+bool BrowserPanel::keyPressed(const juce::KeyPress& key)
+{
+    if (key.getKeyCode() == juce::KeyPress::returnKey)
+    {
+        applyRow(list.getSelectedRow());
+        return true;
+    }
+    return false;
 }
 
 int BrowserPanel::getNumRows()
@@ -111,6 +125,7 @@ void BrowserPanel::paintListBoxItem(int row, juce::Graphics& g, int width, int h
 void BrowserPanel::listBoxItemClicked(int row, const juce::MouseEvent&)
 {
     if (!juce::isPositiveAndBelow(row, rows.size())) return;
+    list.selectRow(row, juce::dontSendNotification);
     const auto& item = items[static_cast<size_t>(rows[static_cast<size_t>(row)])];
     if (status) status(item.name + " - " + item.detail);
 }
@@ -118,6 +133,13 @@ void BrowserPanel::listBoxItemClicked(int row, const juce::MouseEvent&)
 void BrowserPanel::listBoxItemDoubleClicked(int row, const juce::MouseEvent&)
 {
     applyRow(row);
+}
+
+void BrowserPanel::selectedRowsChanged(int lastRowSelected)
+{
+    if (!juce::isPositiveAndBelow(lastRowSelected, rows.size())) return;
+    const auto& item = items[static_cast<size_t>(rows[static_cast<size_t>(lastRowSelected)])];
+    if (status) status(item.name + " - " + item.detail);
 }
 
 void BrowserPanel::rebuildRows()
@@ -135,7 +157,10 @@ void BrowserPanel::rebuildRows()
         rows.push_back(static_cast<int>(i));
     }
     list.updateContent();
+    if (!rows.empty())
+        list.selectRow(0, juce::dontSendNotification);
     list.repaint();
+    apply.setEnabled(!rows.empty());
 }
 
 void BrowserPanel::applyRow(int row)
