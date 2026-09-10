@@ -65,8 +65,14 @@ void StepGrid::paint(juce::Graphics& g)
             const auto bounds = cell(step, row).reduced(2.0f, 2.0f);
             if (!dirty.intersects(bounds)) continue;
             const bool active = notes.test(static_cast<size_t>(row * Session::steps + step));
+            const bool selected = selectedNotes.test(static_cast<size_t>(row * Session::steps + step));
             g.setColour(juce::Colour(active ? 0xffc6d58c : (step / 4 % 2 == 0 ? 0xff2a3139 : 0xff252c33)));
             g.fillRect(bounds);
+            if (selected)
+            {
+                g.setColour(juce::Colour(0xfff4f0b0));
+                g.drawRect(bounds.reduced(1.0f), 2.0f);
+            }
         }
     }
     if (!session.isPatternDrums())
@@ -103,6 +109,12 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
     if (index < 0) return;
     grabKeyboardFocus();
     lastHit = index;
+    pasteAnchorIndex = index;
+    if (event.mods.isCommandDown())
+    {
+        toggleSelection(index);
+        return;
+    }
     if (event.mods.isShiftDown() && !event.mods.isRightButtonDown() && notes.test(static_cast<size_t>(index)))
     {
         gesture = Gesture::move;
@@ -127,9 +139,109 @@ void StepGrid::apply(int index)
                     pitchForIndex(index), adding);
 }
 
+void StepGrid::toggleSelection(int index)
+{
+    if (index < 0 || !notes.test(static_cast<size_t>(index)))
+    {
+        repaint();
+        return;
+    }
+    selectedNotes.flip(static_cast<size_t>(index));
+    repaint(cell(index % Session::steps, index / Session::steps).getSmallestIntegerContainer().expanded(3));
+}
+
+void StepGrid::clearSelection()
+{
+    if (selectedNotes.none())
+        return;
+    selectedNotes.reset();
+    repaint();
+}
+
+bool StepGrid::copySelection()
+{
+    noteClipboard.clear();
+    if (selectedNotes.none())
+        return false;
+
+    auto minStep = Session::steps;
+    auto minPitch = 128;
+    for (int index = 0; index < Session::steps * Session::pitches; ++index)
+        if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
+        {
+            minStep = std::min(minStep, index % Session::steps);
+            minPitch = std::min(minPitch, pitchForIndex(index));
+        }
+    if (minStep >= Session::steps || minPitch > 127)
+        return false;
+
+    for (int index = 0; index < Session::steps * Session::pitches; ++index)
+        if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
+            noteClipboard.push_back({index % Session::steps - minStep, pitchForIndex(index) - minPitch});
+    pasteAnchorIndex = indexForCell(std::min(Session::steps - 1, minStep + 1), minPitch);
+    return !noteClipboard.empty();
+}
+
+bool StepGrid::pasteSelection()
+{
+    if (noteClipboard.empty())
+        return false;
+
+    auto maxStepOffset = 0;
+    auto minPitchOffset = 0;
+    auto maxPitchOffset = 0;
+    for (const auto& note : noteClipboard)
+    {
+        maxStepOffset = std::max(maxStepOffset, note.step);
+        minPitchOffset = std::min(minPitchOffset, note.pitch);
+        maxPitchOffset = std::max(maxPitchOffset, note.pitch);
+    }
+
+    const auto anchor = pasteAnchorIndex >= 0 ? pasteAnchorIndex : 0;
+    const auto anchorStep = juce::jlimit(0, std::max(0, Session::steps - 1 - maxStepOffset), anchor % Session::steps);
+    const auto anchorPitch = juce::jlimit(-minPitchOffset, 127 - maxPitchOffset, pitchForIndex(anchor));
+
+    session.beginNoteGesture("Paste notes");
+    selectedNotes.reset();
+    for (const auto& note : noteClipboard)
+    {
+        const auto step = anchorStep + note.step;
+        const auto pitch = anchorPitch + note.pitch;
+        session.setNote(step, pitch, true);
+        if (const auto index = indexForCell(step, pitch); index >= 0)
+            selectedNotes.set(static_cast<size_t>(index));
+    }
+    session.endNoteGesture();
+    pasteAnchorIndex = indexForCell(std::min(Session::steps - 1, anchorStep + maxStepOffset + 1), anchorPitch);
+    repaint();
+    return true;
+}
+
+bool StepGrid::deleteSelection()
+{
+    if (selectedNotes.none())
+        return false;
+
+    session.beginNoteGesture("Delete notes");
+    for (int index = 0; index < Session::steps * Session::pitches; ++index)
+        if (selectedNotes.test(static_cast<size_t>(index)))
+            session.setNote(index % Session::steps, pitchForIndex(index), false);
+    session.endNoteGesture();
+    clearSelection();
+    return true;
+}
+
 int StepGrid::pitchForIndex(int index) const
 {
     return lowestVisiblePitch + Session::pitches - 1 - index / Session::steps;
+}
+
+int StepGrid::indexForCell(int step, int pitch) const
+{
+    const auto row = lowestVisiblePitch + Session::pitches - 1 - pitch;
+    if (step < 0 || step >= Session::steps || row < 0 || row >= Session::pitches)
+        return -1;
+    return row * Session::steps + step;
 }
 
 juce::Result StepGrid::moveCurrentNoteTo(int index)
@@ -173,6 +285,23 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
     lastHit = -1;
     movingNoteIndex = -1;
     noteMoved = false;
+}
+
+bool StepGrid::keyPressed(const juce::KeyPress& key)
+{
+    const auto command = key.getModifiers().isCommandDown();
+    if (command && key.getKeyCode() == 'C')
+        return copySelection();
+    if (command && key.getKeyCode() == 'V')
+        return pasteSelection();
+    if (key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
+        return deleteSelection();
+    if (key.getKeyCode() == juce::KeyPress::escapeKey)
+    {
+        clearSelection();
+        return true;
+    }
+    return false;
 }
 
 void StepGrid::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
@@ -235,6 +364,7 @@ void StepGrid::rebuildVisibleNotes()
     }
     const auto changed = next ^ notes;
     notes = next;
+    selectedNotes &= notes;
     if (showingDrumLabels != nextDrumLabels)
     {
         showingDrumLabels = nextDrumLabels;

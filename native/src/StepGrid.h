@@ -1,6 +1,7 @@
 #pragma once
 #include "Session.h"
 #include <bitset>
+#include <vector>
 
 namespace theta
 {
@@ -14,25 +15,34 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    bool keyPressed(const juce::KeyPress&) override;
     void resized() override;
 private:
     friend int runArrangementTest();
     enum class Gesture { none, draw, move };
+    struct CopiedNote { int step = 0, pitch = 0; };
     juce::Rectangle<float> cell(int step, int row) const;
     int hit(juce::Point<float>) const;
     void apply(int index);
+    void toggleSelection(int index);
+    void clearSelection();
+    bool copySelection();
+    bool pasteSelection();
+    bool deleteSelection();
     juce::Result moveCurrentNoteTo(int index);
     int pitchForIndex(int index) const;
+    int indexForCell(int step, int pitch) const;
     int automaticLowestPitch() const;
     void rebuildVisibleNotes();
     float playheadXForTime(double seconds) const;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void updatePlayhead();
     Session& session;
-    std::bitset<Session::steps * Session::pitches> notes, visited;
+    std::bitset<Session::steps * Session::pitches> notes, visited, selectedNotes;
+    std::vector<CopiedNote> noteClipboard;
     Gesture gesture = Gesture::none;
     bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false;
-    int lastHit = -1, movingNoteIndex = -1;
+    int lastHit = -1, movingNoteIndex = -1, pasteAnchorIndex = -1;
     int lowestVisiblePitch = Session::lowestNote;
     float playhead = -1.0f;
     juce::VBlankAttachment vblank;

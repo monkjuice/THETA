@@ -286,6 +286,13 @@ int runArrangementTest()
         require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr, "Undo restores the clip to its original track");
         require(te::getAudioTracks(*session.edit)[2]->findClipForID(id) == nullptr, "Undo removes the clip from the drag target track");
         view.sync();
+        session.togglePlayback();
+        require(session.edit->getTransport().isPlaying(), "Transport starts before cross-track clip drag");
+        drag({view.xFor(0.2), view.lane(1).getCentreY()}, {view.xFor(0.5), view.lane(2).getCentreY()});
+        require(session.edit->getTransport().isPlaying(), "Cross-track clip drag keeps playback running");
+        session.stop();
+        session.undo();
+        view.sync();
         drag({view.xFor(0.2), view.lane(1).getCentreY()}, {view.xFor(0.5), view.lane(session.trackCount() - 1).getBottom() + 12.0f});
         require(session.trackCount() == 4, "Dragging an audio clip below the last lane creates a new track");
         require(te::getAudioTracks(*session.edit)[3]->findClipForID(id) != nullptr, "Drop-created track receives the dragged audio clip");
@@ -348,6 +355,25 @@ int runArrangementTest()
         {
             return selectionGrid.lowestVisiblePitch + Session::pitches - 1 - pitch;
         };
+        const auto commandLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::commandModifier);
+        selectionGrid.mouseDown(gridEvent(selectionGrid.cell(4, rowForPitch(55)).getCentre(),
+                                          selectionGrid.cell(4, rowForPitch(55)).getCentre(), false, commandLeft));
+        selectionGrid.mouseDown(gridEvent(selectionGrid.cell(8, rowForPitch(60)).getCentre(),
+                                          selectionGrid.cell(8, rowForPitch(60)).getCentre(), false, commandLeft));
+        require(selectionGrid.selectedNotes.count() == 2, "Command-click selects multiple note cells");
+        require(selectionGrid.keyPressed(juce::KeyPress('C', juce::ModifierKeys::commandModifier, 'c')),
+                "Command-C copies selected notes");
+        require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys::commandModifier, 'v')),
+                "Command-V pastes selected notes");
+        require(session.hasNote(5, 55) && session.hasNote(9, 60), "Pasted notes keep the selected shape one step later");
+        require(selectionGrid.selectedNotes.count() == 2, "Pasted notes become the active selection");
+        require(selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey)),
+                "Delete removes selected notes");
+        require(!session.hasNote(5, 55) && !session.hasNote(9, 60), "Deleted pasted notes are removed from the clip");
+        session.undo();
+        require(session.hasNote(5, 55) && session.hasNote(9, 60), "Undo restores notes removed by multi-selection delete");
+        selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
+        require(selectionGrid.selectedNotes.none(), "Escape clears note selection");
         const auto sourceCell = selectionGrid.cell(1, rowForPitch(48)).getCentre();
         const auto targetCell = selectionGrid.cell(1, rowForPitch(50)).getCentre();
         const auto shiftLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier);

@@ -1200,6 +1200,8 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
     refreshLoop();
     edit->getUndoManager().beginNewTransaction();
     markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
     sendSynchronousChangeMessage();
     return juce::Result::ok();
 }
