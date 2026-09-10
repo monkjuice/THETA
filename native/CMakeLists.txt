@@ -14,6 +14,8 @@ add_subdirectory(.deps/tracktion EXCLUDE_FROM_ALL)
 juce_add_gui_app(ThetaNative
     PRODUCT_NAME "Theta"
     BUNDLE_ID "com.theta.native"
+    ICON_BIG assets/theta_app_icon_1024.png
+    ICON_SMALL assets/theta_app_icon_256.png
     MICROPHONE_PERMISSION_ENABLED TRUE
     MICROPHONE_PERMISSION_TEXT "Record audio into your songs"
     NEEDS_CURL FALSE
