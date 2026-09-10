@@ -2,6 +2,34 @@
 
 namespace theta
 {
+namespace
+{
+juce::String presetId(Session::PatternPreset preset)
+{
+    switch (preset)
+    {
+        case Session::PatternPreset::WarmPulse:  return "WarmPulse";
+        case Session::PatternPreset::AcidSteps:  return "AcidSteps";
+        case Session::PatternPreset::HouseKit:   return "HouseKit";
+        case Session::PatternPreset::BreakKit:   return "BreakKit";
+        case Session::PatternPreset::MinimalKit: return "MinimalKit";
+    }
+    return {};
+}
+
+juce::String effectId(Session::AudioEffect effect)
+{
+    switch (effect)
+    {
+        case Session::AudioEffect::Equaliser:  return "Equaliser";
+        case Session::AudioEffect::Reverb:     return "Reverb";
+        case Session::AudioEffect::Delay:      return "Delay";
+        case Session::AudioEffect::Compressor: return "Compressor";
+    }
+    return {};
+}
+}
+
 BrowserPanel::BrowserPanel(Session& s) : session(s)
 {
     setOpaque(true);
@@ -142,6 +170,16 @@ void BrowserPanel::selectedRowsChanged(int lastRowSelected)
     if (status) status(item.name + " - " + item.detail);
 }
 
+juce::var BrowserPanel::getDragSourceDescription(const juce::SparseSet<int>& rowsToDescribe)
+{
+    if (rowsToDescribe.isEmpty()) return {};
+    const auto row = rowsToDescribe[0];
+    if (!juce::isPositiveAndBelow(row, rows.size())) return {};
+    const auto& item = items[static_cast<size_t>(rows[static_cast<size_t>(row)])];
+    const auto description = dragDescriptionFor(item);
+    return description.isEmpty() ? juce::var{} : juce::var(description);
+}
+
 void BrowserPanel::rebuildRows()
 {
     rows.clear();
@@ -161,6 +199,15 @@ void BrowserPanel::rebuildRows()
         list.selectRow(0, juce::dontSendNotification);
     list.repaint();
     apply.setEnabled(!rows.empty());
+}
+
+juce::String BrowserPanel::dragDescriptionFor(const Item& item) const
+{
+    if (item.preset)
+        return "theta-browser:preset:" + presetId(*item.preset);
+    if (item.effect)
+        return "theta-browser:effect:" + effectId(*item.effect);
+    return {};
 }
 
 void BrowserPanel::applyRow(int row)

@@ -11,6 +11,7 @@
 namespace theta
 {
 class ControlWindow final : public juce::Component,
+                            public juce::DragAndDropContainer,
                             private Session::Listener,
                             private juce::ChangeListener,
                             private juce::Timer

@@ -1,5 +1,6 @@
 #include "Arrangement.h"
 #include "Playhead.h"
+#include <optional>
 #include <set>
 
 namespace theta
@@ -11,6 +12,37 @@ bool isSupportedAudioFile(const juce::File& file)
     const auto extension = file.getFileExtension().toLowerCase();
     return extension == ".wav" || extension == ".aiff" || extension == ".aif"
         || extension == ".flac" || extension == ".ogg" || extension == ".mp3";
+}
+
+std::optional<Session::PatternPreset> patternPresetFromId(const juce::String& id)
+{
+    if (id == "WarmPulse")  return Session::PatternPreset::WarmPulse;
+    if (id == "AcidSteps")  return Session::PatternPreset::AcidSteps;
+    if (id == "HouseKit")   return Session::PatternPreset::HouseKit;
+    if (id == "BreakKit")   return Session::PatternPreset::BreakKit;
+    if (id == "MinimalKit") return Session::PatternPreset::MinimalKit;
+    return std::nullopt;
+}
+
+std::optional<Session::AudioEffect> audioEffectFromId(const juce::String& id)
+{
+    if (id == "Equaliser")  return Session::AudioEffect::Equaliser;
+    if (id == "Reverb")     return Session::AudioEffect::Reverb;
+    if (id == "Delay")      return Session::AudioEffect::Delay;
+    if (id == "Compressor") return Session::AudioEffect::Compressor;
+    return std::nullopt;
+}
+
+juce::String browserDropKind(const juce::String& description)
+{
+    if (!description.startsWith("theta-browser:")) return {};
+    return description.fromFirstOccurrenceOf("theta-browser:", false, false)
+        .upToFirstOccurrenceOf(":", false, false);
+}
+
+juce::String browserDropId(const juce::String& description)
+{
+    return description.fromLastOccurrenceOf(":", false, false);
 }
 }
 
@@ -523,6 +555,33 @@ void Arrangement::filesDropped(const juce::StringArray& files, int x, int y)
     fit();
 }
 
+bool Arrangement::isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails& details)
+{
+    return details.description.toString().startsWith("theta-browser:");
+}
+
+void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& details)
+{
+    auto targetTrack = trackAt(static_cast<float>(details.localPosition.y));
+    const auto description = details.description.toString();
+    if (browserDropKind(description) == "effect"
+        && targetTrack < 0
+        && session.trackCount() > 0
+        && static_cast<float>(details.localPosition.y) > lane(session.trackCount() - 1).getBottom())
+    {
+        const auto result = session.addAudioTrack();
+        if (result.failed())
+        {
+            if (status) status(result.getErrorMessage());
+            return;
+        }
+        targetTrack = session.trackCount() - 1;
+    }
+
+    const auto result = applyBrowserDrop(description, targetTrack);
+    if (result.failed() && status) status(result.getErrorMessage());
+}
+
 void Arrangement::cancelDrag() { dragging = false; }
 
 void Arrangement::selectTrack(int track)
@@ -560,6 +619,36 @@ void Arrangement::nudgeSelected(int direction, bool byBar)
     const auto start = std::max(0.0, old.time.getStart().inSeconds() + delta);
     const auto result = session.editClip(selected, {start, start + length, old.offset.inSeconds()}, ClipGesture::move);
     if (result.failed() && status) status(result.getErrorMessage());
+}
+
+juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int track)
+{
+    const auto kind = browserDropKind(description);
+    const auto id = browserDropId(description);
+
+    if (kind == "preset")
+    {
+        const auto preset = patternPresetFromId(id);
+        if (!preset) return juce::Result::fail("That browser item cannot be loaded here.");
+        session.applyPatternPreset(*preset);
+        selectTrack(0);
+        if (status) status("Loaded browser preset on Pattern 1");
+        return juce::Result::ok();
+    }
+
+    if (kind == "effect")
+    {
+        const auto effect = audioEffectFromId(id);
+        if (!effect) return juce::Result::fail("That browser item cannot be inserted here.");
+        if (track <= 0) return juce::Result::fail("Drop audio effects on an audio track.");
+        const auto result = session.addAudioEffect(*effect, track);
+        if (result.failed()) return result;
+        selectTrack(track);
+        if (status) status("Added browser effect to " + session.trackName(track));
+        return juce::Result::ok();
+    }
+
+    return juce::Result::fail("Drop sounds, drums, or audio effects on the arrangement.");
 }
 
 double Arrangement::snapUnitSeconds() const

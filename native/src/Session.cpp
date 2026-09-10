@@ -193,7 +193,7 @@ bool Session::isPatternDrums() const
     return drums != nullptr && drums->isEnabled();
 }
 
-juce::Result Session::addAudioEffect(AudioEffect effect)
+juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
 {
     const char* type = nullptr;
     juce::String name;
@@ -205,7 +205,11 @@ juce::Result Session::addAudioEffect(AudioEffect effect)
         case AudioEffect::Compressor: type = te::CompressorPlugin::xmlTypeName; name = "Compressor"; break;
     }
 
-    auto* track = te::getAudioTracks(*edit)[1];
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()) || trackIndex <= 0)
+        return juce::Result::fail("Drop audio effects on an audio track.");
+
+    auto* track = tracks[trackIndex];
     edit->getUndoManager().beginNewTransaction("Add " + name);
     auto plugin = edit->getPluginCache().createNewPlugin(type, {});
     if (plugin == nullptr)

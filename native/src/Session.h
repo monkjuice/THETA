@@ -60,7 +60,7 @@ public:
     void clearPattern();
     void applyPatternPreset(PatternPreset);
     bool isPatternDrums() const;
-    juce::Result addAudioEffect(AudioEffect);
+    juce::Result addAudioEffect(AudioEffect, int track = 1);
     int trackCount() const;
     juce::String trackName(int track) const;
     juce::Result addAudioTrack();

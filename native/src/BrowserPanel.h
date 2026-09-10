@@ -32,8 +32,11 @@ private:
     void listBoxItemClicked(int row, const juce::MouseEvent&) override;
     void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override;
     void selectedRowsChanged(int lastRowSelected) override;
+    juce::var getDragSourceDescription(const juce::SparseSet<int>& rowsToDescribe) override;
+    bool mayDragToExternalWindows() const override { return false; }
     void rebuildRows();
     void applyRow(int row);
+    juce::String dragDescriptionFor(const Item&) const;
 
     Session& session;
     juce::Label title, categoriesTitle, soundsTitle;

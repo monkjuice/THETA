@@ -54,6 +54,13 @@ int runArrangementTest()
         view.fit();
         int notifiedTrack = -1;
         view.trackSelected = [&notifiedTrack](int track) { notifiedTrack = track; };
+        require(view.isInterestedInDragSource({"theta-browser:preset:HouseKit", nullptr, {160, 82}}),
+                "Arrangement accepts browser drag payloads");
+        require(view.applyBrowserDrop("theta-browser:preset:HouseKit", 0).wasOk(), "Browser drum drop loads a kit");
+        require(session.isPatternDrums(), "Dropped drum kit enables the drum editor");
+        const auto effectSlots = static_cast<int>(session.deviceSlots(1).size());
+        require(view.applyBrowserDrop("theta-browser:effect:Delay", 1).wasOk(), "Browser effect drop inserts on the target audio track");
+        require(static_cast<int>(session.deviceSlots(1).size()) == effectSlots + 1, "Dropped effect appears in the target audio rack");
 
         // Compare incremental frames to complete renders, including fractional
         // Windows display scales, wraparound, seeks, and hiding the playhead.

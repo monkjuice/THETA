@@ -7,6 +7,7 @@ namespace theta
 {
 class Arrangement final : public juce::Component,
                           public juce::FileDragAndDropTarget,
+                          public juce::DragAndDropTarget,
                           private juce::ChangeListener,
                           private juce::ScrollBar::Listener,
                           private Session::Listener
@@ -24,6 +25,8 @@ public:
     bool keyPressed(const juce::KeyPress&) override;
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&, int x, int y) override;
+    bool isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails&) override;
+    void itemDropped(const juce::DragAndDropTarget::SourceDetails&) override;
     void fit();
     std::function<void(juce::String)> status;
     std::function<void(int)> trackSelected;
@@ -55,6 +58,7 @@ private:
     void splitSelectedAtPlayhead();
     void duplicateSelected();
     void nudgeSelected(int direction, bool byBar);
+    juce::Result applyBrowserDrop(const juce::String& description, int track);
     void updatePlayhead();
     int trackAt(float y) const;
     double snapUnitSeconds() const;
