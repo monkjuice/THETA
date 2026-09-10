@@ -140,6 +140,25 @@ int runArrangementTest()
                 if (isMidiNotePixel(midiPicture.getPixelAt(x, y))) ++midiPixels;
         require(midiPixels >= 25, "Pattern lane must draw visible MIDI notes");
         const auto patternID = session.pattern().itemID;
+        view.selected = patternID;
+        const auto patternPosition = session.pattern().getPosition();
+        view.original = {patternPosition.time.getStart().inSeconds(), patternPosition.time.getEnd().inSeconds(),
+                         patternPosition.offset.inSeconds()};
+        view.preview = {1.0, 1.0 + patternPosition.time.getLength().inSeconds(), patternPosition.offset.inSeconds()};
+        view.originalTrack = view.previewTrack = 0;
+        view.dragging = true;
+        auto dragPreviewPicture = view.createComponentSnapshot(view.getLocalBounds());
+        int dragPreviewOldPixels = 0, dragPreviewNewPixels = 0;
+        for (int y = 95; y < 122; ++y)
+            for (int x = 155; x < 620; ++x)
+            {
+                if (!isMidiNotePixel(dragPreviewPicture.getPixelAt(x, y))) continue;
+                if (x < view.xFor(0.8)) ++dragPreviewOldPixels;
+                if (x >= view.xFor(1.0)) ++dragPreviewNewPixels;
+            }
+        require(dragPreviewOldPixels == 0 && dragPreviewNewPixels >= 25,
+                "Dragged MIDI clip contents must follow the live preview before mouse-up");
+        view.dragging = false;
         require(session.editClip(patternID, {0.0, 0.25, 0.0}, ClipGesture::trimRight).wasOk(),
                 "Can create a very short MIDI clip for paint clipping");
         view.sync();

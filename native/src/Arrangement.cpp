@@ -288,9 +288,9 @@ void Arrangement::paint(juce::Graphics& g)
             g.setColour(juce::Colour(0xffeaf0f3));
             g.drawText("FX" + juce::String(clip.clipPlugins), badge, juce::Justification::centred, true);
         }
+        const auto position = dragging && clip.id == selected ? preview : clip.position;
         if (clip.waveform)
         {
-            const auto position = dragging && clip.id == selected ? preview : clip.position;
             auto waveArea = visible.withTop(box.getY() + 26.0f).reduced(0, 5).getSmallestIntegerContainer();
             if (clip.waveform->thumbnail.getTotalLength() > 0.0)
             {
@@ -314,14 +314,14 @@ void Arrangement::paint(juce::Graphics& g)
             g.setColour(juce::Colour(0x553f4837));
             for (int step = 1; step < Session::steps; ++step)
             {
-                const auto x = xFor(clip.position.start + step * (clip.position.end - clip.position.start) / Session::steps);
+                const auto x = xFor(position.start + step * (position.end - position.start) / Session::steps);
                 if (x > noteArea.getX() && x < noteArea.getRight())
                     g.drawVerticalLine(static_cast<int>(x), noteArea.getY(), noteArea.getBottom());
             }
             for (const auto& note : clip.midiNotes)
             {
-                const auto x1 = xFor(note.start);
-                const auto x2 = xFor(note.end);
+                const auto x1 = xFor(position.start + note.start - clip.position.start);
+                const auto x2 = xFor(position.start + note.end - clip.position.start);
                 const auto w = std::max(3.0f, x2 - x1);
                 const auto pitchScale = static_cast<float>(note.pitch - Session::lowestNote)
                     / static_cast<float>(std::max(1, Session::pitches - 1));
