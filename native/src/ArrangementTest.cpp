@@ -201,6 +201,17 @@ int runArrangementTest()
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 2, "Dropping an audio file on the audio lane imports a clip");
         session.undo();
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Undo restores dropped audio import");
+        require(session.trackCount() == 2, "Starter session has pattern and one audio track");
+        require(session.addAudioTrack().wasOk(), "Can create an audio track");
+        require(session.trackCount() == 3 && session.trackName(2) == "Audio 2", "New audio track is visible in the arrangement model");
+        require(session.removeAudioTrack(2).wasOk(), "Can remove the extra audio track");
+        require(session.trackCount() == 2, "Removing extra audio track restores starter track count");
+        view.filesDropped(dropped, static_cast<int>(view.xFor(1.0)), view.getHeight() - 3);
+        require(session.trackCount() == 3, "Dropping audio below the lanes creates a new audio track");
+        require(te::getAudioTracks(*session.edit)[2]->getClips().size() == 1, "Drop-created track receives the audio clip");
+        session.undo();
+        session.undo();
+        require(session.trackCount() == 2, "Undo removes the drop-created audio track");
 
         // Fit is four seconds wide here. Exercise actual component hit testing,
         // gesture preview, and commit rather than calling only the model facade.

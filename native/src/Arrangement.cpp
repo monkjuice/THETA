@@ -50,6 +50,16 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     zoomOut.onClick = [this] { zoom(2.0, viewStart + viewSpan * 0.5); };
     splitButton.onClick = [this] { splitSelectedAtPlayhead(); };
     duplicateButton.onClick = [this] { duplicateSelected(); };
+    addTrack.onClick = [this]
+    {
+        const auto result = session.addAudioTrack();
+        if (result.failed() && status) status(result.getErrorMessage());
+    };
+    removeTrack.onClick = [this]
+    {
+        const auto result = session.removeAudioTrack(selectedTrack);
+        if (result.failed() && status) status(result.getErrorMessage());
+    };
     snapSize.addItem("1/16", 1);
     snapSize.addItem("1/8", 2);
     snapSize.addItem("1/4", 3);
@@ -57,22 +67,9 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     snapSize.setSelectedId(1, juce::dontSendNotification);
     snapSize.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff262c32));
     snapSize.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff46515a));
-    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &snap, &scroll})
+    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &addTrack, &removeTrack, &snap, &scroll})
         addAndMakeVisible(control);
     addAndMakeVisible(snapSize);
-    for (int i = 0; i < 2; ++i)
-    {
-        mute[i].setButtonText("M");
-        solo[i].setButtonText("S");
-        mute[i].setTooltip("Mute track");
-        solo[i].setTooltip("Solo track");
-        mute[i].onClick = [this, i] { session.toggleTrackMute(i); };
-        solo[i].onClick = [this, i] { session.toggleTrackSolo(i); };
-        mute[i].setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff97634c));
-        solo[i].setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff657440));
-        addAndMakeVisible(mute[i]);
-        addAndMakeVisible(solo[i]);
-    }
     sync();
 }
 
@@ -85,7 +82,7 @@ Arrangement::~Arrangement()
 
 juce::Rectangle<float> Arrangement::lane(int track) const
 {
-    const auto height = (getHeight() - lanesTop - 18.0f) * 0.5f;
+    const auto height = (getHeight() - lanesTop - 18.0f) / static_cast<float>(std::max(1, session.trackCount()));
     return {headerWidth, lanesTop + track * height, std::max(1.0f, getWidth() - headerWidth), height};
 }
 
@@ -113,8 +110,8 @@ void Arrangement::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xffbbc4cc));
     g.drawText("ARRANGEMENT", 10, 0, 138, 30, juce::Justification::centredLeft);
     g.setColour(juce::Colour(0xff8a969f));
-    g.drawText("Drag clips to move / edges to trim / split / duplicate", 570, 0, getWidth() - 580, 30, juce::Justification::centredLeft);
-    for (int track = 0; track < 2; ++track)
+    g.drawText("Drag clips to move / edges to trim / split / duplicate", 740, 0, getWidth() - 750, 30, juce::Justification::centredLeft);
+    for (int track = 0; track < session.trackCount(); ++track)
     {
         const auto row = lane(track);
         g.setColour(juce::Colour(track == 0 ? 0xff242b31 : 0xff20272e));
@@ -127,7 +124,8 @@ void Arrangement::paint(juce::Graphics& g)
             g.fillRect(row.withWidth(3.0f));
         }
         g.setColour(juce::Colour(0xffc4cbd1));
-        g.drawText(track == 0 ? "01  Pattern synth" : "02  Audio 1", 10, static_cast<int>(row.getY()) + 8, 130, 22, juce::Justification::centredLeft);
+        g.drawText(juce::String(track + 1).paddedLeft('0', 2) + "  " + session.trackName(track),
+                   10, static_cast<int>(row.getY()) + 8, 130, 22, juce::Justification::centredLeft);
     }
 
     const auto beatSeconds = 60.0 / session.tempo();
@@ -210,7 +208,7 @@ void Arrangement::paint(juce::Graphics& g)
             }
         }
     }
-    if (!hasAudio)
+    if (!hasAudio && session.trackCount() > 1)
     {
         g.setColour(juce::Colour(0xff75828e));
         g.drawText("Drop audio here, or use Add audio", lane(1).reduced(16, 0), juce::Justification::centredLeft);
@@ -229,12 +227,15 @@ void Arrangement::resized()
     zoomIn.setBounds(240, 3, 32, 26);
     splitButton.setBounds(282, 3, 58, 26);
     duplicateButton.setBounds(348, 3, 52, 26);
-    snap.setBounds(410, 3, 82, 26);
-    snapSize.setBounds(498, 3, 74, 26);
-    for (int i = 0; i < 2; ++i)
+    addTrack.setBounds(410, 3, 70, 26);
+    removeTrack.setBounds(486, 3, 70, 26);
+    snap.setBounds(566, 3, 82, 26);
+    snapSize.setBounds(654, 3, 74, 26);
+    syncTrackControls();
+    for (int i = 0; i < session.trackCount(); ++i)
     {
-        mute[i].setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
-        solo[i].setBounds(62, static_cast<int>(lane(i).getY()) + 38, 42, 26);
+        mute[static_cast<size_t>(i)]->setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
+        solo[static_cast<size_t>(i)]->setBounds(62, static_cast<int>(lane(i).getY()) + 38, 42, 26);
     }
     scroll.setBounds(static_cast<int>(headerWidth), getHeight() - 14, getWidth() - static_cast<int>(headerWidth), 14);
     updateScroll();
@@ -246,11 +247,13 @@ void Arrangement::sync()
     clips.clear();
     std::set<juce::String> usedFiles;
     const auto tracks = te::getAudioTracks(*session.edit);
+    syncTrackControls();
+    selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), selectedTrack);
     songEnd = 0.0;
-    for (int track = 0; track < 2; ++track)
+    for (int track = 0; track < tracks.size(); ++track)
     {
-        mute[track].setToggleState(tracks[track]->isMuted(false), juce::dontSendNotification);
-        solo[track].setToggleState(tracks[track]->isSolo(false), juce::dontSendNotification);
+        mute[static_cast<size_t>(track)]->setToggleState(tracks[track]->isMuted(false), juce::dontSendNotification);
+        solo[static_cast<size_t>(track)]->setToggleState(tracks[track]->isSolo(false), juce::dontSendNotification);
         for (auto* clip : tracks[track]->getClips())
         {
             const auto p = clip->getPosition();
@@ -280,6 +283,33 @@ void Arrangement::sync()
     std::erase_if(waveforms, [&usedFiles](const auto& item) { return !usedFiles.contains(item.first); });
     updateScroll();
     repaint();
+}
+
+void Arrangement::syncTrackControls()
+{
+    const auto count = session.trackCount();
+    while (static_cast<int>(mute.size()) < count)
+    {
+        const auto track = static_cast<int>(mute.size());
+        auto muteButton = std::make_unique<juce::TextButton>("M");
+        auto soloButton = std::make_unique<juce::TextButton>("S");
+        muteButton->setTooltip("Mute track");
+        soloButton->setTooltip("Solo track");
+        muteButton->onClick = [this, track] { session.toggleTrackMute(track); };
+        soloButton->onClick = [this, track] { session.toggleTrackSolo(track); };
+        muteButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff97634c));
+        soloButton->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff657440));
+        addAndMakeVisible(*muteButton);
+        addAndMakeVisible(*soloButton);
+        mute.push_back(std::move(muteButton));
+        solo.push_back(std::move(soloButton));
+    }
+    while (static_cast<int>(mute.size()) > count)
+    {
+        mute.pop_back();
+        solo.pop_back();
+    }
+    removeTrack.setEnabled(selectedTrack > 0 && count > 2);
 }
 
 void Arrangement::updateScroll()
@@ -337,7 +367,7 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
     if (!event.mods.isLeftButtonDown()) return;
-    for (int track = 0; track < 2; ++track)
+    for (int track = 0; track < session.trackCount(); ++track)
         if (lane(track).withX(0.0f).contains(event.position))
         {
             selectTrack(track);
@@ -465,7 +495,18 @@ bool Arrangement::isInterestedInFileDrag(const juce::StringArray& files)
 
 void Arrangement::filesDropped(const juce::StringArray& files, int x, int y)
 {
-    const auto targetTrack = trackAt(static_cast<float>(y));
+    auto targetTrack = trackAt(static_cast<float>(y));
+    if (targetTrack < 0 && session.trackCount() > 0 && static_cast<float>(y) > lane(session.trackCount() - 1).getBottom())
+    {
+        const auto result = session.addAudioTrack();
+        if (result.failed())
+        {
+            if (status) status(result.getErrorMessage());
+            return;
+        }
+        targetTrack = session.trackCount() - 1;
+        selectTrack(targetTrack);
+    }
     if (targetTrack < 0)
     {
         if (status) status("Drop audio on the arrangement lanes.");
@@ -485,10 +526,11 @@ void Arrangement::cancelDrag() { dragging = false; }
 
 void Arrangement::selectTrack(int track)
 {
-    track = juce::jlimit(0, 1, track);
+    track = juce::jlimit(0, std::max(0, session.trackCount() - 1), track);
     if (selectedTrack == track) return;
     selectedTrack = track;
     if (trackSelected) trackSelected(track);
+    removeTrack.setEnabled(selectedTrack > 0 && session.trackCount() > 2);
     repaint();
 }
 
@@ -533,7 +575,7 @@ double Arrangement::snapUnitSeconds() const
 
 int Arrangement::trackAt(float y) const
 {
-    for (int track = 0; track < 2; ++track)
+    for (int track = 0; track < session.trackCount(); ++track)
         if (lane(track).contains(juce::Point<float>(headerWidth, y)))
             return track;
     return -1;

@@ -219,6 +219,57 @@ juce::Result Session::addAudioEffect(AudioEffect effect)
     return juce::Result::ok();
 }
 
+int Session::trackCount() const
+{
+    return te::getAudioTracks(*edit).size();
+}
+
+juce::String Session::trackName(int track) const
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size())) return {};
+    return tracks[track]->getName();
+}
+
+juce::Result Session::addAudioTrack()
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    edit->getUndoManager().beginNewTransaction("Add audio track");
+    auto newTrack = edit->insertNewAudioTrack(te::TrackInsertPoint::getEndOfTracks(*edit), nullptr, false);
+    if (newTrack == nullptr)
+        return juce::Result::fail("Could not create audio track.");
+    newTrack->setName("Audio " + juce::String(tracks.size()));
+    auto audioDevice = edit->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
+    newTrack->pluginList.insertPlugin(audioDevice, 0, nullptr);
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::removeAudioTrack(int track)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (track <= 0 || !juce::isPositiveAndBelow(track, tracks.size()))
+        return juce::Result::fail("Select an audio track to remove.");
+    if (tracks.size() <= 2)
+        return juce::Result::fail("Keep at least one audio track.");
+    edit->getUndoManager().beginNewTransaction("Remove audio track");
+    edit->deleteTrack(tracks[track]);
+    if (track == 1)
+        audioUtility = nullptr;
+    const auto refreshed = te::getAudioTracks(*edit);
+    if (audioUtility == nullptr && refreshed.size() > 1)
+        for (auto plugin : refreshed[1]->pluginList)
+            if (auto* device = dynamic_cast<UtilityDevice*>(plugin))
+                audioUtility = device;
+    refreshLoop();
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
 std::vector<Session::DeviceSlot> Session::deviceSlots(int track) const
 {
     std::vector<DeviceSlot> slots;
@@ -229,7 +280,7 @@ std::vector<Session::DeviceSlot> Session::deviceSlots(int track) const
         if (plugin == nullptr) continue;
         const auto type = plugin->getPluginType();
         slots.push_back({plugin->getDisplayName(), type, plugin->isEnabled(),
-                         track == 1 && type != UtilityDevice::xmlTypeName});
+                         track > 0 && type != UtilityDevice::xmlTypeName});
     }
     return slots;
 }
@@ -257,7 +308,7 @@ juce::Result Session::deleteDevice(int track, int slot)
     if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
         return juce::Result::fail("Select a removable device first.");
     auto* plugin = tracks[track]->pluginList[slot];
-    if (plugin == nullptr || track != 1 || plugin->getPluginType() == UtilityDevice::xmlTypeName)
+    if (plugin == nullptr || track <= 0 || plugin->getPluginType() == UtilityDevice::xmlTypeName)
         return juce::Result::fail("Core devices stay in the starter track chain.");
     edit->getUndoManager().beginNewTransaction("Delete device");
     plugin->removeFromParent();
@@ -291,8 +342,10 @@ void Session::setTempo(double bpm)
 void Session::refreshLoop()
 {
     auto end = pattern().getPosition().time.getEnd();
-    for (auto* clip : te::getAudioTracks(*edit)[1]->getClips())
-        end = std::max(end, clip->getPosition().time.getEnd());
+    const auto tracks = te::getAudioTracks(*edit);
+    for (int track = 1; track < tracks.size(); ++track)
+        for (auto* clip : tracks[track]->getClips())
+            end = std::max(end, clip->getPosition().time.getEnd());
     edit->getTransport().setLoopRange({{}, end});
     edit->getTransport().looping = true;
 }
@@ -339,8 +392,8 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
     if (!candidate) return juce::Result::fail("The project could not be loaded.");
     candidate->editFileRetriever = [file] { return file; };
     const auto tracks = te::getAudioTracks(*candidate);
-    if (tracks.size() != 2)
-        return juce::Result::fail("This editor requires a pattern track and an audio track.");
+    if (tracks.size() < 2)
+        return juce::Result::fail("This editor requires a pattern track and at least one audio track.");
     te::MidiClip* nextPattern = nullptr;
     UtilityDevice* nextUtility = nullptr;
     UtilityDevice* nextAudioUtility = nullptr;
@@ -385,6 +438,7 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
     savedRevision = ++changeRevision;
     edit->getUndoManager().clearUndoHistory();
     edit->resetChangedStatus();
+    refreshLoop();
     listeners.call(&Listener::editDidChange);
     sendSynchronousChangeMessage();
     return juce::Result::ok();

@@ -1,6 +1,7 @@
 #pragma once
 #include "Session.h"
 #include <map>
+#include <memory>
 
 namespace theta
 {
@@ -45,6 +46,7 @@ private:
         int track = 0;
     };
     void sync();
+    void syncTrackControls();
     void updateScroll();
     void zoom(double factor, double anchor);
     void cancelDrag();
@@ -70,9 +72,9 @@ private:
     juce::AudioThumbnailCache thumbnailCache {32};
     std::map<juce::String, std::unique_ptr<Waveform>> waveforms;
     std::vector<ClipView> clips;
-    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, snap {"Clip Snap"};
+    juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, addTrack {"+ Track"}, removeTrack {"- Track"}, snap {"Clip Snap"};
     juce::ComboBox snapSize;
-    std::array<juce::TextButton, 2> mute, solo;
+    std::vector<std::unique_ptr<juce::TextButton>> mute, solo;
     juce::ScrollBar scroll {false};
     juce::VBlankAttachment vblank;
     double viewStart = 0.0, viewSpan = 8.0, songEnd = 2.0;

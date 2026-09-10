@@ -61,6 +61,10 @@ public:
     void applyPatternPreset(PatternPreset);
     bool isPatternDrums() const;
     juce::Result addAudioEffect(AudioEffect);
+    int trackCount() const;
+    juce::String trackName(int track) const;
+    juce::Result addAudioTrack();
+    juce::Result removeAudioTrack(int track);
     std::vector<DeviceSlot> deviceSlots(int track) const;
     juce::Result toggleDeviceEnabled(int track, int slot);
     juce::Result deleteDevice(int track, int slot);
