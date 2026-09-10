@@ -12,6 +12,8 @@ juce::String presetId(Session::PatternPreset preset)
         case Session::PatternPreset::AcidSteps:  return "AcidSteps";
         case Session::PatternPreset::ArpRun:     return "ArpRun";
         case Session::PatternPreset::ChordPad:   return "ChordPad";
+        case Session::PatternPreset::SubBass:    return "SubBass";
+        case Session::PatternPreset::ReeseBass:  return "ReeseBass";
         case Session::PatternPreset::SirenLead:  return "SirenLead";
         case Session::PatternPreset::HouseKit:   return "HouseKit";
         case Session::PatternPreset::BreakKit:   return "BreakKit";
@@ -93,6 +95,8 @@ BrowserPanel::BrowserPanel(Session& s) : session(s)
         {"Sounds", "Acid steps", "Tight 16-step synth riff", Session::PatternPreset::AcidSteps, std::nullopt, std::nullopt, std::nullopt},
         {"Sounds", "Arp run", "Held chord made for Theta Arp", Session::PatternPreset::ArpRun, std::nullopt, std::nullopt, std::nullopt},
         {"Sounds", "Chord pad", "Soft sustaining 4OSC chord synth", Session::PatternPreset::ChordPad, std::nullopt, std::nullopt, std::nullopt},
+        {"Sounds", "Sub bass", "Clean mono low-end bass line", Session::PatternPreset::SubBass, std::nullopt, std::nullopt, std::nullopt},
+        {"Sounds", "Reese bass", "Wide detuned electronic bass", Session::PatternPreset::ReeseBass, std::nullopt, std::nullopt, std::nullopt},
         {"Sounds", "Siren lead", "Rising and falling emergency lead", Session::PatternPreset::SirenLead, std::nullopt, std::nullopt, std::nullopt},
         {"Drums", "House kit", "Four-on-floor kick, backbeat, hats", Session::PatternPreset::HouseKit, std::nullopt, std::nullopt, std::nullopt},
         {"Drums", "Break kit", "Syncopated kick/snare/hats groove", Session::PatternPreset::BreakKit, std::nullopt, std::nullopt, std::nullopt},

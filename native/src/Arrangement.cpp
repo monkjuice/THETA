@@ -20,6 +20,8 @@ std::optional<Session::PatternPreset> patternPresetFromId(const juce::String& id
     if (id == "AcidSteps")  return Session::PatternPreset::AcidSteps;
     if (id == "ArpRun")     return Session::PatternPreset::ArpRun;
     if (id == "ChordPad")   return Session::PatternPreset::ChordPad;
+    if (id == "SubBass")    return Session::PatternPreset::SubBass;
+    if (id == "ReeseBass")  return Session::PatternPreset::ReeseBass;
     if (id == "SirenLead")  return Session::PatternPreset::SirenLead;
     if (id == "HouseKit")   return Session::PatternPreset::HouseKit;
     if (id == "BreakKit")   return Session::PatternPreset::BreakKit;

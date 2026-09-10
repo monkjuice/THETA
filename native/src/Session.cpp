@@ -8,13 +8,15 @@ const juce::Identifier starterPlaceholderID {"thetaStarterPlaceholder"};
 
 struct PresetNote { int step, pitch, length; };
 
+enum class SynthPatch { Default, ChordPad, SubBass, ReeseBass };
+
 struct PresetPattern
 {
     const PresetNote* notes = nullptr;
     int count = 0;
     juce::String name;
     bool useDrums = false;
-    bool useSustainPatch = false;
+    SynthPatch synthPatch = SynthPatch::Default;
 };
 
 PresetPattern presetPattern(Session::PatternPreset preset)
@@ -24,6 +26,8 @@ PresetPattern presetPattern(Session::PatternPreset preset)
     static constexpr PresetNote arpRun[] {{0, 48, 16}, {0, 52, 16}, {0, 55, 16}, {0, 60, 16}};
     static constexpr PresetNote chordPad[] {{0, 48, 7}, {0, 55, 7}, {0, 60, 7}, {0, 64, 7},
                                             {8, 50, 7}, {8, 57, 7}, {8, 62, 7}, {8, 65, 7}};
+    static constexpr PresetNote subBass[] {{0, 36, 4}, {4, 36, 2}, {6, 43, 2}, {8, 39, 4}, {12, 34, 4}};
+    static constexpr PresetNote reeseBass[] {{0, 36, 8}, {8, 39, 4}, {12, 41, 4}};
     static constexpr PresetNote sirenLead[] {{0, 48, 1}, {1, 55, 1}, {2, 60, 1}, {3, 67, 1}, {4, 72, 2}, {7, 67, 1},
                                              {8, 60, 1}, {9, 55, 1}, {10, 48, 1}, {12, 60, 1}, {14, 67, 1}, {15, 72, 1}};
     static constexpr PresetNote houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
@@ -35,15 +39,17 @@ PresetPattern presetPattern(Session::PatternPreset preset)
 
     switch (preset)
     {
-        case Session::PatternPreset::WarmPulse:  return {warmPulse,  static_cast<int>(std::size(warmPulse)),  "Warm pulse", false, false};
-        case Session::PatternPreset::AcidSteps:  return {acidSteps,  static_cast<int>(std::size(acidSteps)),  "Acid steps", false, false};
-        case Session::PatternPreset::ArpRun:     return {arpRun,     static_cast<int>(std::size(arpRun)),     "Arp run", false, false};
-        case Session::PatternPreset::ChordPad:   return {chordPad,   static_cast<int>(std::size(chordPad)),   "Chord pad", false, true};
-        case Session::PatternPreset::SirenLead:  return {sirenLead,  static_cast<int>(std::size(sirenLead)),  "Siren lead", false, false};
-        case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true, false};
-        case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true, false};
-        case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true, false};
-        case Session::PatternPreset::ClapKit:    return {clapKit,    static_cast<int>(std::size(clapKit)),    "Clap kit", true, false};
+        case Session::PatternPreset::WarmPulse:  return {warmPulse,  static_cast<int>(std::size(warmPulse)),  "Warm pulse", false, SynthPatch::Default};
+        case Session::PatternPreset::AcidSteps:  return {acidSteps,  static_cast<int>(std::size(acidSteps)),  "Acid steps", false, SynthPatch::Default};
+        case Session::PatternPreset::ArpRun:     return {arpRun,     static_cast<int>(std::size(arpRun)),     "Arp run", false, SynthPatch::Default};
+        case Session::PatternPreset::ChordPad:   return {chordPad,   static_cast<int>(std::size(chordPad)),   "Chord pad", false, SynthPatch::ChordPad};
+        case Session::PatternPreset::SubBass:    return {subBass,    static_cast<int>(std::size(subBass)),    "Sub bass", false, SynthPatch::SubBass};
+        case Session::PatternPreset::ReeseBass:  return {reeseBass,  static_cast<int>(std::size(reeseBass)),  "Reese bass", false, SynthPatch::ReeseBass};
+        case Session::PatternPreset::SirenLead:  return {sirenLead,  static_cast<int>(std::size(sirenLead)),  "Siren lead", false, SynthPatch::Default};
+        case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true, SynthPatch::Default};
+        case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true, SynthPatch::Default};
+        case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true, SynthPatch::Default};
+        case Session::PatternPreset::ClapKit:    return {clapKit,    static_cast<int>(std::size(clapKit)),    "Clap kit", true, SynthPatch::Default};
     }
     return {};
 }
@@ -56,6 +62,8 @@ juce::Colour presetColour(Session::PatternPreset preset)
         case Session::PatternPreset::AcidSteps:  return juce::Colour(0xff2f6e78);
         case Session::PatternPreset::ArpRun:     return juce::Colour(0xff77659a);
         case Session::PatternPreset::ChordPad:   return juce::Colour(0xff5f718f);
+        case Session::PatternPreset::SubBass:    return juce::Colour(0xff34535f);
+        case Session::PatternPreset::ReeseBass:  return juce::Colour(0xff4a5f38);
         case Session::PatternPreset::SirenLead:  return juce::Colour(0xff8f4f67);
         case Session::PatternPreset::HouseKit:   return juce::Colour(0xff657844);
         case Session::PatternPreset::BreakKit:   return juce::Colour(0xff6f7f43);
@@ -197,6 +205,108 @@ void applyChordPadPatch(te::FourOscPlugin& synth, juce::UndoManager& undoManager
         setPluginParameter(synth.oscParams[2]->fineTune, 5.0f);
         setPluginParameter(synth.oscParams[2]->spread, 70.0f);
         setPluginParameter(synth.oscParams[3]->level, -100.0f);
+    }
+}
+
+void applySubBassPatch(te::FourOscPlugin& synth, juce::UndoManager& undoManager)
+{
+    setPluginParameter(synth.ampAttack, 0.006f);
+    setPluginParameter(synth.ampDecay, 0.18f);
+    setPluginParameter(synth.ampSustain, 88.0f);
+    setPluginParameter(synth.ampRelease, 0.22f);
+    setPluginParameter(synth.ampVelocity, 42.0f);
+    setPluginParameter(synth.filterAttack, 0.0f);
+    setPluginParameter(synth.filterDecay, 0.12f);
+    setPluginParameter(synth.filterSustain, 55.0f);
+    setPluginParameter(synth.filterRelease, 0.18f);
+    setPluginParameter(synth.filterFreq, 48.0f);
+    setPluginParameter(synth.filterResonance, 3.0f);
+    setPluginParameter(synth.filterAmount, -0.03f);
+    setPluginParameter(synth.chorusMix, 0.0f);
+    setPluginParameter(synth.reverbMix, 0.0f);
+    setPluginParameter(synth.legato, 55.0f);
+    setPluginParameter(synth.masterLevel, -8.0f);
+
+    synth.state.setProperty("voiceMode", 1, &undoManager);
+    synth.state.setProperty("voices", 1, &undoManager);
+    synth.state.setProperty("filterType", 1, &undoManager);
+    synth.state.setProperty("filterSlope", 24, &undoManager);
+    synth.state.setProperty("chorusOn", false, &undoManager);
+    synth.state.setProperty("reverbOn", false, &undoManager);
+    synth.state.setProperty("distortionOn", false, &undoManager);
+
+    if (synth.oscParams.size() >= 4)
+    {
+        setPluginParameter(synth.oscParams[0]->level, -5.5f);
+        setPluginParameter(synth.oscParams[0]->tune, 0.0f);
+        setPluginParameter(synth.oscParams[0]->fineTune, 0.0f);
+        setPluginParameter(synth.oscParams[0]->detune, 0.0f);
+        setPluginParameter(synth.oscParams[0]->spread, 0.0f);
+        setPluginParameter(synth.oscParams[1]->level, -19.0f);
+        setPluginParameter(synth.oscParams[1]->tune, 12.0f);
+        setPluginParameter(synth.oscParams[1]->fineTune, 0.0f);
+        setPluginParameter(synth.oscParams[1]->detune, 0.0f);
+        setPluginParameter(synth.oscParams[1]->spread, 0.0f);
+        setPluginParameter(synth.oscParams[2]->level, -100.0f);
+        setPluginParameter(synth.oscParams[3]->level, -100.0f);
+    }
+}
+
+void applyReeseBassPatch(te::FourOscPlugin& synth, juce::UndoManager& undoManager)
+{
+    setPluginParameter(synth.ampAttack, 0.012f);
+    setPluginParameter(synth.ampDecay, 0.45f);
+    setPluginParameter(synth.ampSustain, 82.0f);
+    setPluginParameter(synth.ampRelease, 0.38f);
+    setPluginParameter(synth.ampVelocity, 48.0f);
+    setPluginParameter(synth.filterAttack, 0.03f);
+    setPluginParameter(synth.filterDecay, 0.55f);
+    setPluginParameter(synth.filterSustain, 48.0f);
+    setPluginParameter(synth.filterRelease, 0.28f);
+    setPluginParameter(synth.filterFreq, 63.0f);
+    setPluginParameter(synth.filterResonance, 18.0f);
+    setPluginParameter(synth.filterAmount, 0.12f);
+    setPluginParameter(synth.chorusSpeed, 0.35f);
+    setPluginParameter(synth.chorusDepth, 4.5f);
+    setPluginParameter(synth.chorusWidth, 0.72f);
+    setPluginParameter(synth.chorusMix, 0.16f);
+    setPluginParameter(synth.reverbMix, 0.0f);
+    setPluginParameter(synth.legato, 85.0f);
+    setPluginParameter(synth.masterLevel, -10.0f);
+
+    synth.state.setProperty("voiceMode", 1, &undoManager);
+    synth.state.setProperty("voices", 1, &undoManager);
+    synth.state.setProperty("filterType", 1, &undoManager);
+    synth.state.setProperty("filterSlope", 12, &undoManager);
+    synth.state.setProperty("chorusOn", true, &undoManager);
+    synth.state.setProperty("reverbOn", false, &undoManager);
+    synth.state.setProperty("distortionOn", false, &undoManager);
+
+    if (synth.oscParams.size() >= 4)
+    {
+        setPluginParameter(synth.oscParams[0]->level, -9.0f);
+        setPluginParameter(synth.oscParams[0]->fineTune, -9.0f);
+        setPluginParameter(synth.oscParams[0]->detune, 0.08f);
+        setPluginParameter(synth.oscParams[0]->spread, -70.0f);
+        setPluginParameter(synth.oscParams[1]->level, -9.0f);
+        setPluginParameter(synth.oscParams[1]->fineTune, 9.0f);
+        setPluginParameter(synth.oscParams[1]->detune, 0.08f);
+        setPluginParameter(synth.oscParams[1]->spread, 70.0f);
+        setPluginParameter(synth.oscParams[2]->level, -18.0f);
+        setPluginParameter(synth.oscParams[2]->tune, -12.0f);
+        setPluginParameter(synth.oscParams[2]->spread, 0.0f);
+        setPluginParameter(synth.oscParams[3]->level, -100.0f);
+    }
+}
+
+void applySynthPatch(SynthPatch patch, te::FourOscPlugin& synth, juce::UndoManager& undoManager)
+{
+    switch (patch)
+    {
+        case SynthPatch::Default:   break;
+        case SynthPatch::ChordPad:  applyChordPadPatch(synth, undoManager); break;
+        case SynthPatch::SubBass:   applySubBassPatch(synth, undoManager); break;
+        case SynthPatch::ReeseBass: applyReeseBassPatch(synth, undoManager); break;
     }
 }
 
@@ -518,9 +628,9 @@ void Session::applyPatternPreset(PatternPreset preset)
     const auto data = presetPattern(preset);
     edit->getUndoManager().beginNewTransaction("Load " + data.name);
     setPatternInstrument(data.useDrums);
-    if (data.useSustainPatch)
+    if (data.synthPatch != SynthPatch::Default)
         if (auto* fourOsc = findFourOsc(*te::getAudioTracks(*edit)[0]))
-            applyChordPadPatch(*fourOsc, edit->getUndoManager());
+            applySynthPatch(data.synthPatch, *fourOsc, edit->getUndoManager());
     fillMidiClip(pattern(), data, edit->getUndoManager());
     markModified();
     edit->getUndoManager().beginNewTransaction();
@@ -551,9 +661,9 @@ juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, 
         if (result.failed())
             return result;
     }
-    if (data.useSustainPatch)
+    if (data.synthPatch != SynthPatch::Default)
         if (auto* fourOsc = findFourOsc(*track))
-            applyChordPadPatch(*fourOsc, edit->getUndoManager());
+            applySynthPatch(data.synthPatch, *fourOsc, edit->getUndoManager());
     auto clip = track->insertMIDIClip(data.name, {start, end}, nullptr);
     if (clip == nullptr)
         return juce::Result::fail("The pattern clip could not be added.");

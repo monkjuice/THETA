@@ -113,6 +113,18 @@ int runPatternTest()
         require(session.synth->ampRelease->getCurrentValue() > 0.5f && session.synth->ampRelease->getCurrentValue() < 1.2f
                 && session.synth->chorusMix->getCurrentValue() > 0.2f && session.synth->reverbMix->getCurrentValue() < 0.15f,
                 "Chord pad preset shapes the 4OSC patch for controlled sustain");
+        session.applyPatternPreset(Session::PatternPreset::SubBass);
+        require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(12, 34),
+                "Sub bass preset loads a low mono bass line");
+        require(session.synth->ampRelease->getCurrentValue() < 0.4f && session.synth->chorusMix->getCurrentValue() == 0.0f
+                && static_cast<int>(session.synth->state.getProperty("voices")) == 1,
+                "Sub bass preset shapes the 4OSC patch for clean mono low end");
+        session.applyPatternPreset(Session::PatternPreset::ReeseBass);
+        require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
+                "Reese bass preset loads sustained electronic bass notes");
+        require(session.synth->chorusMix->getCurrentValue() > 0.1f && session.synth->oscParams[0]->detune->getCurrentValue() > 0.05f
+                && static_cast<int>(session.synth->state.getProperty("voices")) == 1,
+                "Reese bass preset shapes the 4OSC patch for detuned bass movement");
         session.applyPatternPreset(Session::PatternPreset::SirenLead);
         require(!session.isPatternDrums() && session.hasNote(4, 72) && session.hasNote(10, 48),
                 "Siren lead preset loads a rising and falling synth line");

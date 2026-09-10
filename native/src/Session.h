@@ -20,6 +20,8 @@ public:
         AcidSteps,
         ArpRun,
         ChordPad,
+        SubBass,
+        ReeseBass,
         SirenLead,
         HouseKit,
         BreakKit,
