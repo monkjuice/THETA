@@ -1285,6 +1285,9 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
         && std::abs(old.offset.inSeconds() - next.offset) < 1.0e-8
         && targetTrack == oldTrackIndex)
         return juce::Result::ok();
+    auto& transport = edit->getTransport();
+    const auto wasPlaying = transport.isPlaying();
+    const auto hadPlaybackContext = transport.isPlayContextActive();
     edit->getUndoManager().beginNewTransaction(gesture == ClipGesture::move ? "Move clip" : "Trim clip");
     if (targetTrack == tracks.size())
     {
@@ -1300,8 +1303,7 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
     if (targetTrack != oldTrackIndex)
     {
         auto* target = refreshedTracks[targetTrack];
-        te::Clip::Ptr clipRef(clip);
-        if (!target->addClip(clipRef))
+        if (!clip->moveTo(*target))
             return juce::Result::fail("The clip could not be moved to that track.");
     }
     clip->setPosition({{tracktion::core::TimePosition::fromSeconds(next.start),
@@ -1310,8 +1312,17 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
     refreshLoop();
     edit->getUndoManager().beginNewTransaction();
     markModified();
-    if (edit->getTransport().isPlaying())
+    if (targetTrack != oldTrackIndex && (wasPlaying || hadPlaybackContext))
+    {
+        transport.freePlaybackContext();
+        transport.ensureContextAllocated(true);
+        if (wasPlaying)
+            transport.play(true);
+    }
+    else if (wasPlaying)
+    {
         edit->restartPlayback();
+    }
     sendSynchronousChangeMessage();
     return juce::Result::ok();
 }

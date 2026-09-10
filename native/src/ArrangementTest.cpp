@@ -277,11 +277,36 @@ int runArrangementTest()
         view.sync();
         view.resized();
         require(view.trackScrollBar.isVisible(), "Adding tracks makes the arrangement lanes vertically scrollable");
+        const auto renderClipRms = [&session, &wav, &require](te::Clip& clip)
+        {
+            juce::TemporaryFile rendered(".wav");
+            te::Renderer::Parameters parameters(*session.edit);
+            parameters.destFile = rendered.getFile();
+            parameters.audioFormat = &wav;
+            parameters.sampleRateForAudio = 48000;
+            parameters.bitDepth = 24;
+            parameters.time = clip.getPosition().time;
+            {
+                te::Renderer::RenderTask task("Moved audio test", parameters, nullptr, nullptr);
+                const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000.0;
+                while (task.runJob() != juce::ThreadPoolJob::jobHasFinished)
+                    require(juce::Time::getMillisecondCounterHiRes() < deadline, "Moved render timeout");
+                require(task.errorMessage.isEmpty(), task.errorMessage.toRawUTF8());
+            }
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(rendered.getFile()));
+            require(reader != nullptr, "Read moved render");
+            juce::AudioBuffer<float> output(2, static_cast<int>(reader->lengthInSamples));
+            require(reader->read(&output, 0, output.getNumSamples(), 0, true, true), "Read moved render samples");
+            return output.getRMSLevel(0, 0, output.getNumSamples());
+        };
         view.selected = id;
         drag({view.xFor(0.2), view.lane(1).getCentreY()}, {view.xFor(0.5), view.lane(2).getCentreY()});
         require(te::getAudioTracks(*session.edit)[1]->getClips().isEmpty(), "Dragging an audio clip to another lane removes it from the source track");
         require(te::getAudioTracks(*session.edit)[2]->findClipForID(id) != nullptr, "Dragging an audio clip to another lane preserves clip identity on the target track");
         require(close(session.findAudioClip(id)->getPosition().time.getStart().inSeconds(), 0.25), "Cross-track audio drag also updates the clip time");
+        require(renderClipRms(*session.findAudioClip(id)) > 0.01f, "Cross-track moved clip still renders audible audio");
         session.undo();
         require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr, "Undo restores the clip to its original track");
         require(te::getAudioTracks(*session.edit)[2]->findClipForID(id) == nullptr, "Undo removes the clip from the drag target track");
@@ -296,6 +321,7 @@ int runArrangementTest()
         drag({view.xFor(0.2), view.lane(1).getCentreY()}, {view.xFor(0.5), view.lane(session.trackCount() - 1).getBottom() + 12.0f});
         require(session.trackCount() == 4, "Dragging an audio clip below the last lane creates a new track");
         require(te::getAudioTracks(*session.edit)[3]->findClipForID(id) != nullptr, "Drop-created track receives the dragged audio clip");
+        require(renderClipRms(*session.findAudioClip(id)) > 0.01f, "Drop-created track moved clip still renders audible audio");
         session.undo();
         require(session.trackCount() == 3, "Undo removes the track created by a clip drag");
         require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr, "Undo restores the clip after a drag-created track");
