@@ -81,6 +81,7 @@ public:
     juce::Result selectPatternClip(te::EditItemID);
     bool isPatternDrums() const;
     juce::Result addAudioEffect(AudioEffect, int track = 1);
+    juce::Result addClipAudioEffect(AudioEffect, te::EditItemID);
     juce::Result addInstrument(Instrument, int track);
     int trackCount() const;
     juce::String trackName(int track) const;
@@ -104,6 +105,8 @@ public:
     juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
     juce::Result duplicateClip(te::EditItemID);
     void deleteClip(te::EditItemID);
+    juce::Result cycleClipColour(te::EditItemID);
+    int clipPluginCount(te::EditItemID) const;
     void toggleTrackMute(int track);
     void toggleTrackSolo(int track);
     // Keep the established settings location so existing audio-device choices survive.

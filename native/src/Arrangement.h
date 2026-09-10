@@ -48,6 +48,8 @@ private:
         double speed = 1.0;
         double sourceDuration = 0.0;
         int track = 0;
+        juce::Colour colour;
+        int clipPlugins = 0;
     };
     void sync();
     void syncTrackControls();

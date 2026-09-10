@@ -225,12 +225,26 @@ void Arrangement::paint(juce::Graphics& g)
         juce::Graphics::ScopedSaveState scope(g);
         g.reduceClipRegion(juce::Rectangle<int>(0, static_cast<int>(lanesTop), getWidth() - 14,
                                                 std::max(1, getHeight() - static_cast<int>(lanesTop) - 18)));
-        g.setColour(juce::Colour(clip.track == 0 ? 0xff414c34 : 0xff284b59));
+        const auto fallback = juce::Colour(clip.track == 0 ? 0xff414c34 : 0xff284b59);
+        const auto label = clip.colour.isTransparent() ? fallback : clip.colour;
+        g.setColour(label.withAlpha(clip.id == selected ? 0.82f : 0.68f));
         g.fillRect(box);
+        g.setColour(label.brighter(0.55f));
+        g.fillRect(box.withHeight(4.0f));
         g.setColour(juce::Colour(clip.id == selected ? 0xffdce9b1 : 0xff617985));
         g.drawRect(box.reduced(0.5f), clip.id == selected ? 2.0f : 1.0f);
         g.setColour(juce::Colour(0xffe0e7ec));
         g.drawText(clip.name, visible.reduced(6.0f, 0).withHeight(23.0f), juce::Justification::centredLeft, true);
+        if (clip.clipPlugins > 0)
+        {
+            const auto badge = visible.withSizeKeepingCentre(28.0f, 16.0f).withRightX(visible.getRight() - 5.0f).withY(visible.getY() + 5.0f);
+            g.setColour(juce::Colour(0xcc15191d));
+            g.fillRect(badge);
+            g.setColour(label.brighter(0.75f));
+            g.drawRect(badge.reduced(0.5f), 1.0f);
+            g.setColour(juce::Colour(0xffeaf0f3));
+            g.drawText("FX" + juce::String(clip.clipPlugins), badge, juce::Justification::centred, true);
+        }
         if (clip.waveform)
         {
             const auto position = dragging && clip.id == selected ? preview : clip.position;
@@ -337,7 +351,7 @@ void Arrangement::sync()
         {
             const auto p = clip->getPosition();
             ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(),
-                           p.offset.inSeconds() + p.time.getLength().inSeconds(), track};
+                           p.offset.inSeconds() + p.time.getLength().inSeconds(), track, clip->getColour(), session.clipPluginCount(clip->itemID)};
             if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
             {
                 const auto file = clip->getSourceFileReference().getFile();
@@ -565,6 +579,12 @@ bool Arrangement::keyPressed(const juce::KeyPress& key)
         duplicateSelected();
         return true;
     }
+    if (!key.getModifiers().isAnyModifierKeyDown() && key.getKeyCode() == 'C')
+    {
+        const auto result = session.cycleClipColour(selected);
+        if (result.failed() && status) status(result.getErrorMessage());
+        return true;
+    }
     if (key.getKeyCode() == juce::KeyPress::escapeKey && dragging)
     {
         cancelDrag();
@@ -627,6 +647,27 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
     auto targetTrack = trackAt(static_cast<float>(details.localPosition.y));
     const auto description = details.description.toString();
     const auto kind = browserDropKind(description);
+    if (kind == "effect")
+        if (const auto clipIndex = hit(details.localPosition.toFloat()); clipIndex >= 0)
+        {
+            const auto effect = audioEffectFromId(browserDropId(description));
+            if (!effect)
+            {
+                if (status) status("That browser item cannot be inserted here.");
+                return;
+            }
+            const auto& clip = clips[static_cast<size_t>(clipIndex)];
+            const auto result = session.addClipAudioEffect(*effect, clip.id);
+            if (result.failed())
+            {
+                if (status) status(result.getErrorMessage());
+                return;
+            }
+            selected = clip.id;
+            selectTrack(clip.track);
+            if (status) status("Added browser effect to clip");
+            return;
+        }
     if ((kind == "preset" || kind == "effect" || kind == "instrument")
         && targetTrack < 0
         && session.trackCount() > 0

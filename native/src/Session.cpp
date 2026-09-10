@@ -35,6 +35,59 @@ PresetPattern presetPattern(Session::PatternPreset preset)
     return {};
 }
 
+juce::Colour presetColour(Session::PatternPreset preset)
+{
+    switch (preset)
+    {
+        case Session::PatternPreset::WarmPulse:  return juce::Colour(0xff4f7d8f);
+        case Session::PatternPreset::AcidSteps:  return juce::Colour(0xff2f6e78);
+        case Session::PatternPreset::HouseKit:   return juce::Colour(0xff657844);
+        case Session::PatternPreset::BreakKit:   return juce::Colour(0xff6f7f43);
+        case Session::PatternPreset::MinimalKit: return juce::Colour(0xff506d45);
+    }
+    return juce::Colour(0xff4b6671);
+}
+
+juce::Colour instrumentColour(Session::Instrument instrument)
+{
+    switch (instrument)
+    {
+        case Session::Instrument::FourOsc: return juce::Colour(0xff3d6f8b);
+        case Session::Instrument::Drums:   return juce::Colour(0xff738044);
+        case Session::Instrument::Utility: return juce::Colour(0xff56636c);
+    }
+    return juce::Colour(0xff4b6671);
+}
+
+juce::Colour nextClipColour(juce::Colour current)
+{
+    static constexpr juce::uint32 palette[] {
+        0xff3d6f8b, 0xff738044, 0xff8d5f42, 0xff7a5b8f,
+        0xff9b4f67, 0xff4b7f68, 0xff8a7a42, 0xff56636c
+    };
+    int closest = -1;
+    for (int i = 0; i < static_cast<int>(std::size(palette)); ++i)
+        if (current == juce::Colour(palette[i]))
+        {
+            closest = i;
+            break;
+        }
+    return juce::Colour(palette[static_cast<size_t>((closest + 1) % static_cast<int>(std::size(palette)))]);
+}
+
+bool effectTypeAndName(Session::AudioEffect effect, const char*& type, juce::String& name)
+{
+    switch (effect)
+    {
+        case Session::AudioEffect::Equaliser:  type = te::EqualiserPlugin::xmlTypeName;  name = "EQ"; break;
+        case Session::AudioEffect::Reverb:     type = te::ReverbPlugin::xmlTypeName;     name = "Reverb"; break;
+        case Session::AudioEffect::Delay:      type = te::DelayPlugin::xmlTypeName;      name = "Delay"; break;
+        case Session::AudioEffect::Compressor: type = te::CompressorPlugin::xmlTypeName; name = "Compressor"; break;
+        case Session::AudioEffect::ThetaSpace: type = ThetaSpaceDevice::xmlTypeName;     name = "Theta Space"; break;
+    }
+    return type != nullptr;
+}
+
 void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoManager& undoManager)
 {
     auto& sequence = clip.getSequence();
@@ -185,6 +238,8 @@ Session::Session()
     utility->gain().setParameter(-12.0f, juce::dontSendNotification);
     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     patternClip = track->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
+    if (patternClip != nullptr)
+        patternClip->setColour(presetColour(PatternPreset::WarmPulse));
     patternClipID = patternClip->itemID;
     auto* audioTrack = te::getAudioTracks(*edit)[1];
     audioTrack->setName("Audio 1");
@@ -232,6 +287,7 @@ juce::Result Session::importAudioAt(const juce::File& file, int trackIndex, doub
         {{start, start + tracktion::core::TimeDuration::fromSeconds(duration)}, {}}, false);
     if (clip == nullptr)
         return juce::Result::fail("The audio clip could not be added.");
+    clip->setColour(juce::Colour(0xff4d6975));
     refreshLoop();
     markModified();
     sendSynchronousChangeMessage();
@@ -339,6 +395,7 @@ juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, 
     auto clip = track->insertMIDIClip(data.name, {start, end}, nullptr);
     if (clip == nullptr)
         return juce::Result::fail("The pattern clip could not be added.");
+    clip->setColour(presetColour(preset));
     fillMidiClip(*clip, data, edit->getUndoManager());
     refreshLoop();
     markModified();
@@ -381,6 +438,7 @@ juce::Result Session::insertInstrumentClip(Instrument instrument, int trackIndex
     auto clip = track->insertMIDIClip(name, {start, end}, nullptr);
     if (clip == nullptr)
         return juce::Result::fail("The instrument clip could not be added.");
+    clip->setColour(instrumentColour(instrument));
     patternClip = clip.get();
     patternClipID = patternClip->itemID;
     refreshLoop();
@@ -424,14 +482,8 @@ juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
 {
     const char* type = nullptr;
     juce::String name;
-    switch (effect)
-    {
-        case AudioEffect::Equaliser:  type = te::EqualiserPlugin::xmlTypeName;  name = "EQ"; break;
-        case AudioEffect::Reverb:     type = te::ReverbPlugin::xmlTypeName;     name = "Reverb"; break;
-        case AudioEffect::Delay:      type = te::DelayPlugin::xmlTypeName;      name = "Delay"; break;
-        case AudioEffect::Compressor: type = te::CompressorPlugin::xmlTypeName; name = "Compressor"; break;
-        case AudioEffect::ThetaSpace: type = ThetaSpaceDevice::xmlTypeName;     name = "Theta Space"; break;
-    }
+    if (!effectTypeAndName(effect, type, name))
+        return juce::Result::fail("That audio effect could not be created.");
 
     const auto tracks = te::getAudioTracks(*edit);
     if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
@@ -443,6 +495,36 @@ juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
     if (plugin == nullptr)
         return juce::Result::fail(name + " could not be created.");
     track->pluginList.insertPlugin(plugin, track->pluginList.size(), nullptr);
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::addClipAudioEffect(AudioEffect effect, te::EditItemID clipID)
+{
+    const char* type = nullptr;
+    juce::String name;
+    if (!effectTypeAndName(effect, type, name))
+        return juce::Result::fail("That audio effect could not be created.");
+
+    auto* clip = dynamic_cast<te::AudioClipBase*>(findClip(clipID));
+    if (clip == nullptr)
+        return juce::Result::fail("Clip effects can be dropped on audio clips.");
+    if (!clip->canHaveEffects())
+        return juce::Result::fail("This audio clip cannot host effects while warped or reversed.");
+
+    auto plugin = edit->getPluginCache().createNewPlugin(type, {});
+    if (plugin == nullptr)
+        return juce::Result::fail(name + " could not be created.");
+    if (!plugin->canBeAddedToClip())
+        return juce::Result::fail(name + " cannot be added to a clip.");
+
+    edit->getUndoManager().beginNewTransaction("Add " + name + " to clip");
+    clip->getPluginList()->insertPlugin(plugin, clip->getPluginList()->size(), nullptr);
+    clip->enableEffects(true, false);
     edit->getUndoManager().beginNewTransaction();
     markModified();
     if (edit->getTransport().isPlaying())
@@ -753,7 +835,10 @@ void Session::ensureEditablePatternClip()
         const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
         patternClip = tracks[0]->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
         if (patternClip != nullptr)
+        {
+            patternClip->setColour(presetColour(PatternPreset::WarmPulse));
             patternClipID = patternClip->itemID;
+        }
     }
 }
 
@@ -919,8 +1004,12 @@ juce::Result Session::duplicateClip(te::EditItemID id)
     const auto duplicateRange = firstFreeDuplicateRange(*clip);
     te::Clip* copy = nullptr;
     if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
+    {
         copy = track->insertWaveClip(audio->getName() + " copy", audio->getSourceFileReference().getFile(),
             {duplicateRange, old.offset}, false).get();
+        if (copy != nullptr)
+            copy->setColour(audio->getColour());
+    }
     else if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
         if (auto midiCopy = track->insertMIDIClip(midi->getName() + " copy",
             duplicateRange, nullptr))
@@ -963,6 +1052,8 @@ void Session::deleteClip(te::EditItemID id)
                 {
                     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
                     patternClip = tracks[0]->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
+                    if (patternClip != nullptr)
+                        patternClip->setColour(presetColour(PatternPreset::WarmPulse));
                 }
                 if (patternClip != nullptr)
                     patternClipID = patternClip->itemID;
@@ -973,6 +1064,27 @@ void Session::deleteClip(te::EditItemID id)
         markModified();
         sendSynchronousChangeMessage();
     }
+}
+
+juce::Result Session::cycleClipColour(te::EditItemID id)
+{
+    auto* clip = findClip(id);
+    if (clip == nullptr)
+        return juce::Result::fail("Select a clip first.");
+    edit->getUndoManager().beginNewTransaction("Color clip");
+    clip->setColour(nextClipColour(clip->getColour()));
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+int Session::clipPluginCount(te::EditItemID id) const
+{
+    auto* clip = dynamic_cast<te::AudioClipBase*>(findClip(id));
+    if (clip == nullptr || clip->getPluginList() == nullptr)
+        return 0;
+    return clip->getPluginList()->size();
 }
 
 void Session::toggleTrackMute(int track)

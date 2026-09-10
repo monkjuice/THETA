@@ -193,6 +193,21 @@ int runArrangementTest()
         require(te::getAudioTracks(*session.edit)[1]->getClips().size() == 1, "Undo duplicate restores one audio clip");
         clip = session.findAudioClip(id);
         require(clip != nullptr, "Original clip remains after undo duplicate");
+        const auto originalColour = clip->getColour();
+        view.keyPressed(juce::KeyPress('C'));
+        require(clip->getColour() != originalColour, "C cycles the selected clip colour label");
+        session.undo();
+        const auto audioTrackSlots = static_cast<int>(session.deviceSlots(1).size());
+        const auto clipSlots = session.clipPluginCount(id);
+        view.sync();
+        view.fit();
+        view.itemDropped({"theta-browser:effect:ThetaSpace", nullptr,
+                          {static_cast<int>(view.xFor(0.25)), static_cast<int>(view.lane(1).getCentreY())}});
+        require(static_cast<int>(session.deviceSlots(1).size()) == audioTrackSlots,
+                "Dropping an audio effect on an audio clip leaves the track rack unchanged");
+        require(session.clipPluginCount(id) == clipSlots + 1,
+                "Dropping an audio effect on an audio clip inserts clip-local FX");
+        session.undo();
 
         const auto event = [&view](juce::Point<float> down, juce::Point<float> point, bool dragged)
         {
