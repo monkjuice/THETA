@@ -149,6 +149,16 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::SirenLead);
         require(!session.isPatternDrums() && session.hasNote(4, 72) && session.hasNote(10, 48),
                 "Siren lead preset loads a rising and falling synth line");
+        session.applyPatternPreset(Session::PatternPreset::WavePad);
+        require(session.thetaWave->isEnabled() && !session.synth->isEnabled() && !session.drums->isEnabled(),
+                "Wave pad preset enables Theta Wave");
+        require(!session.isPatternDrums() && session.hasNote(0, 48) && session.hasNote(8, 62),
+                "Wave pad preset loads sustained wavetable chords");
+        session.applyPatternPreset(Session::PatternPreset::WaveBass);
+        require(session.thetaWave->isEnabled() && session.hasNote(0, 36) && session.hasNote(12, 39),
+                "Wave bass preset keeps Theta Wave active with low notes");
+        session.undo();
+        session.undo();
         session.undo();
         session.undo();
         session.undo();

@@ -23,6 +23,8 @@ std::optional<Session::PatternPreset> patternPresetFromId(const juce::String& id
     if (id == "SubBass")    return Session::PatternPreset::SubBass;
     if (id == "ReeseBass")  return Session::PatternPreset::ReeseBass;
     if (id == "SirenLead")  return Session::PatternPreset::SirenLead;
+    if (id == "WavePad")    return Session::PatternPreset::WavePad;
+    if (id == "WaveBass")   return Session::PatternPreset::WaveBass;
     if (id == "HouseKit")   return Session::PatternPreset::HouseKit;
     if (id == "BreakKit")   return Session::PatternPreset::BreakKit;
     if (id == "MinimalKit") return Session::PatternPreset::MinimalKit;

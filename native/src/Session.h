@@ -24,6 +24,8 @@ public:
         SubBass,
         ReeseBass,
         SirenLead,
+        WavePad,
+        WaveBass,
         HouseKit,
         BreakKit,
         MinimalKit,
