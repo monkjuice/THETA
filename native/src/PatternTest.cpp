@@ -127,6 +127,54 @@ int runPatternTest()
             }
         require(peak > 0.0001f && peak < 1.0f, "Synth output must be audible and below clipping");
         reader.reset();
+
+        {
+            Session fxSession;
+            require(fxSession.importAudio(output.getFile()).wasOk(), "Theta Space test imports rendered audio");
+            require(fxSession.addAudioEffect(Session::AudioEffect::ThetaSpace).wasOk(), "Theta Space can be inserted for render stability");
+            auto* fxTrack = te::getAudioTracks(*fxSession.edit)[1];
+            const auto thetaSlot = fxTrack->pluginList.size() - 1;
+            auto* thetaSpace = dynamic_cast<ThetaSpaceDevice*>(fxTrack->pluginList[thetaSlot]);
+            require(thetaSpace != nullptr, "Inserted effect is Theta Space");
+            require(fxSession.setDeviceParameter(1, thetaSlot, 0, 1.0f).wasOk(), "Theta Space test sets wet mix");
+            require(fxSession.setDeviceParameter(1, thetaSlot, 2, 0.9f).wasOk(), "Theta Space test sets feedback");
+            auto params = thetaSpace->getAutomatableParameters();
+            require(params.size() >= 2 && params[1] != nullptr, "Theta Space size parameter is automatable");
+            auto& sizeCurve = params[1]->getCurve();
+            sizeCurve.addPoint(tracktion::core::TimePosition::fromSeconds(0.0), 0.0f, 0.0f, nullptr);
+            sizeCurve.addPoint(tracktion::core::TimePosition::fromSeconds(1.0), 1.0f, 0.0f, nullptr);
+
+            juce::TemporaryFile fxOutput(".wav");
+            te::Renderer::Parameters fxParameters(*fxSession.edit);
+            fxParameters.destFile = fxOutput.getFile();
+            fxParameters.audioFormat = &wav;
+            fxParameters.sampleRateForAudio = 48000;
+            fxParameters.bitDepth = 24;
+            fxParameters.time = fxTrack->getClips()[0]->getPosition().time;
+            {
+                te::Renderer::RenderTask task("Theta Space size automation test", fxParameters, nullptr, nullptr);
+                const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000.0;
+                while (task.runJob() != juce::ThreadPoolJob::jobHasFinished)
+                    require(juce::Time::getMillisecondCounterHiRes() < deadline, "Theta Space render timed out");
+                require(task.errorMessage.isEmpty(), task.errorMessage.toRawUTF8());
+            }
+            std::unique_ptr<juce::AudioFormatReader> fxReader(formats.createReaderFor(fxOutput.getFile()));
+            require(fxReader != nullptr, "Read Theta Space render");
+            juce::AudioBuffer<float> fxAudio(static_cast<int>(fxReader->numChannels), static_cast<int>(fxReader->lengthInSamples));
+            require(fxReader->read(&fxAudio, 0, fxAudio.getNumSamples(), 0, true, true), "Read Theta Space samples");
+            float fxPeak = 0.0f;
+            for (int c = 0; c < fxAudio.getNumChannels(); ++c)
+                for (int frame = 0; frame < fxAudio.getNumSamples(); ++frame)
+                {
+                    const auto sample = fxAudio.getSample(c, frame);
+                    require(std::isfinite(sample), "Theta Space size automation must stay finite");
+                    fxPeak = std::max(fxPeak, std::abs(sample));
+                }
+            require(fxPeak > 0.0001f && fxPeak <= 1.0f, "Theta Space size automation remains bounded and audible");
+            fxSession.stop();
+            fxSession.panicReset();
+        }
+
         require(session.importAudio(output.getFile()).wasOk(), "Import rendered audio");
         auto* audioTrack = te::getAudioTracks(*session.edit)[1];
         require(audioTrack->getClips().size() == 1, "Import creates an audio clip");

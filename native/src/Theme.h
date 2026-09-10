@@ -1,11 +1,64 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <algorithm>
+#include <cmath>
 
 namespace theta
 {
 class Theme final : public juce::LookAndFeel_V4
 {
 public:
+    void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
+                          float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
+                          juce::Slider& slider) override
+    {
+        const auto diameter = static_cast<float>(std::min(width, height)) - 4.0f;
+        const auto area = juce::Rectangle<float>(static_cast<float>(x), static_cast<float>(y),
+                                                static_cast<float>(width), static_cast<float>(height))
+                              .withSizeKeepingCentre(diameter, diameter);
+        const auto radius = area.getWidth() * 0.5f;
+        const auto centre = area.getCentre();
+        const auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+
+        g.setColour(slider.findColour(juce::Slider::backgroundColourId));
+        g.fillEllipse(area);
+        g.setColour(juce::Colour(0xff11161a));
+        g.drawEllipse(area.reduced(0.5f), 1.0f);
+
+        const auto arc = area.reduced(3.0f);
+        juce::Path backgroundArc;
+        backgroundArc.addCentredArc(centre.x, centre.y, arc.getWidth() * 0.5f, arc.getHeight() * 0.5f,
+                                    0.0f, rotaryStartAngle, rotaryEndAngle, true);
+        g.setColour(slider.findColour(juce::Slider::backgroundColourId).brighter(0.25f));
+        g.strokePath(backgroundArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        juce::Path valueArc;
+        valueArc.addCentredArc(centre.x, centre.y, arc.getWidth() * 0.5f, arc.getHeight() * 0.5f,
+                               0.0f, rotaryStartAngle, angle, true);
+        g.setColour(slider.findColour(juce::Slider::trackColourId));
+        g.strokePath(valueArc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        g.setColour(juce::Colour(0xffaab7bf));
+        for (const auto tickAngle : {0.0f, juce::MathConstants<float>::halfPi,
+                                     juce::MathConstants<float>::pi, juce::MathConstants<float>::pi * 1.5f})
+        {
+            const auto tickCentre = centre + juce::Point<float>(std::sin(tickAngle), -std::cos(tickAngle)) * (radius * 0.43f);
+            const auto horizontal = std::abs(std::sin(tickAngle)) > 0.5f;
+            const juce::Rectangle<float> tick(horizontal ? tickCentre.x - 5.0f : tickCentre.x - 1.0f,
+                                             horizontal ? tickCentre.y - 1.0f : tickCentre.y - 5.0f,
+                                             horizontal ? 10.0f : 2.0f,
+                                             horizontal ? 2.0f : 10.0f);
+            g.fillRect(tick);
+        }
+
+        juce::Path pointer;
+        pointer.addRectangle(-1.25f, -radius * 0.36f, 2.5f, radius * 0.31f);
+        g.setColour(slider.findColour(juce::Slider::thumbColourId));
+        g.fillPath(pointer, juce::AffineTransform::rotation(angle).translated(centre.x, centre.y));
+        g.setColour(juce::Colour(0xff0c1013));
+        g.drawEllipse(area.reduced(radius * 0.34f), 1.0f);
+    }
+
     void drawButtonBackground(juce::Graphics& g, juce::Button& button,
                               const juce::Colour& background, bool highlighted, bool pressed) override
     {

@@ -55,6 +55,8 @@ void ThetaSpaceDevice::initialise(const te::PluginInitialisationInfo& info)
     dryL.assign(static_cast<size_t>(std::max(1, info.blockSizeSamples)), 0.0f);
     dryR.assign(static_cast<size_t>(std::max(1, info.blockSizeSamples)), 0.0f);
     writeIndex = 0;
+    smoothedDelaySamples = static_cast<float>(juce::jlimit(1, delaySamples - 1,
+        static_cast<int>((0.045f + std::clamp(sizeParam->getCurrentValue(), 0.0f, 1.0f) * 0.72f) * static_cast<float>(sampleRate))));
     reverb.setSampleRate(sampleRate);
     reset();
 }
@@ -64,6 +66,11 @@ void ThetaSpaceDevice::reset()
     std::fill(delayL.begin(), delayL.end(), 0.0f);
     std::fill(delayR.begin(), delayR.end(), 0.0f);
     writeIndex = 0;
+    if (delayL.size() > 2)
+        smoothedDelaySamples = static_cast<float>(juce::jlimit(1, static_cast<int>(delayL.size()) - 1,
+            static_cast<int>((0.045f + std::clamp(sizeParam->getCurrentValue(), 0.0f, 1.0f) * 0.72f) * static_cast<float>(sampleRate))));
+    else
+        smoothedDelaySamples = 1.0f;
     reverb.reset();
 }
 
@@ -90,8 +97,8 @@ void ThetaSpaceDevice::applyToBuffer(const te::PluginRenderContext& context)
     const auto driveAmount = 1.0f + std::clamp(driveParam->getCurrentValue(), 0.0f, 1.0f) * 8.0f;
     const auto stereoWidth = std::clamp(widthParam->getCurrentValue(), 0.0f, 2.0f);
     const auto output = juce::Decibels::decibelsToGain(outputParam->getCurrentValue());
-    const auto delaySamples = juce::jlimit(1, static_cast<int>(delayL.size()) - 1,
-        static_cast<int>((0.045 + room * 0.72) * sampleRate));
+    const auto targetDelaySamples = static_cast<float>(juce::jlimit(1, static_cast<int>(delayL.size()) - 1,
+        static_cast<int>((0.045 + room * 0.72) * sampleRate)));
 
     juce::Reverb::Parameters params;
     params.roomSize = room;
@@ -110,9 +117,18 @@ void ThetaSpaceDevice::applyToBuffer(const te::PluginRenderContext& context)
         dryL[static_cast<size_t>(i)] = inL;
         dryR[static_cast<size_t>(i)] = inR;
 
-        const auto readIndex = (writeIndex + static_cast<int>(delayL.size()) - delaySamples) % static_cast<int>(delayL.size());
-        const auto delayedL = delayL[static_cast<size_t>(readIndex)];
-        const auto delayedR = delayR[static_cast<size_t>(readIndex)];
+        smoothedDelaySamples += (targetDelaySamples - smoothedDelaySamples) * 0.0015f;
+        smoothedDelaySamples = juce::jlimit(1.0f, static_cast<float>(delayL.size() - 2), smoothedDelaySamples);
+        auto readPosition = static_cast<float>(writeIndex) - smoothedDelaySamples;
+        while (readPosition < 0.0f)
+            readPosition += static_cast<float>(delayL.size());
+        const auto readIndex0 = static_cast<int>(readPosition) % static_cast<int>(delayL.size());
+        const auto readIndex1 = (readIndex0 + 1) % static_cast<int>(delayL.size());
+        const auto fraction = readPosition - std::floor(readPosition);
+        const auto delayedL = delayL[static_cast<size_t>(readIndex0)]
+            + (delayL[static_cast<size_t>(readIndex1)] - delayL[static_cast<size_t>(readIndex0)]) * fraction;
+        const auto delayedR = delayR[static_cast<size_t>(readIndex0)]
+            + (delayR[static_cast<size_t>(readIndex1)] - delayR[static_cast<size_t>(readIndex0)]) * fraction;
         const auto drivenL = std::tanh((inL + delayedR * 0.18f) * driveAmount) / std::tanh(driveAmount);
         const auto drivenR = std::tanh((inR + delayedL * 0.18f) * driveAmount) / std::tanh(driveAmount);
         delayL[static_cast<size_t>(writeIndex)] = std::clamp(drivenL + delayedL * feedback, -1.5f, 1.5f);

@@ -31,5 +31,6 @@ private:
     std::vector<float> delayL, delayR, dryL, dryR;
     double sampleRate = 48000.0;
     int writeIndex = 0;
+    float smoothedDelaySamples = 1.0f;
 };
 }
