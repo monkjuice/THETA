@@ -25,6 +25,7 @@ juce_add_binary_data(ThetaNativeAssets
 target_sources(ThetaNative PRIVATE
     src/Main.cpp src/Session.cpp src/StepGrid.cpp src/Arrangement.cpp src/ProjectFiles.cpp src/Playhead.cpp
     src/BrowserPanel.cpp src/DeviceRack.cpp src/DrumDevice.cpp src/UtilityDevice.cpp src/ThetaSpaceDevice.cpp src/ThetaBloomDevice.cpp src/ThetaArpDevice.cpp
+    src/ThetaWaveDevice.cpp
     src/SelfTest.cpp src/PatternTest.cpp src/ArrangementTest.cpp)
 target_compile_definitions(ThetaNative PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0

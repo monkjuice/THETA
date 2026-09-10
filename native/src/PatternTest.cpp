@@ -12,8 +12,9 @@ int runPatternTest()
             if (!valid) throw std::runtime_error(message);
         };
         Session session;
-        require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr && session.drums != nullptr,
-                "Session creates synth, drum, and Utility devices");
+        require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr
+                && session.thetaWave != nullptr && session.drums != nullptr,
+                "Session creates synth, wavetable, drum, and Utility devices");
         auto* effectTrack = te::getAudioTracks(*session.edit)[1];
         const auto initialAudioPluginCount = effectTrack->pluginList.size();
         require(session.addAudioEffect(Session::AudioEffect::Equaliser).wasOk(), "Audio FX browser action inserts EQ");
@@ -67,6 +68,19 @@ int runPatternTest()
                     "Theta Arp is inserted before the target instrument");
             auto arpParameters = parameterSession.deviceParameters(1, arpSlot);
             require(arpParameters.size() == 3, "Theta Arp exposes rate, octaves, and gate controls");
+            require(parameterSession.addInstrument(Session::Instrument::ThetaWave, 1).wasOk(), "Audio track can host Theta Wave");
+            int waveSlot = -1;
+            for (int i = 0; i < parameterTrack->pluginList.size(); ++i)
+            {
+                auto* plugin = parameterTrack->pluginList[i];
+                if (plugin != nullptr && plugin->getPluginType() == ThetaWaveDevice::xmlTypeName)
+                    waveSlot = i;
+            }
+            require(waveSlot >= 0, "Theta Wave is inserted in the target track chain");
+            auto waveParameters = parameterSession.deviceParameters(1, waveSlot);
+            require(waveParameters.size() >= 10 && waveParameters[0].name == "Position"
+                    && waveParameters[5].name == "Attack",
+                    "Theta Wave exposes wavetable and envelope macros");
         }
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");
@@ -180,6 +194,40 @@ int runPatternTest()
         reader.reset();
 
         {
+            Session waveSession;
+            require(waveSession.addInstrument(Session::Instrument::ThetaWave, 0).wasOk(), "Theta Wave can be activated on the pattern track");
+            waveSession.setNote(0, 48, true);
+            waveSession.setNote(4, 55, true);
+            juce::TemporaryFile waveOutput(".wav");
+            te::Renderer::Parameters waveParameters(*waveSession.edit);
+            waveParameters.destFile = waveOutput.getFile();
+            waveParameters.audioFormat = &wav;
+            waveParameters.sampleRateForAudio = 48000;
+            waveParameters.bitDepth = 24;
+            waveParameters.time = waveSession.pattern().getPosition().time;
+            {
+                te::Renderer::RenderTask task("Theta Wave render test", waveParameters, nullptr, nullptr);
+                const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000.0;
+                while (task.runJob() != juce::ThreadPoolJob::jobHasFinished)
+                    require(juce::Time::getMillisecondCounterHiRes() < deadline, "Theta Wave render timed out");
+                require(task.errorMessage.isEmpty(), task.errorMessage.toRawUTF8());
+            }
+            std::unique_ptr<juce::AudioFormatReader> waveReader(formats.createReaderFor(waveOutput.getFile()));
+            require(waveReader != nullptr, "Read Theta Wave render");
+            juce::AudioBuffer<float> waveAudio(static_cast<int>(waveReader->numChannels), static_cast<int>(waveReader->lengthInSamples));
+            require(waveReader->read(&waveAudio, 0, waveAudio.getNumSamples(), 0, true, true), "Read Theta Wave samples");
+            float wavePeak = 0.0f;
+            for (int c = 0; c < waveAudio.getNumChannels(); ++c)
+                for (int frame = 0; frame < waveAudio.getNumSamples(); ++frame)
+                {
+                    const auto sample = waveAudio.getSample(c, frame);
+                    require(std::isfinite(sample), "Theta Wave render must stay finite");
+                    wavePeak = std::max(wavePeak, std::abs(sample));
+                }
+            require(wavePeak > 0.0001f && wavePeak < 1.0f, "Theta Wave output must be audible and below clipping");
+        }
+
+        {
             Session arpSession;
             arpSession.applyPatternPreset(Session::PatternPreset::ArpRun);
             require(arpSession.addMidiEffect(Session::MidiEffect::ThetaArp, 0).wasOk(), "Theta Arp can be inserted on the pattern synth");
@@ -281,8 +329,9 @@ int runPatternTest()
         auto loadedXml = juce::parseXML(project.getFile());
         require(loadedXml != nullptr, "Read saved project");
         require(session.restoreProject(juce::ValueTree::fromXml(*loadedXml), project.getFile()).wasOk(), "Restore project");
-        require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr && session.drums != nullptr,
-                "Project restore keeps synth, drum, and Utility devices");
+        require(session.utility != nullptr && session.audioUtility != nullptr && session.synth != nullptr
+                && session.thetaWave != nullptr && session.drums != nullptr,
+                "Project restore keeps synth, wavetable, drum, and Utility devices");
         require(!session.synth->isEnabled() && session.drums->isEnabled(), "Project restore keeps drum instrument selection");
         require(session.pattern().getSequence().getNumNotes() == 10, "Notes survive project reopen");
         require(std::abs(session.tempo() - 90.0) < 0.001, "Tempo survives project reopen");

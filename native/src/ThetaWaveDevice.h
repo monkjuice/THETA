@@ -1,0 +1,54 @@
+#pragma once
+#include <tracktion_engine/tracktion_engine.h>
+#include <array>
+
+namespace theta
+{
+namespace te = tracktion::engine;
+
+class ThetaWaveDevice final : public te::Plugin
+{
+public:
+    inline static const char* xmlTypeName = "theta.wave.v1";
+    static const char* getPluginName() { return "Theta Wave"; }
+    explicit ThetaWaveDevice(te::PluginCreationInfo);
+    ~ThetaWaveDevice() override;
+    juce::String getName() const override { return getPluginName(); }
+    juce::String getPluginType() override { return xmlTypeName; }
+    juce::String getVendor() override { return "Theta"; }
+    juce::String getSelectableDescription() override { return getName(); }
+    BusLayout getBusses() const override { return BusLayout::singleStereoInOut(); }
+    bool isSynth() override { return true; }
+    bool takesMidiInput() override { return true; }
+    bool producesAudioWhenNoAudioInput() override { return true; }
+    void initialise(const te::PluginInitialisationInfo&) override;
+    void deinitialise() override {}
+    void reset() override;
+    void midiPanic() override;
+    void applyToBuffer(const te::PluginRenderContext&) override;
+    void restorePluginStateFromValueTree(const juce::ValueTree&) override;
+
+private:
+    struct Voice
+    {
+        bool active = false, released = false;
+        int note = 0;
+        float velocity = 0.0f, phase = 0.0f, subPhase = 0.0f, envelope = 0.0f, releaseStart = 0.0f;
+    };
+
+    void trigger(int note, float velocity);
+    void release(int note);
+    float renderVoice(Voice&);
+    float wave(float phase) const;
+
+    juce::CachedValue<float> position, shape, sub, cutoff, resonance, attack, decay, sustain, releaseTime;
+    juce::CachedValue<float> unison, detune, width, outputDb;
+    te::AutomatableParameter::Ptr positionParam, shapeParam, subParam, cutoffParam, resonanceParam;
+    te::AutomatableParameter::Ptr attackParam, decayParam, sustainParam, releaseParam;
+    te::AutomatableParameter::Ptr unisonParam, detuneParam, widthParam, outputParam;
+    std::array<Voice, 12> voices;
+    double sampleRate = 48000.0;
+    size_t nextVoice = 0;
+    float filterL = 0.0f, filterR = 0.0f;
+};
+}

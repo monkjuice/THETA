@@ -43,9 +43,10 @@ std::optional<Session::AudioEffect> audioEffectFromId(const juce::String& id)
 
 std::optional<Session::Instrument> instrumentFromId(const juce::String& id)
 {
-    if (id == "FourOsc") return Session::Instrument::FourOsc;
-    if (id == "Drums")   return Session::Instrument::Drums;
-    if (id == "Utility") return Session::Instrument::Utility;
+    if (id == "FourOsc")   return Session::Instrument::FourOsc;
+    if (id == "ThetaWave") return Session::Instrument::ThetaWave;
+    if (id == "Drums")     return Session::Instrument::Drums;
+    if (id == "Utility")   return Session::Instrument::Utility;
     return std::nullopt;
 }
 

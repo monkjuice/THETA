@@ -4,6 +4,7 @@
 #include "ThetaSpaceDevice.h"
 #include "ThetaBloomDevice.h"
 #include "ThetaArpDevice.h"
+#include "ThetaWaveDevice.h"
 #include "ClipGeometry.h"
 #include <vector>
 
@@ -40,6 +41,7 @@ public:
     enum class Instrument
     {
         FourOsc,
+        ThetaWave,
         Drums,
         Utility
     };
@@ -132,6 +134,7 @@ public:
     UtilityDevice* utility = nullptr; // owned by edit's plugin list
     UtilityDevice* audioUtility = nullptr; // owned by edit's plugin list
     te::FourOscPlugin* synth = nullptr; // owned by edit's plugin list
+    ThetaWaveDevice* thetaWave = nullptr; // owned by edit's plugin list
     DrumDevice* drums = nullptr; // owned by edit's plugin list
 private:
     void refreshAfterUndoRedo(bool changed);

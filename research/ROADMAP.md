@@ -77,3 +77,44 @@ Do not promise “unlimited tracks.” Report workload and hardware. A deep seri
 ## Prototype status
 
 The web source has been removed from the active tree. A small native engine evaluation now lives in `native/`; no production migration or packaged release is complete.
+
+## Long-Term Instrument Plan: Theta Wave
+
+Theta Wave is the long-running path toward a built-in wavetable instrument in the spirit of Ableton Wavetable, adapted to Theta's simpler native workflow. The goal is not to clone every feature at once; it is to grow a musical instrument in stable layers.
+
+### Phase 1: Playable Wavetable Core
+
+- Add `Theta Wave` as a native synth device and browser instrument.
+- Implement a small polyphonic voice engine with MIDI note on/off, velocity, amp envelope, output gain, and panic/reset behavior.
+- Start with a morphing oscillator that blends basic table shapes: sine, triangle, saw, square, and bright folded/harmonic shapes.
+- Expose compact rack macros: Position, Shape, Sub, Cutoff, Resonance, Attack, Decay, Sustain, Release, Unison, Detune, Width, Output.
+- Keep CPU and allocation behavior real-time safe inside `applyToBuffer`.
+
+### Phase 2: Musical Presets
+
+- Add browser sounds that use Theta Wave for pads, plucks, basses, sirens, bells, and soft chords.
+- Make presets set the track instrument plus the MIDI clip content, like current 4OSC presets.
+- Keep track-device knobs global, Ableton-style. Per-clip variation should come later through clip envelopes/automation, not duplicated hidden device state.
+
+### Phase 3: Visual Device Panel
+
+- Add a dedicated Theta Wave editor window with waveform display, wavetable position feedback, oscillator controls, filter controls, and envelope curves.
+- Keep the inline Device Rack view macro-focused and compact.
+- Add preset names and visual state that stay readable at small rack sizes.
+
+### Phase 4: Real Wavetable Content
+
+- Replace the basic analytic shapes with a proper wavetable bank.
+- Add table interpolation, anti-aliasing strategy, mip levels or band-limited generation, and importable internal tables.
+- Add oscillator extras: bend/fold, sync-like motion, phase offset, noise/sub oscillator, stereo spread, and better unison models.
+
+### Phase 5: Modulation And Clip Envelopes
+
+- Add LFOs, modulation envelopes, velocity/key tracking, and a modulation matrix.
+- Add clip envelopes that target device parameters, matching the Ableton-style model: clips automate track/device controls during playback instead of owning separate hidden device copies.
+- Let clip envelopes be drawn as zones/curves in the arrangement and editor.
+
+### Phase 6: Production Polish
+
+- Add patch browser, saveable presets, categorized factory sounds, migration/versioning for older projects, parameter automation tests, render null checks, and stress tests.
+- Add UI affordances for modulation depth, hover readouts, MIDI learn later if wanted, and better accessibility naming.
