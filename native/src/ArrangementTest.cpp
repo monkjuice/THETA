@@ -58,6 +58,9 @@ int runArrangementTest()
                 "Arrangement accepts browser drag payloads");
         require(view.applyBrowserDrop("theta-browser:preset:HouseKit", 0).wasOk(), "Browser drum drop loads a kit");
         require(session.isPatternDrums(), "Dropped drum kit enables the drum editor");
+        const auto patternDevices = session.deviceSlots(0).size();
+        require(view.applyBrowserDrop("theta-browser:effect:Reverb", 0).wasOk(), "Audio FX can be dropped on the pattern clip track");
+        require(session.deviceSlots(0).size() == patternDevices + 1, "Dropped Reverb appears on the pattern track rack");
         const auto patternClipsBeforeDrop = te::getAudioTracks(*session.edit)[0]->getClips().size();
         view.itemDropped({"theta-browser:preset:BreakKit", nullptr, {static_cast<int>(view.xFor(1.0)), 82}});
         require(te::getAudioTracks(*session.edit)[0]->getClips().size() == patternClipsBeforeDrop + 1,
@@ -230,6 +233,17 @@ int runArrangementTest()
         require(te::getAudioTracks(*session.edit)[2]->getClips().size() == audio2Clips + 1,
                 "Dragging a browser sound onto Audio 2 creates the clip on Audio 2");
         require(session.deviceSlots(2).size() > audio2Devices, "Dropped browser sound adds an instrument to the target track");
+        view.sync();
+        view.selected = te::getAudioTracks(*session.edit)[2]->getClips().getLast()->itemID;
+        require(session.selectPatternClip(view.selected).wasOk(), "Selecting a non-first MIDI clip makes it editable in the note editor");
+        const auto selectedClipNotes = session.pattern().getSequence().getNumNotes();
+        session.setNote(1, 48, true);
+        require(session.pattern().getSequence().getNumNotes() == selectedClipNotes + 1,
+                "Note editor writes into the selected non-first MIDI clip");
+        session.undo();
+        const auto audio2DevicesAfterSound = session.deviceSlots(2).size();
+        require(view.applyBrowserDrop("theta-browser:instrument:Drums", 2).wasOk(), "Instrument browser rows can be dropped onto non-first tracks");
+        require(session.deviceSlots(2).size() == audio2DevicesAfterSound + 1, "Dropped instrument appears on the target track");
         session.undo();
         require(session.removeAudioTrack(2).wasOk(), "Can remove the extra audio track");
         require(session.trackCount() == 2, "Removing extra audio track restores starter track count");

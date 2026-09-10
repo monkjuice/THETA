@@ -15,6 +15,16 @@ std::optional<Session::AudioEffect> effectFromBrowserDrop(const juce::String& de
     if (id == "Compressor") return Session::AudioEffect::Compressor;
     return std::nullopt;
 }
+
+std::optional<Session::Instrument> instrumentFromBrowserDrop(const juce::String& description)
+{
+    if (!description.startsWith("theta-browser:instrument:")) return std::nullopt;
+    const auto id = description.fromLastOccurrenceOf(":", false, false);
+    if (id == "FourOsc") return Session::Instrument::FourOsc;
+    if (id == "Drums")   return Session::Instrument::Drums;
+    if (id == "Utility") return Session::Instrument::Utility;
+    return std::nullopt;
+}
 }
 
 DeviceRack::DeviceRack(Session& s) : session(s)
@@ -111,15 +121,23 @@ void DeviceRack::selectedRowsChanged(int lastRowSelected)
 
 bool DeviceRack::isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails& details)
 {
-    return effectFromBrowserDrop(details.description.toString()).has_value();
+    const auto description = details.description.toString();
+    return effectFromBrowserDrop(description).has_value() || instrumentFromBrowserDrop(description).has_value();
 }
 
 void DeviceRack::itemDropped(const juce::DragAndDropTarget::SourceDetails& details)
 {
-    const auto effect = effectFromBrowserDrop(details.description.toString());
-    if (!effect) return;
-    const auto result = session.addAudioEffect(*effect, selectedTrack);
-    if (status) status(result.wasOk() ? "Added effect to " + session.trackName(selectedTrack) : result.getErrorMessage());
+    const auto description = details.description.toString();
+    if (const auto effect = effectFromBrowserDrop(description))
+    {
+        const auto result = session.addAudioEffect(*effect, selectedTrack);
+        if (status) status(result.wasOk() ? "Added effect to " + session.trackName(selectedTrack) : result.getErrorMessage());
+    }
+    else if (const auto instrument = instrumentFromBrowserDrop(description))
+    {
+        const auto result = session.addInstrument(*instrument, selectedTrack);
+        if (status) status(result.wasOk() ? "Added instrument to " + session.trackName(selectedTrack) : result.getErrorMessage());
+    }
 }
 
 void DeviceRack::changeListenerCallback(juce::ChangeBroadcaster*)

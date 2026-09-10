@@ -26,6 +26,12 @@ public:
         Delay,
         Compressor
     };
+    enum class Instrument
+    {
+        FourOsc,
+        Drums,
+        Utility
+    };
     struct DeviceSlot
     {
         juce::String name;
@@ -60,8 +66,10 @@ public:
     void clearPattern();
     void applyPatternPreset(PatternPreset);
     juce::Result insertPatternPreset(PatternPreset, int track, double startSeconds);
+    juce::Result selectPatternClip(te::EditItemID);
     bool isPatternDrums() const;
     juce::Result addAudioEffect(AudioEffect, int track = 1);
+    juce::Result addInstrument(Instrument, int track);
     int trackCount() const;
     juce::String trackName(int track) const;
     juce::Result addAudioTrack();
@@ -92,7 +100,9 @@ public:
 private:
     void refreshAfterUndoRedo(bool changed);
     void setPatternInstrument(bool useDrums);
+    void ensureEditablePatternClip();
     te::MidiClip* patternClip = nullptr; // owned by edit
+    te::EditItemID patternClipID;
     // Engine initialization also changes its edit flag asynchronously. Track
     // user commands separately so startup cannot dirty an untouched document.
     juce::int64 changeRevision = 0, savedRevision = 0;

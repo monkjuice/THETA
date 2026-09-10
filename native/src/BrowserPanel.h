@@ -25,6 +25,7 @@ private:
         juce::String detail;
         std::optional<Session::PatternPreset> preset;
         std::optional<Session::AudioEffect> effect;
+        std::optional<Session::Instrument> instrument;
     };
 
     int getNumRows() override;

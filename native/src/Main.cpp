@@ -308,6 +308,7 @@ public:
     void requestClose() { files.confirmUnsaved([] { juce::JUCEApplication::getInstance()->quit(); }); }
 
 private:
+    juce::TooltipWindow tooltipWindow {this, 700};
     void editWillChange() override
     {
         session.edit->getTransport().removeChangeListener(this);

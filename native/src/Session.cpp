@@ -53,6 +53,14 @@ bool trackHasPlugin(te::AudioTrack& track, const juce::String& type)
             return true;
     return false;
 }
+
+DrumDevice* findDrumDevice(te::AudioTrack& track)
+{
+    for (auto* plugin : track.pluginList)
+        if (auto* drums = dynamic_cast<DrumDevice*>(plugin))
+            return drums;
+    return nullptr;
+}
 }
 
 Session::Session()
@@ -78,6 +86,7 @@ Session::Session()
     utility->gain().setParameter(-12.0f, juce::dontSendNotification);
     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     patternClip = track->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
+    patternClipID = patternClip->itemID;
     auto* audioTrack = te::getAudioTracks(*edit)[1];
     audioTrack->setName("Audio 1");
     auto audioDevice = edit->getPluginCache().createNewPlugin(UtilityDevice::xmlTypeName, {});
@@ -253,7 +262,23 @@ void Session::setPatternInstrument(bool useDrums)
 
 bool Session::isPatternDrums() const
 {
-    return drums != nullptr && drums->isEnabled();
+    auto* track = patternClip != nullptr ? patternClip->getClipTrack() : nullptr;
+    if (track == nullptr) return drums != nullptr && drums->isEnabled();
+    auto* audioTrack = dynamic_cast<te::AudioTrack*>(track);
+    if (audioTrack == nullptr) return false;
+    if (auto* drumDevice = findDrumDevice(*audioTrack))
+        return drumDevice->isEnabled();
+    return false;
+}
+
+juce::Result Session::selectPatternClip(te::EditItemID id)
+{
+    auto* midi = dynamic_cast<te::MidiClip*>(findClip(id));
+    if (midi == nullptr) return juce::Result::fail("Select a MIDI clip to edit notes.");
+    patternClip = midi;
+    patternClipID = id;
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
@@ -269,8 +294,8 @@ juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
     }
 
     const auto tracks = te::getAudioTracks(*edit);
-    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()) || trackIndex <= 0)
-        return juce::Result::fail("Drop audio effects on an audio track.");
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
+        return juce::Result::fail("Drop audio effects on a track.");
 
     auto* track = tracks[trackIndex];
     edit->getUndoManager().beginNewTransaction("Add " + name);
@@ -278,6 +303,37 @@ juce::Result Session::addAudioEffect(AudioEffect effect, int trackIndex)
     if (plugin == nullptr)
         return juce::Result::fail(name + " could not be created.");
     track->pluginList.insertPlugin(plugin, track->pluginList.size(), nullptr);
+    edit->getUndoManager().beginNewTransaction();
+    markModified();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::addInstrument(Instrument instrument, int trackIndex)
+{
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(trackIndex, tracks.size()))
+        return juce::Result::fail("Drop instruments on a track.");
+
+    auto* track = tracks[trackIndex];
+    const char* type = nullptr;
+    juce::String name;
+    switch (instrument)
+    {
+        case Instrument::FourOsc: type = te::FourOscPlugin::xmlTypeName; name = "4OSC"; break;
+        case Instrument::Drums:   type = DrumDevice::xmlTypeName;        name = "Theta Drums"; break;
+        case Instrument::Utility: type = UtilityDevice::xmlTypeName;     name = "Utility"; break;
+    }
+    if (trackHasPlugin(*track, type))
+        return juce::Result::fail(name + " is already on " + track->getName() + ".");
+
+    edit->getUndoManager().beginNewTransaction("Add " + name);
+    auto plugin = edit->getPluginCache().createNewPlugin(type, {});
+    if (plugin == nullptr)
+        return juce::Result::fail(name + " could not be created.");
+    track->pluginList.insertPlugin(plugin, instrument == Instrument::Utility ? track->pluginList.size() : 0, nullptr);
     edit->getUndoManager().beginNewTransaction();
     markModified();
     if (edit->getTransport().isPlaying())
@@ -321,8 +377,15 @@ juce::Result Session::removeAudioTrack(int track)
         return juce::Result::fail("Select an audio track to remove.");
     if (tracks.size() <= 2)
         return juce::Result::fail("Keep at least one audio track.");
+    const auto removingEditedPatternTrack = patternClip != nullptr && patternClip->getClipTrack() == tracks[track];
     edit->getUndoManager().beginNewTransaction("Remove audio track");
     edit->deleteTrack(tracks[track]);
+    if (removingEditedPatternTrack)
+    {
+        patternClip = nullptr;
+        patternClipID = {};
+        ensureEditablePatternClip();
+    }
     if (track == 1)
         audioUtility = nullptr;
     const auto refreshed = te::getAudioTracks(*edit);
@@ -346,8 +409,10 @@ std::vector<Session::DeviceSlot> Session::deviceSlots(int track) const
     {
         if (plugin == nullptr) continue;
         const auto type = plugin->getPluginType();
+        const auto coreStarterDevice = track == 0 && (type == UtilityDevice::xmlTypeName
+            || type == te::FourOscPlugin::xmlTypeName || type == DrumDevice::xmlTypeName);
         slots.push_back({plugin->getDisplayName(), type, plugin->isEnabled(),
-                         track > 0 && type != UtilityDevice::xmlTypeName});
+                         !coreStarterDevice && type != UtilityDevice::xmlTypeName});
     }
     return slots;
 }
@@ -375,7 +440,10 @@ juce::Result Session::deleteDevice(int track, int slot)
     if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
         return juce::Result::fail("Select a removable device first.");
     auto* plugin = tracks[track]->pluginList[slot];
-    if (plugin == nullptr || track <= 0 || plugin->getPluginType() == UtilityDevice::xmlTypeName)
+    const auto type = plugin->getPluginType();
+    const auto coreStarterDevice = track == 0 && (type == UtilityDevice::xmlTypeName
+        || type == te::FourOscPlugin::xmlTypeName || type == DrumDevice::xmlTypeName);
+    if (plugin == nullptr || coreStarterDevice || type == UtilityDevice::xmlTypeName)
         return juce::Result::fail("Core devices stay in the starter track chain.");
     edit->getUndoManager().beginNewTransaction("Delete device");
     plugin->removeFromParent();
@@ -430,11 +498,39 @@ void Session::redo()
 void Session::refreshAfterUndoRedo(bool changed)
 {
     if (changed) markModified();
+    ensureEditablePatternClip();
     edit->tempoSequence.updateTempoData();
     refreshLoop();
     if (changed && edit->getTransport().isPlaying())
         edit->restartPlayback();
     sendSynchronousChangeMessage();
+}
+
+void Session::ensureEditablePatternClip()
+{
+    if (auto* midi = dynamic_cast<te::MidiClip*>(findClip(patternClipID)))
+    {
+        patternClip = midi;
+        return;
+    }
+
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!tracks.isEmpty())
+        for (auto* clip : tracks[0]->getClips())
+            if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
+            {
+                patternClip = midi;
+                patternClipID = midi->itemID;
+                return;
+            }
+
+    if (!tracks.isEmpty())
+    {
+        const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
+        patternClip = tracks[0]->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
+        if (patternClip != nullptr)
+            patternClipID = patternClip->itemID;
+    }
 }
 
 juce::ValueTree Session::projectSnapshot()
@@ -496,6 +592,7 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
     stop();
     edit = std::move(candidate);
     patternClip = nextPattern;
+    patternClipID = patternClip->itemID;
     utility = nextUtility;
     audioUtility = nextAudioUtility;
     synth = nextSynth;
@@ -642,6 +739,8 @@ void Session::deleteClip(te::EditItemID id)
                     const auto end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
                     patternClip = tracks[0]->insertMIDIClip("Pattern 1", {{}, end}, nullptr).get();
                 }
+                if (patternClip != nullptr)
+                    patternClipID = patternClip->itemID;
             }
         }
         refreshLoop();

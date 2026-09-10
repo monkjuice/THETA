@@ -33,6 +33,14 @@ std::optional<Session::AudioEffect> audioEffectFromId(const juce::String& id)
     return std::nullopt;
 }
 
+std::optional<Session::Instrument> instrumentFromId(const juce::String& id)
+{
+    if (id == "FourOsc") return Session::Instrument::FourOsc;
+    if (id == "Drums")   return Session::Instrument::Drums;
+    if (id == "Utility") return Session::Instrument::Utility;
+    return std::nullopt;
+}
+
 juce::String browserDropKind(const juce::String& description)
 {
     if (!description.startsWith("theta-browser:")) return {};
@@ -80,10 +88,10 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     zoomOut.setButtonText(L"\u2212");
     zoomIn.setButtonText(L"+");
     splitButton.setButtonText(L"\u2702");
-    duplicateButton.setButtonText(L"\u2398");
+    duplicateButton.setButtonText(L"\u29c9");
     addTrack.setButtonText(L"+");
     removeTrack.setButtonText(L"\u2212");
-    snap.setButtonText(L"\u25c7");
+    snap.setButtonText(L"\u2317");
     fitButton.setTooltip("Fit arrangement");
     zoomOut.setTooltip("Zoom out");
     zoomIn.setTooltip("Zoom in");
@@ -466,6 +474,11 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     const auto& clip = clips[static_cast<size_t>(index)];
     selected = clip.id;
     selectTrack(clip.track);
+    if (clip.waveform == nullptr)
+    {
+        const auto result = session.selectPatternClip(selected);
+        if (result.failed() && status) status(result.getErrorMessage());
+    }
     repaint();
     original = preview = clip.position;
     sourceDuration = clip.sourceDuration;
@@ -693,11 +706,23 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
     {
         const auto effect = audioEffectFromId(id);
         if (!effect) return juce::Result::fail("That browser item cannot be inserted here.");
-        if (track <= 0) return juce::Result::fail("Drop audio effects on an audio track.");
+        if (track < 0) return juce::Result::fail("Drop audio effects on a track or clip.");
         const auto result = session.addAudioEffect(*effect, track);
         if (result.failed()) return result;
         selectTrack(track);
         if (status) status("Added browser effect to " + session.trackName(track));
+        return juce::Result::ok();
+    }
+
+    if (kind == "instrument")
+    {
+        const auto instrument = instrumentFromId(id);
+        if (!instrument) return juce::Result::fail("That browser item cannot be inserted here.");
+        if (track < 0) return juce::Result::fail("Drop instruments on a track or clip.");
+        const auto result = session.addInstrument(*instrument, track);
+        if (result.failed()) return result;
+        selectTrack(track);
+        if (status) status("Added instrument to " + session.trackName(track));
         return juce::Result::ok();
     }
 
