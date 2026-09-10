@@ -524,7 +524,6 @@ juce::Result Session::addClipAudioEffect(AudioEffect effect, te::EditItemID clip
 
     edit->getUndoManager().beginNewTransaction("Add " + name + " to clip");
     clip->getPluginList()->insertPlugin(plugin, clip->getPluginList()->size(), nullptr);
-    clip->enableEffects(true, false);
     edit->getUndoManager().beginNewTransaction();
     markModified();
     if (edit->getTransport().isPlaying())

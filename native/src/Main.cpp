@@ -11,6 +11,12 @@
 
 namespace theta
 {
+juce::File thetaLogFile()
+{
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Theta").getChildFile("theta.log");
+}
+
 class ControlWindow final : public juce::Component,
                             public juce::DragAndDropContainer,
                             private Session::Listener,
@@ -21,7 +27,7 @@ public:
     explicit ControlWindow(Session& s) : session(s), browser(s), grid(s), arrangement(s), rack(s), files(s)
     {
         setOpaque(true);
-        files.status = [this](const juce::String& message) { status.setText(message, juce::dontSendNotification); };
+        files.status = [this](const juce::String& message) { logStatus(message); };
         files.loadingChanged = [this](bool loading) { setEnabled(!loading); };
         arrangement.status = files.status;
         arrangement.trackSelected = [this](int track) { rack.selectTrack(track); };
@@ -33,7 +39,7 @@ public:
         save.onClick = [this] { files.save(); };
         title.setText("THETA", juce::dontSendNotification);
         title.setFont(juce::FontOptions(26.0f));
-        status.setText("PATTERN 1  /  4OSC     Draw notes, then press Play", juce::dontSendNotification);
+        logStatus("PATTERN 1  /  4OSC     Draw notes, then press Play");
         gainLabel.setText("SYNTH GAIN", juce::dontSendNotification);
         audioGainLabel.setText("AUDIO GAIN", juce::dontSendNotification);
         hint.setText({}, juce::dontSendNotification);
@@ -330,9 +336,16 @@ private:
                 if (safe == nullptr || selected.getResult() == juce::File{}) return;
                 const auto result = safe->session.importAudio(selected.getResult());
                 if (result.wasOk()) safe->arrangement.fit();
-                safe->status.setText(result.wasOk() ? selected.getResult().getFileName()
-                                                   : result.getErrorMessage(), juce::dontSendNotification);
+                safe->logStatus(result.wasOk() ? selected.getResult().getFileName()
+                                               : result.getErrorMessage());
             });
+    }
+
+    void logStatus(const juce::String& message)
+    {
+        if (message.isEmpty()) return;
+        status.setText(message, juce::dontSendNotification);
+        juce::Logger::writeToLog("Theta: " + message);
     }
 
     void changeListenerCallback(juce::ChangeBroadcaster*) override
@@ -407,6 +420,11 @@ public:
     const juce::String getApplicationVersion() override { return "0.1.0"; }
     void initialise(const juce::String& args) override
     {
+        const auto logFile = thetaLogFile();
+        logFile.getParentDirectory().createDirectory();
+        logger = std::make_unique<juce::FileLogger>(logFile, "Theta debug log", 512 * 1024);
+        juce::Logger::setCurrentLogger(logger.get());
+        juce::Logger::writeToLog("Theta: log started at " + logFile.getFullPathName());
         if (args == "--self-test" || args == "--pattern-test" || args == "--arrangement-test")
         {
             setApplicationReturnValue(args == "--self-test" ? runSelfTest()
@@ -439,6 +457,8 @@ public:
         stopTimer();
         window.reset();
         session.reset();
+        juce::Logger::setCurrentLogger(nullptr);
+        logger.reset();
         juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
     }
     void systemRequestedQuit() override
@@ -498,6 +518,7 @@ private:
         void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
     };
     Theme theme;
+    std::unique_ptr<juce::FileLogger> logger;
     std::unique_ptr<Session> session;
     std::unique_ptr<Window> window;
     juce::Component::SafePointer<StartupScreen> loading;

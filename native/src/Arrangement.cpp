@@ -665,7 +665,8 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
             }
             selected = clip.id;
             selectTrack(clip.track);
-            if (status) status("Added browser effect to clip");
+            if (status) status("Added browser effect to clip; clip FX count "
+                + juce::String(session.clipPluginCount(clip.id)));
             return;
         }
     if ((kind == "preset" || kind == "effect" || kind == "instrument")
@@ -753,7 +754,7 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
         const auto result = session.addAudioEffect(*effect, track);
         if (result.failed()) return result;
         selectTrack(track);
-        if (status) status("Added browser effect to " + session.trackName(track));
+        if (status) status("Added browser effect to " + session.trackName(track) + " track rack");
         return juce::Result::ok();
     }
 
