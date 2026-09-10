@@ -61,6 +61,10 @@ int runArrangementTest()
         const auto patternDevices = session.deviceSlots(0).size();
         require(view.applyBrowserDrop("theta-browser:effect:Reverb", 0).wasOk(), "Audio FX can be dropped on the pattern clip track");
         require(session.deviceSlots(0).size() == patternDevices + 1, "Dropped Reverb appears on the pattern track rack");
+        const auto midiDropDevices = session.deviceSlots(0).size();
+        view.itemDropped({"theta-browser:effect:Delay", nullptr, {static_cast<int>(view.xFor(0.25)), 82}});
+        require(session.deviceSlots(0).size() == midiDropDevices + 1,
+                "Dropping audio FX on a MIDI clip falls back to the clip's track rack");
         const auto patternClipsBeforeDrop = te::getAudioTracks(*session.edit)[0]->getClips().size();
         view.itemDropped({"theta-browser:preset:BreakKit", nullptr, {static_cast<int>(view.xFor(1.0)), 82}});
         require(te::getAudioTracks(*session.edit)[0]->getClips().size() == patternClipsBeforeDrop + 1,

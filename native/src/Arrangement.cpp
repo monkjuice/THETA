@@ -660,7 +660,16 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
             const auto result = session.addClipAudioEffect(*effect, clip.id);
             if (result.failed())
             {
-                if (status) status(result.getErrorMessage());
+                const auto trackResult = session.addAudioEffect(*effect, clip.track);
+                if (trackResult.failed())
+                {
+                    if (status) status(result.getErrorMessage() + " " + trackResult.getErrorMessage());
+                    return;
+                }
+                selected = clip.id;
+                selectTrack(clip.track);
+                if (status) status("Added browser effect to " + session.trackName(clip.track)
+                    + " track rack for selected MIDI clip");
                 return;
             }
             selected = clip.id;
