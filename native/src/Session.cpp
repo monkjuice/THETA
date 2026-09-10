@@ -14,6 +14,7 @@ struct PresetPattern
     int count = 0;
     juce::String name;
     bool useDrums = false;
+    bool useSustainPatch = false;
 };
 
 PresetPattern presetPattern(Session::PatternPreset preset)
@@ -21,6 +22,8 @@ PresetPattern presetPattern(Session::PatternPreset preset)
     static constexpr PresetNote warmPulse[] {{0, 48, 2}, {4, 55, 2}, {8, 60, 2}, {12, 55, 2}};
     static constexpr PresetNote acidSteps[] {{0, 48, 1}, {3, 51, 1}, {6, 55, 1}, {7, 58, 1}, {10, 55, 1}, {13, 63, 1}, {15, 58, 1}};
     static constexpr PresetNote arpRun[] {{0, 48, 16}, {0, 52, 16}, {0, 55, 16}, {0, 60, 16}};
+    static constexpr PresetNote chordPad[] {{0, 48, 16}, {0, 55, 16}, {0, 60, 16}, {0, 64, 16},
+                                            {8, 50, 8}, {8, 57, 8}, {8, 62, 8}, {8, 65, 8}};
     static constexpr PresetNote sirenLead[] {{0, 48, 1}, {1, 55, 1}, {2, 60, 1}, {3, 67, 1}, {4, 72, 2}, {7, 67, 1},
                                              {8, 60, 1}, {9, 55, 1}, {10, 48, 1}, {12, 60, 1}, {14, 67, 1}, {15, 72, 1}};
     static constexpr PresetNote houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
@@ -32,14 +35,15 @@ PresetPattern presetPattern(Session::PatternPreset preset)
 
     switch (preset)
     {
-        case Session::PatternPreset::WarmPulse:  return {warmPulse,  static_cast<int>(std::size(warmPulse)),  "Warm pulse", false};
-        case Session::PatternPreset::AcidSteps:  return {acidSteps,  static_cast<int>(std::size(acidSteps)),  "Acid steps", false};
-        case Session::PatternPreset::ArpRun:     return {arpRun,     static_cast<int>(std::size(arpRun)),     "Arp run", false};
-        case Session::PatternPreset::SirenLead:  return {sirenLead,  static_cast<int>(std::size(sirenLead)),  "Siren lead", false};
-        case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true};
-        case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true};
-        case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true};
-        case Session::PatternPreset::ClapKit:    return {clapKit,    static_cast<int>(std::size(clapKit)),    "Clap kit", true};
+        case Session::PatternPreset::WarmPulse:  return {warmPulse,  static_cast<int>(std::size(warmPulse)),  "Warm pulse", false, false};
+        case Session::PatternPreset::AcidSteps:  return {acidSteps,  static_cast<int>(std::size(acidSteps)),  "Acid steps", false, false};
+        case Session::PatternPreset::ArpRun:     return {arpRun,     static_cast<int>(std::size(arpRun)),     "Arp run", false, false};
+        case Session::PatternPreset::ChordPad:   return {chordPad,   static_cast<int>(std::size(chordPad)),   "Chord pad", false, true};
+        case Session::PatternPreset::SirenLead:  return {sirenLead,  static_cast<int>(std::size(sirenLead)),  "Siren lead", false, false};
+        case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true, false};
+        case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true, false};
+        case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true, false};
+        case Session::PatternPreset::ClapKit:    return {clapKit,    static_cast<int>(std::size(clapKit)),    "Clap kit", true, false};
     }
     return {};
 }
@@ -51,6 +55,7 @@ juce::Colour presetColour(Session::PatternPreset preset)
         case Session::PatternPreset::WarmPulse:  return juce::Colour(0xff4f7d8f);
         case Session::PatternPreset::AcidSteps:  return juce::Colour(0xff2f6e78);
         case Session::PatternPreset::ArpRun:     return juce::Colour(0xff77659a);
+        case Session::PatternPreset::ChordPad:   return juce::Colour(0xff5f718f);
         case Session::PatternPreset::SirenLead:  return juce::Colour(0xff8f4f67);
         case Session::PatternPreset::HouseKit:   return juce::Colour(0xff657844);
         case Session::PatternPreset::BreakKit:   return juce::Colour(0xff6f7f43);
@@ -130,6 +135,68 @@ te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type)
         if (plugin != nullptr && plugin->getPluginType() == type)
             return plugin;
     return nullptr;
+}
+
+te::FourOscPlugin* findFourOsc(te::AudioTrack& track)
+{
+    return dynamic_cast<te::FourOscPlugin*>(findPlugin(track, te::FourOscPlugin::xmlTypeName));
+}
+
+void setPluginParameter(te::AutomatableParameter::Ptr parameter, float value)
+{
+    if (parameter == nullptr)
+        return;
+    const auto range = parameter->getValueRange();
+    parameter->setParameter(juce::jlimit(range.getStart(), range.getEnd(), value), juce::sendNotification);
+}
+
+void applyChordPadPatch(te::FourOscPlugin& synth, juce::UndoManager& undoManager)
+{
+    setPluginParameter(synth.ampAttack, 0.32f);
+    setPluginParameter(synth.ampDecay, 1.1f);
+    setPluginParameter(synth.ampSustain, 92.0f);
+    setPluginParameter(synth.ampRelease, 2.8f);
+    setPluginParameter(synth.ampVelocity, 55.0f);
+    setPluginParameter(synth.filterAttack, 0.2f);
+    setPluginParameter(synth.filterDecay, 1.0f);
+    setPluginParameter(synth.filterSustain, 72.0f);
+    setPluginParameter(synth.filterRelease, 2.3f);
+    setPluginParameter(synth.filterFreq, 78.0f);
+    setPluginParameter(synth.filterResonance, 12.0f);
+    setPluginParameter(synth.filterAmount, 0.08f);
+    setPluginParameter(synth.chorusSpeed, 0.65f);
+    setPluginParameter(synth.chorusDepth, 7.5f);
+    setPluginParameter(synth.chorusWidth, 0.9f);
+    setPluginParameter(synth.chorusMix, 0.32f);
+    setPluginParameter(synth.reverbSize, 0.72f);
+    setPluginParameter(synth.reverbDamping, 0.45f);
+    setPluginParameter(synth.reverbWidth, 0.95f);
+    setPluginParameter(synth.reverbMix, 0.22f);
+    setPluginParameter(synth.masterLevel, -9.0f);
+
+    synth.state.setProperty("voiceMode", 2, &undoManager);
+    synth.state.setProperty("voices", 32, &undoManager);
+    synth.state.setProperty("filterType", 1, &undoManager);
+    synth.state.setProperty("filterSlope", 12, &undoManager);
+    synth.state.setProperty("chorusOn", true, &undoManager);
+    synth.state.setProperty("reverbOn", true, &undoManager);
+    synth.state.setProperty("distortionOn", false, &undoManager);
+
+    if (synth.oscParams.size() >= 4)
+    {
+        setPluginParameter(synth.oscParams[0]->level, -9.0f);
+        setPluginParameter(synth.oscParams[0]->detune, 0.02f);
+        setPluginParameter(synth.oscParams[0]->spread, 45.0f);
+        setPluginParameter(synth.oscParams[1]->level, -12.0f);
+        setPluginParameter(synth.oscParams[1]->fineTune, -8.0f);
+        setPluginParameter(synth.oscParams[1]->detune, 0.04f);
+        setPluginParameter(synth.oscParams[1]->spread, -55.0f);
+        setPluginParameter(synth.oscParams[2]->level, -16.0f);
+        setPluginParameter(synth.oscParams[2]->tune, 12.0f);
+        setPluginParameter(synth.oscParams[2]->fineTune, 5.0f);
+        setPluginParameter(synth.oscParams[2]->spread, 70.0f);
+        setPluginParameter(synth.oscParams[3]->level, -100.0f);
+    }
 }
 
 bool trackHasPlugin(te::AudioTrack& track, const juce::String& type)
@@ -449,6 +516,9 @@ void Session::applyPatternPreset(PatternPreset preset)
     const auto data = presetPattern(preset);
     edit->getUndoManager().beginNewTransaction("Load " + data.name);
     setPatternInstrument(data.useDrums);
+    if (data.useSustainPatch)
+        if (auto* fourOsc = findFourOsc(*te::getAudioTracks(*edit)[0]))
+            applyChordPadPatch(*fourOsc, edit->getUndoManager());
     fillMidiClip(pattern(), data, edit->getUndoManager());
     markModified();
     edit->getUndoManager().beginNewTransaction();
@@ -479,6 +549,9 @@ juce::Result Session::insertPatternPreset(PatternPreset preset, int trackIndex, 
         if (result.failed())
             return result;
     }
+    if (data.useSustainPatch)
+        if (auto* fourOsc = findFourOsc(*track))
+            applyChordPadPatch(*fourOsc, edit->getUndoManager());
     auto clip = track->insertMIDIClip(data.name, {start, end}, nullptr);
     if (clip == nullptr)
         return juce::Result::fail("The pattern clip could not be added.");

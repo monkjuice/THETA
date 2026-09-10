@@ -297,6 +297,10 @@ int runArrangementTest()
         require(te::getAudioTracks(*session.edit)[2]->getClips().getLast()->getName() == "Siren lead",
                 "Dropped siren preset names the new clip");
         session.undo();
+        require(view.applyBrowserDrop("theta-browser:preset:ChordPad", 2).wasOk(), "Chord pad browser row creates a synth clip");
+        require(te::getAudioTracks(*session.edit)[2]->getClips().getLast()->getName() == "Chord pad",
+                "Dropped chord pad preset names the new clip");
+        session.undo();
         require(view.applyBrowserDrop("theta-browser:preset:ClapKit", 2).wasOk(), "Clap kit browser row creates a drum clip");
         require(session.selectPatternClip(te::getAudioTracks(*session.edit)[2]->getClips().getLast()->itemID).wasOk(),
                 "Dropped clap preset can be selected for note editing");

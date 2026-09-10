@@ -18,6 +18,7 @@ public:
         WarmPulse,
         AcidSteps,
         ArpRun,
+        ChordPad,
         SirenLead,
         HouseKit,
         BreakKit,
