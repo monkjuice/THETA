@@ -266,7 +266,7 @@ void DeviceRack::resized()
     const auto paramCount = std::min(6, static_cast<int>(parameters.size()));
     const auto columns = paramCount > 3 ? 3 : std::max(1, paramCount);
     const auto rows = paramCount > 3 ? 2 : 1;
-    const auto parameterHeight = paramCount > 0 ? (rows == 2 ? 168 : 132) : 0;
+    const auto parameterHeight = paramCount > 0 ? (rows == 2 ? 206 : 132) : 0;
     const auto availableHeight = std::max(60, getHeight() - 42);
     const auto desiredListHeight = 10 + std::max(3, getNumRows()) * list.getRowHeight();
     const auto maxListHeight = paramCount > 0
@@ -282,7 +282,7 @@ void DeviceRack::resized()
         auto* name = parameterLabels[i];
         auto* slider = parameterSliders[i];
         auto* value = parameterValues[i];
-        if (i >= 6)
+        if (i >= paramCount)
         {
             name->setVisible(false);
             slider->setVisible(false);
