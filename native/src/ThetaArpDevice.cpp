@@ -129,16 +129,23 @@ void ThetaArpDevice::applyToBuffer(const te::PluginRenderContext& context)
         processed.add(message);
     }
 
-    for (auto& pending : pendingOffs)
-        if (pending.active && pending.time >= blockStart && pending.time < blockEnd)
-        {
-            processed.addMidiMessage(juce::MidiMessage::noteOff(pending.channel, pending.pitch),
-                                     pending.time - blockStart, pending.source);
-            pending.active = false;
-        }
+    const auto flushPendingOffs = [&]
+    {
+        for (auto& pending : pendingOffs)
+            if (pending.active && pending.time < blockEnd)
+            {
+                processed.addMidiMessage(juce::MidiMessage::noteOff(pending.channel, pending.pitch),
+                                         std::max(0.0, pending.time - blockStart), pending.source);
+                pending.active = false;
+            }
+    };
+
+    flushPendingOffs();
 
     const auto count = activeNoteCount();
     const auto octaveCount = juce::jlimit(1, 3, juce::roundToInt(octavesParam->getCurrentValue()));
+    const auto stepLength = stepSeconds();
+    const auto gateLength = stepLength * gateParam->getCurrentValue() / 100.0;
     while (count > 0 && nextTickSeconds < blockEnd)
     {
         if (nextTickSeconds >= blockStart)
@@ -150,10 +157,13 @@ void ThetaArpDevice::applyToBuffer(const te::PluginRenderContext& context)
             const auto& source = heldNotes[static_cast<size_t>(sourcePitch)];
             const auto relative = nextTickSeconds - blockStart;
             processed.addMidiMessage(juce::MidiMessage::noteOn(source.channel, pitch, source.velocity), relative, source.source);
-            addPendingOff(nextTickSeconds + stepSeconds() * gateParam->getCurrentValue() / 100.0,
-                          pitch, source.channel, source.source);
+            const auto offTime = nextTickSeconds + gateLength;
+            if (offTime < blockEnd)
+                processed.addMidiMessage(juce::MidiMessage::noteOff(source.channel, pitch), offTime - blockStart, source.source);
+            else
+                addPendingOff(offTime, pitch, source.channel, source.source);
         }
-        nextTickSeconds += stepSeconds();
+        nextTickSeconds += stepLength;
         ++arpStep;
     }
 

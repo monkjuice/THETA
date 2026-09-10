@@ -155,6 +155,41 @@ int runPatternTest()
         reader.reset();
 
         {
+            Session arpSession;
+            arpSession.applyPatternPreset(Session::PatternPreset::ArpRun);
+            require(arpSession.addMidiEffect(Session::MidiEffect::ThetaArp, 0).wasOk(), "Theta Arp can be inserted on the pattern synth");
+            juce::TemporaryFile arpOutput(".wav");
+            te::Renderer::Parameters arpParameters(*arpSession.edit);
+            arpParameters.destFile = arpOutput.getFile();
+            arpParameters.audioFormat = &wav;
+            arpParameters.sampleRateForAudio = 48000;
+            arpParameters.bitDepth = 24;
+            arpParameters.time = arpSession.pattern().getPosition().time;
+            {
+                te::Renderer::RenderTask task("Theta Arp render test", arpParameters, nullptr, nullptr);
+                const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000.0;
+                while (task.runJob() != juce::ThreadPoolJob::jobHasFinished)
+                    require(juce::Time::getMillisecondCounterHiRes() < deadline, "Theta Arp render timed out");
+                require(task.errorMessage.isEmpty(), task.errorMessage.toRawUTF8());
+            }
+            std::unique_ptr<juce::AudioFormatReader> arpReader(formats.createReaderFor(arpOutput.getFile()));
+            require(arpReader != nullptr, "Read Theta Arp render");
+            juce::AudioBuffer<float> arpAudio(static_cast<int>(arpReader->numChannels), static_cast<int>(arpReader->lengthInSamples));
+            require(arpReader->read(&arpAudio, 0, arpAudio.getNumSamples(), 0, true, true), "Read Theta Arp samples");
+            float arpPeak = 0.0f;
+            for (int c = 0; c < arpAudio.getNumChannels(); ++c)
+                for (int frame = 0; frame < arpAudio.getNumSamples(); ++frame)
+                {
+                    const auto sample = arpAudio.getSample(c, frame);
+                    require(std::isfinite(sample), "Theta Arp render must stay finite");
+                    arpPeak = std::max(arpPeak, std::abs(sample));
+                }
+            require(arpPeak > 0.0001f && arpPeak < 1.0f, "Theta Arp render must be audible and below clipping");
+            arpSession.stop();
+            arpSession.panicReset();
+        }
+
+        {
             Session fxSession;
             require(fxSession.importAudio(output.getFile()).wasOk(), "Theta Space test imports rendered audio");
             require(fxSession.addAudioEffect(Session::AudioEffect::ThetaSpace).wasOk(), "Theta Space can be inserted for render stability");
