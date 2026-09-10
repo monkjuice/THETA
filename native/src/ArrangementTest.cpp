@@ -215,6 +215,25 @@ int runArrangementTest()
         require(close(session.pattern().getPosition().time.getStart().inSeconds(), 0.25), "Pointer drag moves MIDI pattern clips");
         session.undo();
         require(close(session.pattern().getPosition().time.getStart().inSeconds(), 0.0), "Undo restores MIDI pattern move");
+        view.itemDropped({"theta-browser:preset:MinimalKit", nullptr, {static_cast<int>(view.xFor(2.0)), 82}});
+        auto* patternTrack = te::getAudioTracks(*session.edit)[0];
+        const auto blockedClipCount = patternTrack->getClips().size();
+        view.selected = patternID;
+        view.duplicateSelected();
+        require(patternTrack->getClips().size() == blockedClipCount + 1,
+                "Duplicate creates a MIDI copy when the adjacent space is occupied");
+        auto* gapCopy = patternTrack->getClips().getLast();
+        require(close(gapCopy->getPosition().time.getStart().inSeconds(), 4.0),
+                "Duplicate lands after the blocking clip when it cannot fit beside the source");
+        view.sync();
+        const auto clickX = static_cast<float>(view.xFor(gapCopy->getPosition().time.getStart().inSeconds() + 0.1));
+        const auto clickY = view.lane(0).getCentreY();
+        view.mouseDown(event({clickX, clickY}, {clickX, clickY}, false));
+        view.mouseUp(event({clickX, clickY}, {clickX, clickY}, false));
+        require(close(gapCopy->getPosition().time.getStart().inSeconds(), 4.0),
+                "Clicking a gap-placed duplicate does not move it to the track end");
+        session.undo();
+        session.undo();
         view.selected = id;
         juce::StringArray dropped;
         dropped.add(source.getFile().getFullPathName());

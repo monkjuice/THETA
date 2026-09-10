@@ -80,6 +80,38 @@ te::AutomatableParameter* activeParameterAt(te::Plugin& plugin, int index)
     return nullptr;
 }
 
+tracktion::core::TimeRange firstFreeDuplicateRange(te::Clip& source)
+{
+    const auto old = source.getPosition().time;
+    const auto length = old.getLength();
+    auto start = old.getEnd();
+    auto* owner = source.getClipTrack();
+    if (owner == nullptr)
+        return {start, start + length};
+
+    bool moved = false;
+    do
+    {
+        moved = false;
+        const tracktion::core::TimeRange candidate {start, start + length};
+        for (auto* clip : owner->getClips())
+        {
+            if (clip == nullptr || clip == &source)
+                continue;
+            const auto occupied = clip->getPosition().time;
+            if (candidate.overlaps(occupied))
+            {
+                start = occupied.getEnd();
+                moved = true;
+                break;
+            }
+        }
+    }
+    while (moved);
+
+    return {start, start + length};
+}
+
 juce::Result ensurePlugin(te::Edit& edit, te::AudioTrack& track, const juce::String& type,
                           int insertIndex, te::Plugin*& plugin, bool& changed)
 {
@@ -839,16 +871,17 @@ juce::Result Session::duplicateClip(te::EditItemID id)
     auto* track = clip->getClipTrack();
     if (track == nullptr) return juce::Result::fail("The selected clip is not on a track.");
     edit->getUndoManager().beginNewTransaction("Duplicate clip");
+    const auto duplicateRange = firstFreeDuplicateRange(*clip);
     te::Clip* copy = nullptr;
     if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
         copy = track->insertWaveClip(audio->getName() + " copy", audio->getSourceFileReference().getFile(),
-            {{old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, old.offset}, false).get();
+            {duplicateRange, old.offset}, false).get();
     else if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
         if (auto midiCopy = track->insertMIDIClip(midi->getName() + " copy",
-            {old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, nullptr))
+            duplicateRange, nullptr))
         {
             midiCopy->cloneFrom(midi);
-            midiCopy->setPosition({{old.time.getEnd(), old.time.getEnd() + old.time.getLength()}, old.offset});
+            midiCopy->setPosition({duplicateRange, old.offset});
             copy = midiCopy.get();
         }
     if (copy == nullptr)
