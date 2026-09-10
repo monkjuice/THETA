@@ -36,14 +36,18 @@ private:
         bool active = false;
         float age = 0.0f, velocity = 0.0f, phase = 0.0f, noise = 0.0f;
         uint32_t seed = 1;
+        int samplePosition = 0;
     };
 
     void trigger(int note, float velocity);
     float render(Voice&);
     float nextNoise(Voice&) noexcept;
+    void loadClapSample();
 
     std::array<Voice, 32> voices;
+    juce::AudioBuffer<float> clapSample;
     double sampleRate = 48000.0;
+    double clapSampleRate = 44100.0;
     size_t nextVoice = 0;
 };
 }

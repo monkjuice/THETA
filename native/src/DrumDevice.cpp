@@ -1,4 +1,5 @@
 #include "DrumDevice.h"
+#include "BinaryData.h"
 #include <cmath>
 
 namespace theta
@@ -13,6 +14,7 @@ DrumDevice::~DrumDevice()
 void DrumDevice::initialise(const te::PluginInitialisationInfo& info)
 {
     sampleRate = info.sampleRate > 0.0 ? info.sampleRate : 48000.0;
+    loadClapSample();
     reset();
 }
 
@@ -47,6 +49,7 @@ void DrumDevice::trigger(int note, float velocity)
     voice.velocity = std::clamp(velocity, 0.0f, 1.0f);
     voice.phase = 0.0f;
     voice.noise = 0.0f;
+    voice.samplePosition = 0;
     voice.seed = voice.seed * 1664525u + 1013904223u + static_cast<uint32_t>(note * 97);
 }
 
@@ -82,6 +85,23 @@ float DrumDevice::render(Voice& voice)
 
     if (voice.type == VoiceType::clap)
     {
+        if (clapSample.getNumSamples() > 0)
+        {
+            const auto sourcePosition = voice.samplePosition++ * clapSampleRate / sampleRate;
+            const auto index = static_cast<int>(sourcePosition);
+            if (index >= clapSample.getNumSamples() - 1)
+            {
+                voice.active = false;
+                return 0.0f;
+            }
+            const auto frac = static_cast<float>(sourcePosition - index);
+            auto sample = 0.0f;
+            for (int channel = 0; channel < clapSample.getNumChannels(); ++channel)
+                sample += clapSample.getSample(channel, index) * (1.0f - frac)
+                        + clapSample.getSample(channel, index + 1) * frac;
+            return sample / static_cast<float>(clapSample.getNumChannels()) * voice.velocity * 0.9f;
+        }
+
         if (t > 0.26f) { voice.active = false; return 0.0f; }
         const auto crack = std::exp(-t * 95.0f);
         const auto body = (1.0f - std::exp(-t * 240.0f)) * std::exp(-t * 18.0f);
@@ -121,5 +141,25 @@ void DrumDevice::applyToBuffer(const te::PluginRenderContext& context)
         for (int channel = 0; channel < context.destBuffer->getNumChannels(); ++channel)
             context.destBuffer->setSample(channel, frame, sample);
     }
+}
+
+void DrumDevice::loadClapSample()
+{
+    if (clapSample.getNumSamples() > 0)
+        return;
+
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatReader> reader(wav.createReaderFor(
+        new juce::MemoryInputStream(BinaryData::KorgM1Clap_wav,
+                                    static_cast<size_t>(BinaryData::KorgM1Clap_wavSize), false),
+        true));
+    if (reader == nullptr || reader->lengthInSamples <= 0)
+        return;
+
+    clapSampleRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
+    const auto samples = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples,
+                                                               static_cast<juce::int64>(std::ceil(sampleRate))));
+    clapSample.setSize(static_cast<int>(reader->numChannels), samples);
+    reader->read(&clapSample, 0, samples, 0, true, true);
 }
 }

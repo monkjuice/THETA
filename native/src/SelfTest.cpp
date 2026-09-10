@@ -48,6 +48,23 @@ int runSelfTest()
         require(dynamic_cast<UtilityDevice*>(reloaded.get()) != nullptr);
         require(std::abs(reloaded->getAutomatableParameterByID("gainDb")->getCurrentValue() + 12.0f) < 1.0e-5f);
         device.deinitialise();
+
+        session.drums->initialise({{}, 48000.0, 512});
+        juce::AudioBuffer<float> drumBuffer(2, 4096);
+        te::MidiMessageArray midi;
+        midi.addMidiMessage(juce::MidiMessage::noteOn(1, 56, 1.0f), 0.0, {});
+        te::PluginRenderContext drumContext(&drumBuffer, 0, drumBuffer.getNumSamples(), &midi, 0.0, {}, true, false, true, false);
+        session.drums->applyToBuffer(drumContext);
+        float clapPeak = 0.0f;
+        for (int c = 0; c < drumBuffer.getNumChannels(); ++c)
+            for (int i = 0; i < drumBuffer.getNumSamples(); ++i)
+            {
+                const auto sample = drumBuffer.getSample(c, i);
+                require(std::isfinite(sample));
+                clapPeak = std::max(clapPeak, std::abs(sample));
+            }
+        require(clapPeak > 0.0001f && clapPeak < 1.0f);
+        session.drums->deinitialise();
         return 0;
     }
     catch (const std::exception& error)

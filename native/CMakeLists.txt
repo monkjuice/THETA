@@ -18,6 +18,8 @@ juce_add_gui_app(ThetaNative
     MICROPHONE_PERMISSION_TEXT "Record audio into your songs"
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
+juce_add_binary_data(ThetaNativeAssets
+    SOURCES assets/Korg-M1-Clap.wav)
 target_sources(ThetaNative PRIVATE
     src/Main.cpp src/Session.cpp src/StepGrid.cpp src/Arrangement.cpp src/ProjectFiles.cpp src/Playhead.cpp
     src/BrowserPanel.cpp src/DeviceRack.cpp src/DrumDevice.cpp src/UtilityDevice.cpp src/ThetaSpaceDevice.cpp src/ThetaArpDevice.cpp
@@ -28,6 +30,7 @@ target_compile_definitions(ThetaNative PRIVATE
     JUCE_MODAL_LOOPS_PERMITTED=0
     TRACKTION_ENABLE_TIMESTRETCH_SOUNDTOUCH=1)
 target_link_libraries(ThetaNative PRIVATE
+    ThetaNativeAssets
     tracktion::tracktion_engine tracktion::tracktion_graph tracktion::tracktion_core
     juce::juce_audio_utils juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)
