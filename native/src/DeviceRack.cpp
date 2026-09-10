@@ -264,11 +264,17 @@ void DeviceRack::resized()
     bypass.setBounds(getWidth() - 76, 5, 30, 24);
     remove.setBounds(getWidth() - 40, 5, 30, 24);
     const auto paramCount = std::min(6, static_cast<int>(parameters.size()));
-    const auto parameterHeight = paramCount > 0 ? 172 : 0;
-    list.setBounds(12, 34, getWidth() - 24, std::max(60, getHeight() - 42 - parameterHeight));
-    const auto parameterArea = juce::Rectangle<int>(12, list.getBottom() + 8, getWidth() - 24, parameterHeight).reduced(2, 0);
     const auto columns = paramCount > 3 ? 3 : std::max(1, paramCount);
     const auto rows = paramCount > 3 ? 2 : 1;
+    const auto parameterHeight = paramCount > 0 ? (rows == 2 ? 168 : 132) : 0;
+    const auto availableHeight = std::max(60, getHeight() - 42);
+    const auto desiredListHeight = 10 + std::max(3, getNumRows()) * list.getRowHeight();
+    const auto maxListHeight = paramCount > 0
+        ? std::max(76, availableHeight - parameterHeight - 10)
+        : availableHeight;
+    const auto listHeight = juce::jlimit(76, maxListHeight, desiredListHeight);
+    list.setBounds(12, 34, getWidth() - 24, listHeight);
+    const auto parameterArea = juce::Rectangle<int>(12, list.getBottom() + 10, getWidth() - 24, parameterHeight).reduced(2, 0);
     const auto cellWidth = columns > 0 ? parameterArea.getWidth() / columns : parameterArea.getWidth();
     const auto cellHeight = rows > 0 ? parameterArea.getHeight() / rows : parameterArea.getHeight();
     for (int i = 0; i < parameterSliders.size(); ++i)
