@@ -207,7 +207,7 @@ juce::String BrowserPanel::dragDescriptionFor(const Item& item) const
         return "theta-browser:preset:" + presetId(*item.preset);
     if (item.effect)
         return "theta-browser:effect:" + effectId(*item.effect);
-    return {};
+    return "theta-browser:info:" + item.name;
 }
 
 void BrowserPanel::applyRow(int row)

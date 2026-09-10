@@ -58,6 +58,11 @@ int runArrangementTest()
                 "Arrangement accepts browser drag payloads");
         require(view.applyBrowserDrop("theta-browser:preset:HouseKit", 0).wasOk(), "Browser drum drop loads a kit");
         require(session.isPatternDrums(), "Dropped drum kit enables the drum editor");
+        const auto patternClipsBeforeDrop = te::getAudioTracks(*session.edit)[0]->getClips().size();
+        view.itemDropped({"theta-browser:preset:BreakKit", nullptr, {static_cast<int>(view.xFor(1.0)), 82}});
+        require(te::getAudioTracks(*session.edit)[0]->getClips().size() == patternClipsBeforeDrop + 1,
+                "Dragging a browser preset to the arrangement adds a pattern clip instead of replacing the first one");
+        session.undo();
         const auto effectSlots = static_cast<int>(session.deviceSlots(1).size());
         require(view.applyBrowserDrop("theta-browser:effect:Delay", 1).wasOk(), "Browser effect drop inserts on the target audio track");
         require(static_cast<int>(session.deviceSlots(1).size()) == effectSlots + 1, "Dropped effect appears in the target audio rack");
@@ -215,6 +220,9 @@ int runArrangementTest()
         require(session.trackCount() == 2, "Starter session has pattern and one audio track");
         require(session.addAudioTrack().wasOk(), "Can create an audio track");
         require(session.trackCount() == 3 && session.trackName(2) == "Audio 2", "New audio track is visible in the arrangement model");
+        view.sync();
+        view.resized();
+        require(view.trackScrollBar.isVisible(), "Adding tracks makes the arrangement lanes vertically scrollable");
         require(session.removeAudioTrack(2).wasOk(), "Can remove the extra audio track");
         require(session.trackCount() == 2, "Removing extra audio track restores starter track count");
         view.filesDropped(dropped, static_cast<int>(view.xFor(1.0)), view.getHeight() - 3);
@@ -236,10 +244,10 @@ int runArrangementTest()
         require(close(clip->getPosition().time.getStart().inSeconds(), 0.0), "One undo restores move");
         session.redo();
 
-        drag({255.5f, 180}, {308.75f, 180});
+        drag({view.xFor(0.5) + 2.0f, 180}, {view.xFor(0.75), 180});
         require(close(clip->getPosition().time.getStart().inSeconds(), 0.75), "Left handle trims start");
         require(close(clip->getPosition().offset.inSeconds(), 0.25), "Left trim advances source offset");
-        drag({466.5f, 180}, {413.25f, 180});
+        drag({view.xFor(1.5) - 2.0f, 180}, {view.xFor(1.25), 180});
         require(close(clip->getPosition().time.getEnd().inSeconds(), 1.25), "Right handle trims end");
         require(close(clip->getPosition().offset.inSeconds(), 0.25), "Right trim preserves source offset");
         drag({view.xFor(1.25) - 2.0f, 180}, {view.xFor(1.5), 180});

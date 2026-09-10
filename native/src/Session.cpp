@@ -2,6 +2,51 @@
 
 namespace theta
 {
+namespace
+{
+struct PresetNote { int step, pitch, length; };
+
+struct PresetPattern
+{
+    const PresetNote* notes = nullptr;
+    int count = 0;
+    juce::String name;
+    bool useDrums = false;
+};
+
+PresetPattern presetPattern(Session::PatternPreset preset)
+{
+    static constexpr PresetNote warmPulse[] {{0, 48, 2}, {4, 55, 2}, {8, 60, 2}, {12, 55, 2}};
+    static constexpr PresetNote acidSteps[] {{0, 48, 1}, {3, 51, 1}, {6, 55, 1}, {7, 58, 1}, {10, 55, 1}, {13, 63, 1}, {15, 58, 1}};
+    static constexpr PresetNote houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
+                                            {2, 58, 1}, {6, 58, 1}, {10, 58, 1}, {14, 58, 1}};
+    static constexpr PresetNote breakKit[] {{0, 48, 1}, {3, 48, 1}, {8, 48, 1}, {11, 48, 1}, {4, 53, 1}, {10, 53, 1},
+                                            {1, 58, 1}, {3, 58, 1}, {6, 58, 1}, {9, 58, 1}, {12, 58, 1}, {15, 58, 1}};
+    static constexpr PresetNote minimalKit[] {{0, 48, 1}, {7, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1}, {2, 58, 1}, {10, 58, 1}, {14, 58, 1}};
+
+    switch (preset)
+    {
+        case Session::PatternPreset::WarmPulse:  return {warmPulse,  static_cast<int>(std::size(warmPulse)),  "Warm pulse", false};
+        case Session::PatternPreset::AcidSteps:  return {acidSteps,  static_cast<int>(std::size(acidSteps)),  "Acid steps", false};
+        case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true};
+        case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true};
+        case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true};
+    }
+    return {};
+}
+
+void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoManager& undoManager)
+{
+    auto& sequence = clip.getSequence();
+    sequence.removeAllNotes(&undoManager);
+    for (int i = 0; i < preset.count; ++i)
+        sequence.addNote(preset.notes[i].pitch, tracktion::core::BeatPosition::fromBeats(preset.notes[i].step * 0.25),
+                         tracktion::core::BeatDuration::fromBeats(std::max(1, preset.notes[i].length) * 0.225), 100, 0,
+                         &undoManager);
+    clip.setName(preset.name);
+}
+}
+
 Session::Session()
 {
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
@@ -142,43 +187,39 @@ void Session::clearPattern()
 
 void Session::applyPatternPreset(PatternPreset preset)
 {
-    struct Note { int step, pitch, length; };
-    const Note* notes = nullptr;
-    int count = 0;
-    juce::String name;
-
-    static constexpr Note warmPulse[] {{0, 48, 2}, {4, 55, 2}, {8, 60, 2}, {12, 55, 2}};
-    static constexpr Note acidSteps[] {{0, 48, 1}, {3, 51, 1}, {6, 55, 1}, {7, 58, 1}, {10, 55, 1}, {13, 63, 1}, {15, 58, 1}};
-    static constexpr Note houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
-                                      {2, 58, 1}, {6, 58, 1}, {10, 58, 1}, {14, 58, 1}};
-    static constexpr Note breakKit[] {{0, 48, 1}, {3, 48, 1}, {8, 48, 1}, {11, 48, 1}, {4, 53, 1}, {10, 53, 1},
-                                      {1, 58, 1}, {3, 58, 1}, {6, 58, 1}, {9, 58, 1}, {12, 58, 1}, {15, 58, 1}};
-    static constexpr Note minimalKit[] {{0, 48, 1}, {7, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1}, {2, 58, 1}, {10, 58, 1}, {14, 58, 1}};
-
-    auto useDrums = false;
-    switch (preset)
-    {
-        case PatternPreset::WarmPulse:  notes = warmPulse;  count = static_cast<int>(std::size(warmPulse));  name = "Warm pulse"; break;
-        case PatternPreset::AcidSteps:  notes = acidSteps;  count = static_cast<int>(std::size(acidSteps));  name = "Acid steps"; break;
-        case PatternPreset::HouseKit:   notes = houseKit;   count = static_cast<int>(std::size(houseKit));   name = "House kit"; useDrums = true; break;
-        case PatternPreset::BreakKit:   notes = breakKit;   count = static_cast<int>(std::size(breakKit));   name = "Break kit"; useDrums = true; break;
-        case PatternPreset::MinimalKit: notes = minimalKit; count = static_cast<int>(std::size(minimalKit)); name = "Minimal kit"; useDrums = true; break;
-    }
-
-    edit->getUndoManager().beginNewTransaction("Load " + name);
-    setPatternInstrument(useDrums);
-    auto& sequence = pattern().getSequence();
-    sequence.removeAllNotes(&edit->getUndoManager());
-    for (int i = 0; i < count; ++i)
-        sequence.addNote(notes[i].pitch, tracktion::core::BeatPosition::fromBeats(notes[i].step * 0.25),
-                         tracktion::core::BeatDuration::fromBeats(std::max(1, notes[i].length) * 0.225), 100, 0,
-                         &edit->getUndoManager());
-    pattern().setName(name);
+    const auto data = presetPattern(preset);
+    edit->getUndoManager().beginNewTransaction("Load " + data.name);
+    setPatternInstrument(data.useDrums);
+    fillMidiClip(pattern(), data, edit->getUndoManager());
     markModified();
     edit->getUndoManager().beginNewTransaction();
     if (edit->getTransport().isPlaying())
         edit->restartPlayback();
     sendSynchronousChangeMessage();
+}
+
+juce::Result Session::insertPatternPreset(PatternPreset preset, double startSeconds)
+{
+    if (!std::isfinite(startSeconds) || startSeconds < 0.0)
+        return juce::Result::fail("Invalid pattern drop position.");
+    const auto tracks = te::getAudioTracks(*edit);
+    if (tracks.isEmpty()) return juce::Result::fail("The pattern track is missing.");
+    const auto data = presetPattern(preset);
+    const auto start = tracktion::core::TimePosition::fromSeconds(startSeconds);
+    const auto end = start + tracktion::core::TimeDuration::fromSeconds(
+        edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0)).inSeconds());
+    edit->getUndoManager().beginNewTransaction("Add " + data.name);
+    setPatternInstrument(data.useDrums);
+    auto clip = tracks[0]->insertMIDIClip(data.name, {start, end}, nullptr);
+    if (clip == nullptr)
+        return juce::Result::fail("The pattern clip could not be added.");
+    fillMidiClip(*clip, data, edit->getUndoManager());
+    markModified();
+    edit->getUndoManager().beginNewTransaction();
+    if (edit->getTransport().isPlaying())
+        edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 void Session::setPatternInstrument(bool useDrums)

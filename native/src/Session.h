@@ -59,6 +59,7 @@ public:
     void endNoteGesture();
     void clearPattern();
     void applyPatternPreset(PatternPreset);
+    juce::Result insertPatternPreset(PatternPreset, double startSeconds);
     bool isPatternDrums() const;
     juce::Result addAudioEffect(AudioEffect, int track = 1);
     int trackCount() const;

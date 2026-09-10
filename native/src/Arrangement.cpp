@@ -75,6 +75,7 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     session.addChangeListener(this);
     session.listeners.add(this);
     scroll.addListener(this);
+    trackScrollBar.addListener(this);
     snap.setClickingTogglesState(true);
     snap.setToggleState(true, juce::dontSendNotification);
     fitButton.onClick = [this] { fit(); };
@@ -99,7 +100,7 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     snapSize.setSelectedId(1, juce::dontSendNotification);
     snapSize.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff262c32));
     snapSize.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff46515a));
-    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &addTrack, &removeTrack, &snap, &scroll})
+    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &addTrack, &removeTrack, &snap, &scroll, &trackScrollBar})
         addAndMakeVisible(control);
     addAndMakeVisible(snapSize);
     sync();
@@ -110,12 +111,24 @@ Arrangement::~Arrangement()
     session.removeChangeListener(this);
     session.listeners.remove(this);
     scroll.removeListener(this);
+    trackScrollBar.removeListener(this);
+}
+
+float Arrangement::laneContentHeight() const
+{
+    return std::max(1.0f, getHeight() - lanesTop - 18.0f);
+}
+
+float Arrangement::laneHeight() const
+{
+    return std::max(48.0f, std::min(82.0f, laneContentHeight() / 2.0f));
 }
 
 juce::Rectangle<float> Arrangement::lane(int track) const
 {
-    const auto height = (getHeight() - lanesTop - 18.0f) / static_cast<float>(std::max(1, session.trackCount()));
-    return {headerWidth, lanesTop + track * height, std::max(1.0f, getWidth() - headerWidth), height};
+    const auto height = laneHeight();
+    return {headerWidth, lanesTop + track * height - static_cast<float>(trackScroll),
+            std::max(1.0f, getWidth() - headerWidth - 14.0f), height};
 }
 
 float Arrangement::xFor(double seconds) const
@@ -147,8 +160,9 @@ void Arrangement::paint(juce::Graphics& g)
     for (int track = 0; track < session.trackCount(); ++track)
     {
         const auto row = lane(track);
+        if (row.getBottom() < lanesTop || row.getY() > getHeight() - 18.0f) continue;
         g.setColour(juce::Colour(track == 0 ? 0xff242b31 : 0xff20272e));
-        g.fillRect(row);
+        g.fillRect(row.withX(0.0f).withWidth(static_cast<float>(getWidth()) - 14.0f));
         if (track == selectedTrack)
         {
             g.setColour(juce::Colour(0xff343f47));
@@ -168,7 +182,7 @@ void Arrangement::paint(juce::Graphics& g)
     {
         const auto x = xFor(time);
         g.setColour(juce::Colour(0xff35404a));
-        g.drawVerticalLine(static_cast<int>(x), rulerTop, getHeight() - 18.0f);
+        g.drawVerticalLine(static_cast<int>(x), static_cast<int>(lanesTop), getHeight() - 18.0f);
         const int beat = juce::roundToInt(time / beatSeconds);
         g.setColour(juce::Colour(0xff8c99a4));
         g.drawText(juce::String(beat / 4 + 1) + "." + juce::String(beat % 4 + 1),
@@ -180,10 +194,12 @@ void Arrangement::paint(juce::Graphics& g)
     {
         hasAudio |= clip.track == 1;
         const auto box = bounds(clip);
-        const auto visible = box.getIntersection(lane(clip.track));
+        const auto visible = box.getIntersection(lane(clip.track))
+            .getIntersection({0.0f, lanesTop, static_cast<float>(getWidth() - 14), laneContentHeight()});
         if (visible.isEmpty() || !visible.intersects(dirty)) continue;
         juce::Graphics::ScopedSaveState scope(g);
-        g.reduceClipRegion(lane(clip.track).getSmallestIntegerContainer());
+        g.reduceClipRegion(juce::Rectangle<int>(0, static_cast<int>(lanesTop), getWidth() - 14,
+                                                std::max(1, getHeight() - static_cast<int>(lanesTop) - 18)));
         g.setColour(juce::Colour(clip.track == 0 ? 0xff414c34 : 0xff284b59));
         g.fillRect(box);
         g.setColour(juce::Colour(clip.id == selected ? 0xffdce9b1 : 0xff617985));
@@ -267,10 +283,15 @@ void Arrangement::resized()
     syncTrackControls();
     for (int i = 0; i < session.trackCount(); ++i)
     {
-        mute[static_cast<size_t>(i)]->setBounds(12, static_cast<int>(lane(i).getY()) + 38, 42, 26);
-        solo[static_cast<size_t>(i)]->setBounds(62, static_cast<int>(lane(i).getY()) + 38, 42, 26);
+        const auto row = lane(i);
+        const auto visible = row.getBottom() >= lanesTop && row.getY() <= getHeight() - 18.0f;
+        mute[static_cast<size_t>(i)]->setVisible(visible);
+        solo[static_cast<size_t>(i)]->setVisible(visible);
+        mute[static_cast<size_t>(i)]->setBounds(12, static_cast<int>(row.getY()) + 38, 42, 26);
+        solo[static_cast<size_t>(i)]->setBounds(62, static_cast<int>(row.getY()) + 38, 42, 26);
     }
-    scroll.setBounds(static_cast<int>(headerWidth), getHeight() - 14, getWidth() - static_cast<int>(headerWidth), 14);
+    scroll.setBounds(static_cast<int>(headerWidth), getHeight() - 14, getWidth() - static_cast<int>(headerWidth) - 14, 14);
+    trackScrollBar.setBounds(getWidth() - 12, static_cast<int>(lanesTop), 12, getHeight() - static_cast<int>(lanesTop) - 18);
     updateScroll();
     updatePlayhead();
 }
@@ -353,6 +374,12 @@ void Arrangement::updateScroll()
     viewStart = std::clamp(viewStart, 0.0, std::max(0.0, total - viewSpan));
     scroll.setRangeLimits(0.0, total, juce::dontSendNotification);
     scroll.setCurrentRange(viewStart, viewSpan, juce::dontSendNotification);
+    const auto trackTotal = static_cast<double>(session.trackCount()) * laneHeight();
+    const auto trackVisible = static_cast<double>(laneContentHeight());
+    trackScroll = std::clamp(trackScroll, 0.0, std::max(0.0, trackTotal - trackVisible));
+    trackScrollBar.setRangeLimits(0.0, std::max(trackVisible, trackTotal), juce::dontSendNotification);
+    trackScrollBar.setCurrentRange(trackScroll, trackVisible, juce::dontSendNotification);
+    trackScrollBar.setVisible(trackTotal > trackVisible + 1.0);
 }
 
 void Arrangement::fit()
@@ -376,11 +403,15 @@ void Arrangement::zoom(double factor, double anchor)
     repaint();
 }
 
-void Arrangement::scrollBarMoved(juce::ScrollBar*, double start)
+void Arrangement::scrollBarMoved(juce::ScrollBar* bar, double start)
 {
     cancelDrag();
-    viewStart = start;
+    if (bar == &trackScrollBar)
+        trackScroll = start;
+    else
+        viewStart = start;
     updatePlayhead();
+    resized();
     repaint();
 }
 
@@ -470,6 +501,14 @@ void Arrangement::mouseWheelMove(const juce::MouseEvent& event, const juce::Mous
 {
     if (dragging) return;
     if (event.mods.isCommandDown()) zoom(std::exp(-wheel.deltaY * 2.0), timeAt(event.position.x));
+    else if (std::abs(wheel.deltaY) > std::abs(wheel.deltaX)
+             && static_cast<float>(session.trackCount()) * laneHeight() > laneContentHeight() + 1.0f)
+    {
+        trackScroll += -wheel.deltaY * laneHeight() * 1.5;
+        updateScroll();
+        resized();
+        repaint();
+    }
     else
     {
         viewStart -= (std::abs(wheel.deltaX) > std::abs(wheel.deltaY) ? wheel.deltaX : wheel.deltaY) * viewSpan * 0.3;
@@ -571,7 +610,9 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
         targetTrack = session.trackCount() - 1;
     }
 
-    const auto result = applyBrowserDrop(description, targetTrack);
+    const auto result = applyBrowserDrop(description, targetTrack,
+                                         snapped(std::max(0.0, timeAt(static_cast<float>(details.localPosition.x))), false),
+                                         true);
     if (result.failed() && status) status(result.getErrorMessage());
 }
 
@@ -614,7 +655,7 @@ void Arrangement::nudgeSelected(int direction, bool byBar)
     if (result.failed() && status) status(result.getErrorMessage());
 }
 
-juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int track)
+juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int track, double startSeconds, bool insertPreset)
 {
     const auto kind = browserDropKind(description);
     const auto id = browserDropId(description);
@@ -623,9 +664,12 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
     {
         const auto preset = patternPresetFromId(id);
         if (!preset) return juce::Result::fail("That browser item cannot be loaded here.");
-        session.applyPatternPreset(*preset);
+        const auto result = insertPreset ? session.insertPatternPreset(*preset, startSeconds)
+                                         : juce::Result::ok();
+        if (result.failed()) return result;
+        if (!insertPreset) session.applyPatternPreset(*preset);
         selectTrack(0);
-        if (status) status("Loaded browser preset on Pattern 1");
+        if (status) status(insertPreset ? "Added pattern clip from browser" : "Loaded browser preset on Pattern 1");
         return juce::Result::ok();
     }
 
@@ -638,6 +682,12 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
         if (result.failed()) return result;
         selectTrack(track);
         if (status) status("Added browser effect to " + session.trackName(track));
+        return juce::Result::ok();
+    }
+
+    if (kind == "info")
+    {
+        if (status) status(id + " is already available in this starter session.");
         return juce::Result::ok();
     }
 

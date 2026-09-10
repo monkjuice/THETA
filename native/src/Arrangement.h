@@ -58,7 +58,7 @@ private:
     void splitSelectedAtPlayhead();
     void duplicateSelected();
     void nudgeSelected(int direction, bool byBar);
-    juce::Result applyBrowserDrop(const juce::String& description, int track);
+    juce::Result applyBrowserDrop(const juce::String& description, int track, double startSeconds = 0.0, bool insertPreset = false);
     void updatePlayhead();
     int trackAt(float y) const;
     double snapUnitSeconds() const;
@@ -66,6 +66,8 @@ private:
     double timeAt(float x) const;
     double snapped(double seconds, bool bypass) const;
     juce::Rectangle<float> lane(int track) const;
+    float laneHeight() const;
+    float laneContentHeight() const;
     juce::Rectangle<float> bounds(const ClipView&) const;
     int hit(juce::Point<float>) const;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
@@ -80,9 +82,9 @@ private:
     juce::TextButton fitButton {"Fit"}, zoomIn {"+"}, zoomOut {"-"}, splitButton {"Split"}, duplicateButton {"Dup"}, addTrack {"+ Track"}, removeTrack {"- Track"}, snap {"Clip Snap"};
     juce::ComboBox snapSize;
     std::vector<std::unique_ptr<juce::TextButton>> mute, solo;
-    juce::ScrollBar scroll {false};
+    juce::ScrollBar scroll {false}, trackScrollBar {true};
     juce::VBlankAttachment vblank;
-    double viewStart = 0.0, viewSpan = 8.0, songEnd = 2.0;
+    double viewStart = 0.0, viewSpan = 8.0, songEnd = 2.0, trackScroll = 0.0;
     te::EditItemID selected;
     int selectedTrack = 0;
     bool dragging = false;

@@ -153,6 +153,8 @@ public:
             g.setColour(juce::Colour(0xff3a434b));
             g.fillRect(rackSplitterBounds());
         }
+        g.setColour(juce::Colour(0xff3a434b));
+        g.fillRect(arrangementSplitterBounds());
     }
 
     void resized() override
@@ -161,7 +163,10 @@ public:
         const auto leftWidth = browserOpen ? browserWidth : 0;
         const auto editorX = leftWidth + gap;
         const auto editorW = getWidth() - editorX - 24;
-        const auto lowerTop = 464;
+        const auto arrangementTop = 174;
+        arrangementHeight = juce::jlimit(160, std::max(160, getHeight() - 420), arrangementHeight);
+        const auto arrangementBottom = arrangementTop + arrangementHeight;
+        const auto lowerTop = arrangementBottom + 44;
         const auto bottomPanelTop = getHeight() - 78;
         const auto lowerH = std::max(112, bottomPanelTop - lowerTop - 18);
         const auto lowerW = rackOpen ? std::max(300, editorW - rackWidth - gap) : editorW;
@@ -183,13 +188,18 @@ public:
         browser.setBounds(0, 104, browserWidth, getHeight() - 104);
         browserToggle.setButtonText(browserOpen ? "<" : ">");
         browserToggle.setBounds(leftWidth + 4, 108, 24, 24);
-        arrangement.setBounds(editorX, 174, editorW, 246);
-        patternLabel.setBounds(editorX, 430, lowerW, 24);
+        arrangement.setBounds(editorX, arrangementTop, editorW, arrangementHeight);
+        patternLabel.setBounds(editorX, arrangementBottom + 10, lowerW, 24);
         grid.setBounds(editorX, lowerTop, lowerW, lowerH);
         rack.setVisible(rackOpen);
-        rack.setBounds(editorX + lowerW + gap, lowerTop, rackWidth, lowerH);
+        if (rackOpen)
+            rack.setBounds(editorX + lowerW + gap, lowerTop, rackWidth, lowerH);
+        else
+            rack.setBounds(getWidth(), lowerTop, 0, lowerH);
         rackToggle.setButtonText(rackOpen ? ">" : "<");
-        rackToggle.setBounds(getWidth() - 52, 430, 28, 24);
+        rackToggle.setBounds(getWidth() - 52, arrangementBottom + 10, 28, 24);
+        browserToggle.toFront(false);
+        rackToggle.toFront(false);
         hint.setBounds(editorX, getHeight() - 117, editorW, 28);
         const auto half = (editorW - 28) / 2;
         gainLabel.setBounds(editorX + 16, getHeight() - 66, 100, 28);
@@ -200,17 +210,21 @@ public:
 
     void mouseMove(const juce::MouseEvent& event) override
     {
-        setMouseCursor(isOverSplitter(event.position) ? juce::MouseCursor::LeftRightResizeCursor
-                                                      : juce::MouseCursor::NormalCursor);
+        setMouseCursor(isOverArrangementSplitter(event.position) ? juce::MouseCursor::UpDownResizeCursor
+            : isOverSplitter(event.position) ? juce::MouseCursor::LeftRightResizeCursor
+            : juce::MouseCursor::NormalCursor);
     }
 
     void mouseDown(const juce::MouseEvent& event) override
     {
         resizingBrowser = browserOpen && std::abs(event.x - browserWidth) <= 5 && event.y >= 104;
         resizingRack = rackOpen && rackSplitterBounds().expanded(4, 0).contains(event.getPosition());
+        resizingArrangement = isOverArrangementSplitter(event.position);
         resizeStartX = event.x;
+        resizeStartY = event.y;
         resizeStartBrowserWidth = browserWidth;
         resizeStartRackWidth = rackWidth;
+        resizeStartArrangementHeight = arrangementHeight;
     }
 
     void mouseDrag(const juce::MouseEvent& event) override
@@ -227,12 +241,19 @@ public:
             resized();
             repaint();
         }
+        else if (resizingArrangement)
+        {
+            arrangementHeight = juce::jlimit(160, std::max(160, getHeight() - 420), resizeStartArrangementHeight + event.y - resizeStartY);
+            resized();
+            repaint();
+        }
     }
 
     void mouseUp(const juce::MouseEvent&) override
     {
         resizingBrowser = false;
         resizingRack = false;
+        resizingArrangement = false;
     }
 
     bool keyPressed(const juce::KeyPress& key) override
@@ -329,10 +350,20 @@ private:
         return {rack.getX() - 10, rack.getY(), 4, rack.getHeight()};
     }
 
+    juce::Rectangle<int> arrangementSplitterBounds() const
+    {
+        return {arrangement.getX(), arrangement.getBottom() + 3, arrangement.getWidth(), 4};
+    }
+
     bool isOverSplitter(juce::Point<float> point) const
     {
         return (browserOpen && std::abs(point.x - static_cast<float>(browserWidth)) <= 5.0f && point.y >= 104.0f)
             || (rackOpen && rackSplitterBounds().expanded(4, 0).toFloat().contains(point));
+    }
+
+    bool isOverArrangementSplitter(juce::Point<float> point) const
+    {
+        return arrangementSplitterBounds().expanded(0, 4).toFloat().contains(point);
     }
 
     Session& session;
@@ -350,9 +381,9 @@ private:
     juce::Component::SafePointer<juce::DialogWindow> audioSettings;
     juce::TextButton open {"Open"}, save {"Save"};
     ProjectFiles files;
-    int browserWidth = 244, rackWidth = 312;
-    int resizeStartX = 0, resizeStartBrowserWidth = 244, resizeStartRackWidth = 312;
-    bool browserOpen = true, rackOpen = true, resizingBrowser = false, resizingRack = false;
+    int browserWidth = 244, rackWidth = 312, arrangementHeight = 246;
+    int resizeStartX = 0, resizeStartY = 0, resizeStartBrowserWidth = 244, resizeStartRackWidth = 312, resizeStartArrangementHeight = 246;
+    bool browserOpen = true, rackOpen = true, resizingBrowser = false, resizingRack = false, resizingArrangement = false;
 };
 
 class Application final : public juce::JUCEApplication, private juce::Timer
