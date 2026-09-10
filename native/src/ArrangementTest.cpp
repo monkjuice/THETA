@@ -139,6 +139,16 @@ int runArrangementTest()
             for (int x = 155; x < 620; ++x)
                 if (isMidiNotePixel(midiPicture.getPixelAt(x, y))) ++midiPixels;
         require(midiPixels >= 25, "Pattern lane must draw visible MIDI notes");
+        session.applyPatternPreset(Session::PatternPreset::SubBass);
+        view.sync();
+        auto bassMidiPicture = view.createComponentSnapshot(view.getLocalBounds());
+        int bassMidiPixels = 0;
+        for (int y = 95; y < 122; ++y)
+            for (int x = 155; x < 620; ++x)
+                if (isMidiNotePixel(bassMidiPicture.getPixelAt(x, y))) ++bassMidiPixels;
+        require(bassMidiPixels >= 25, "Low bass MIDI clips must draw visible arrangement note bars");
+        session.undo();
+        view.sync();
         const auto patternID = session.pattern().itemID;
         view.selected = patternID;
         const auto patternPosition = session.pattern().getPosition();

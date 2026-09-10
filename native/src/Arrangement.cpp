@@ -260,8 +260,9 @@ void Arrangement::paint(juce::Graphics& g)
     for (const auto& clip : clips)
     {
         hasAudio |= clip.track == 1;
+        const auto paintTrack = dragging && clip.id == selected ? previewTrack : clip.track;
         const auto box = bounds(clip);
-        const auto visible = box.getIntersection(lane(clip.track))
+        const auto visible = box.getIntersection(lane(paintTrack))
             .getIntersection({0.0f, lanesTop, static_cast<float>(getWidth() - 14), laneContentHeight()});
         if (visible.isEmpty() || !visible.intersects(dirty)) continue;
         juce::Graphics::ScopedSaveState scope(g);
@@ -318,13 +319,20 @@ void Arrangement::paint(juce::Graphics& g)
                 if (x > noteArea.getX() && x < noteArea.getRight())
                     g.drawVerticalLine(static_cast<int>(x), noteArea.getY(), noteArea.getBottom());
             }
+            auto lowPitch = Session::lowestNote;
+            auto highPitch = Session::lowestNote + Session::pitches - 1;
+            for (const auto& note : clip.midiNotes)
+            {
+                lowPitch = std::min(lowPitch, note.pitch);
+                highPitch = std::max(highPitch, note.pitch);
+            }
             for (const auto& note : clip.midiNotes)
             {
                 const auto x1 = xFor(position.start + note.start - clip.position.start);
                 const auto x2 = xFor(position.start + note.end - clip.position.start);
                 const auto w = std::max(3.0f, x2 - x1);
-                const auto pitchScale = static_cast<float>(note.pitch - Session::lowestNote)
-                    / static_cast<float>(std::max(1, Session::pitches - 1));
+                const auto pitchScale = static_cast<float>(note.pitch - lowPitch)
+                    / static_cast<float>(std::max(1, highPitch - lowPitch));
                 const auto h = std::max(4.0f, noteArea.getHeight() / Session::pitches - 1.0f);
                 const auto y = noteArea.getBottom() - h - pitchScale * (noteArea.getHeight() - h);
                 const juce::Rectangle<float> noteBox {x1, y, w, h};
