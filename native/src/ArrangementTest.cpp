@@ -245,6 +245,18 @@ int runArrangementTest()
         require(close(session.pattern().getPosition().time.getStart().inSeconds(), 0.25), "Pointer drag moves MIDI pattern clips");
         session.undo();
         require(close(session.pattern().getPosition().time.getStart().inSeconds(), 0.0), "Undo restores MIDI pattern move");
+        view.sync();
+        view.selected = patternID;
+        const auto patternEnd = session.pattern().getPosition().time.getEnd().inSeconds();
+        drag({static_cast<float>(view.xFor(patternEnd) - 2.0), view.lane(0).getCentreY()},
+             {static_cast<float>(view.xFor(0.75)), view.lane(0).getCentreY()});
+        require(close(session.pattern().getPosition().time.getEnd().inSeconds(), 0.75), "Right trim shrinks MIDI clips");
+        view.sync();
+        drag({static_cast<float>(view.xFor(0.75) - 2.0), view.lane(0).getCentreY()},
+             {static_cast<float>(view.xFor(patternEnd)), view.lane(0).getCentreY()});
+        require(close(session.pattern().getPosition().time.getEnd().inSeconds(), patternEnd), "Right trim can expand a previously shrunken MIDI clip");
+        session.undo();
+        session.undo();
         view.itemDropped({"theta-browser:preset:MinimalKit", nullptr, {static_cast<int>(view.xFor(2.0)), 82}});
         auto* patternTrack = te::getAudioTracks(*session.edit)[0];
         const auto blockedClipCount = patternTrack->getClips().size();

@@ -380,6 +380,7 @@ void Arrangement::sync()
             }
             else if (auto* midi = dynamic_cast<te::MidiClip*>(clip))
             {
+                view.sourceDuration = te::Edit::getMaximumEditEnd().inSeconds();
                 for (auto* note : midi->getSequence().getNotes())
                 {
                     const auto noteStart = session.edit->tempoSequence.toTime(note->getStartBeat()).inSeconds();
