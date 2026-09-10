@@ -25,7 +25,9 @@ private:
     int getNumRows() override;
     void paintListBoxItem(int row, juce::Graphics&, int width, int height, bool selected) override;
     void selectedRowsChanged(int lastRowSelected) override;
+    void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
+    void openSelectedDevice();
     void rebuildParameterControls();
     void sync();
 

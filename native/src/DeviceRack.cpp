@@ -208,10 +208,7 @@ DeviceRack::DeviceRack(Session& s) : session(s)
     audio.setRadioGroupId(29, juce::dontSendNotification);
     pattern.onClick = [this] { selectTrack(0); };
     audio.onClick = [this] { selectTrack(1); };
-    open.onClick = [this]
-    {
-        floatingWindow = std::make_unique<FloatingDeviceWindow>(session, selectedTrack, selectedSlot);
-    };
+    open.onClick = [this] { openSelectedDevice(); };
     bypass.onClick = [this]
     {
         const auto result = session.toggleDeviceEnabled(selectedTrack, selectedSlot);
@@ -306,6 +303,21 @@ void DeviceRack::selectedRowsChanged(int lastRowSelected)
 {
     selectedSlot = juce::jlimit(0, std::max(0, static_cast<int>(slots.size()) - 1), lastRowSelected);
     sync();
+}
+
+void DeviceRack::listBoxItemDoubleClicked(int row, const juce::MouseEvent&)
+{
+    selectedSlot = juce::jlimit(0, std::max(0, static_cast<int>(slots.size()) - 1), row);
+    openSelectedDevice();
+}
+
+void DeviceRack::openSelectedDevice()
+{
+    if (slots.empty())
+        return;
+    selectedSlot = juce::jlimit(0, static_cast<int>(slots.size()) - 1, selectedSlot);
+    floatingWindow = std::make_unique<FloatingDeviceWindow>(session, selectedTrack, selectedSlot);
+    if (status) status("Opened " + slots[static_cast<size_t>(selectedSlot)].name + " device panel");
 }
 
 bool DeviceRack::isInterestedInDragSource(const juce::DragAndDropTarget::SourceDetails& details)
