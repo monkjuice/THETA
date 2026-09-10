@@ -33,17 +33,17 @@ private:
     {
         bool active = false, released = false;
         int note = 0;
-        float velocity = 0.0f, phase = 0.0f, subPhase = 0.0f, envelope = 0.0f, releaseStart = 0.0f;
+        float velocity = 0.0f, phase = 0.0f, subPhase = 0.0f, motionPhase = 0.0f, envelope = 0.0f, releaseStart = 0.0f;
     };
 
     void trigger(int note, float velocity);
     void release(int note);
     float renderVoice(Voice&);
-    float wave(float phase) const;
+    float wave(float phase, float motionOffset) const;
 
-    juce::CachedValue<float> position, shape, sub, cutoff, resonance, attack, decay, sustain, releaseTime;
+    juce::CachedValue<float> position, shape, motion, sub, cutoff, resonance, attack, decay, sustain, releaseTime;
     juce::CachedValue<float> unison, detune, width, outputDb;
-    te::AutomatableParameter::Ptr positionParam, shapeParam, subParam, cutoffParam, resonanceParam;
+    te::AutomatableParameter::Ptr positionParam, shapeParam, motionParam, subParam, cutoffParam, resonanceParam;
     te::AutomatableParameter::Ptr attackParam, decayParam, sustainParam, releaseParam;
     te::AutomatableParameter::Ptr unisonParam, detuneParam, widthParam, outputParam;
     std::array<Voice, 12> voices;

@@ -79,7 +79,7 @@ int runPatternTest()
             require(waveSlot >= 0, "Theta Wave is inserted in the target track chain");
             auto waveParameters = parameterSession.deviceParameters(1, waveSlot);
             require(waveParameters.size() >= 10 && waveParameters[0].name == "Position"
-                    && waveParameters[5].name == "Attack",
+                    && waveParameters[2].name == "Motion" && waveParameters[6].name == "Attack",
                     "Theta Wave exposes wavetable and envelope macros");
         }
         auto& sequence = session.pattern().getSequence();
@@ -157,6 +157,9 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::WaveBass);
         require(session.thetaWave->isEnabled() && session.hasNote(0, 36) && session.hasNote(12, 39),
                 "Wave bass preset keeps Theta Wave active with low notes");
+        session.applyPatternPreset(Session::PatternPreset::WavePluck);
+        require(session.thetaWave->isEnabled() && session.hasNote(0, 60) && session.hasNote(12, 74),
+                "Wave pluck preset keeps Theta Wave active with bright notes");
         session.undo();
         session.undo();
         session.undo();

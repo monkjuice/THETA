@@ -9,6 +9,7 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     auto* undo = getUndoManager();
     position.referTo(state, "position", undo, 0.35f);
     shape.referTo(state, "shape", undo, 0.55f);
+    motion.referTo(state, "motion", undo, 0.22f);
     sub.referTo(state, "sub", undo, 0.18f);
     cutoff.referTo(state, "cutoff", undo, 6400.0f);
     resonance.referTo(state, "resonance", undo, 0.15f);
@@ -23,6 +24,7 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
 
     positionParam = addParam("position", "Position", {0.0f, 1.0f});
     shapeParam = addParam("shape", "Shape", {0.0f, 1.0f});
+    motionParam = addParam("motion", "Motion", {0.0f, 1.0f});
     subParam = addParam("sub", "Sub", {0.0f, 1.0f});
     cutoffParam = addParam("cutoff", "Cutoff", {80.0f, 18000.0f, 0.0f, 0.45f});
     resonanceParam = addParam("resonance", "Resonance", {0.0f, 1.0f});
@@ -36,7 +38,7 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     outputParam = addParam("outputDb", "Output", {-36.0f, 6.0f});
 
     for (auto pair : std::initializer_list<std::pair<te::AutomatableParameter::Ptr*, juce::CachedValue<float>*>>{
-             {&positionParam, &position}, {&shapeParam, &shape}, {&subParam, &sub}, {&cutoffParam, &cutoff},
+             {&positionParam, &position}, {&shapeParam, &shape}, {&motionParam, &motion}, {&subParam, &sub}, {&cutoffParam, &cutoff},
              {&resonanceParam, &resonance}, {&attackParam, &attack}, {&decayParam, &decay},
              {&sustainParam, &sustain}, {&releaseParam, &releaseTime}, {&unisonParam, &unison},
              {&detuneParam, &detune}, {&widthParam, &width}, {&outputParam, &outputDb}})
@@ -46,6 +48,7 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     auto msText = [] (float value) { return juce::String(juce::roundToInt(value * 1000.0f)) + "ms"; };
     positionParam->valueToStringFunction = percentText;
     shapeParam->valueToStringFunction = percentText;
+    motionParam->valueToStringFunction = percentText;
     subParam->valueToStringFunction = percentText;
     cutoffParam->valueToStringFunction = [] (float value) { return juce::String(juce::roundToInt(value)) + "Hz"; };
     resonanceParam->valueToStringFunction = percentText;
@@ -91,6 +94,7 @@ void ThetaWaveDevice::trigger(int note, float velocity)
     voice.active = true;
     voice.note = note;
     voice.velocity = std::clamp(velocity, 0.0f, 1.0f);
+    voice.motionPhase = static_cast<float>(nextVoice % voices.size()) / static_cast<float>(voices.size());
 }
 
 void ThetaWaveDevice::release(int note)
@@ -103,16 +107,17 @@ void ThetaWaveDevice::release(int note)
         }
 }
 
-float ThetaWaveDevice::wave(float phase) const
+float ThetaWaveDevice::wave(float phase, float motionOffset) const
 {
     phase -= std::floor(phase);
+    const auto positionValue = std::clamp(positionParam->getCurrentValue() + motionOffset, 0.0f, 1.0f);
     const auto sine = std::sin(phase * juce::MathConstants<float>::twoPi);
     const auto tri = 1.0f - 4.0f * std::abs(phase - 0.5f);
     const auto saw = phase * 2.0f - 1.0f;
     const auto square = phase < 0.5f ? 1.0f : -1.0f;
-    const auto folded = std::sin((phase + positionParam->getCurrentValue() * 0.35f) * juce::MathConstants<float>::twoPi)
+    const auto folded = std::sin((phase + positionValue * 0.35f) * juce::MathConstants<float>::twoPi)
         * 0.58f + std::sin(phase * juce::MathConstants<float>::twoPi * (2.0f + shapeParam->getCurrentValue() * 6.0f)) * 0.42f;
-    const auto morph = std::clamp(positionParam->getCurrentValue(), 0.0f, 1.0f) * 4.0f;
+    const auto morph = positionValue * 4.0f;
     const auto index = std::min(3, static_cast<int>(morph));
     const auto mix = morph - static_cast<float>(index);
     const float shapes[] {sine, tri, saw, square, folded};
@@ -150,6 +155,11 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
 
     const auto frequency = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(voice.note));
     const auto unisonCount = juce::jlimit(1, 4, juce::roundToInt(unisonParam->getCurrentValue()));
+    voice.motionPhase += dt * (0.08f + motionParam->getCurrentValue() * 3.2f);
+    if (voice.motionPhase >= 1.0f)
+        voice.motionPhase -= std::floor(voice.motionPhase);
+    const auto motionOffset = std::sin(voice.motionPhase * juce::MathConstants<float>::twoPi)
+        * motionParam->getCurrentValue() * 0.18f;
     auto sample = 0.0f;
     const auto basePhase = voice.phase;
     for (int i = 0; i < unisonCount; ++i)
@@ -157,7 +167,7 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
         const auto spread = unisonCount == 1 ? 0.0f : (static_cast<float>(i) / static_cast<float>(unisonCount - 1) - 0.5f);
         const auto cents = spread * detuneParam->getCurrentValue() * 48.0f;
         const auto detunedPhase = basePhase * std::pow(2.0f, cents / 1200.0f);
-        sample += wave(detunedPhase + spread * widthParam->getCurrentValue() * 0.12f);
+        sample += wave(detunedPhase + spread * widthParam->getCurrentValue() * 0.12f, motionOffset + spread * motionParam->getCurrentValue() * 0.04f);
     }
     voice.phase += frequency * dt;
     if (voice.phase >= 1.0f)
@@ -218,7 +228,7 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
 
 void ThetaWaveDevice::restorePluginStateFromValueTree(const juce::ValueTree& source)
 {
-    te::copyPropertiesToCachedValues(source, position, shape, sub, cutoff, resonance, attack, decay, sustain, releaseTime,
+    te::copyPropertiesToCachedValues(source, position, shape, motion, sub, cutoff, resonance, attack, decay, sustain, releaseTime,
                                      unison, detune, width, outputDb);
     for (auto* parameter : getAutomatableParameters())
         parameter->updateFromAttachedValue();

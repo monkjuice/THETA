@@ -26,6 +26,7 @@ public:
         SirenLead,
         WavePad,
         WaveBass,
+        WavePluck,
         HouseKit,
         BreakKit,
         MinimalKit,
@@ -117,6 +118,8 @@ public:
     void setTempo(double bpm);
     void undo();
     void redo();
+    juce::Result setLoopRange(double startSeconds, double endSeconds);
+    bool hasManualLoopRange() const { return manualLoop; }
     void refreshLoop();
     te::Clip* findClip(te::EditItemID) const;
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
@@ -147,6 +150,8 @@ private:
     // Engine initialization also changes its edit flag asynchronously. Track
     // user commands separately so startup cannot dirty an untouched document.
     juce::int64 changeRevision = 0, savedRevision = 0;
+    bool manualLoop = false;
+    tracktion::core::TimeRange manualLoopRange;
 };
 int runSelfTest();
 int runPatternTest();

@@ -236,6 +236,19 @@ int runArrangementTest()
             view.mouseDrag(event(down, to, true));
             view.mouseUp(event(down, to, true));
         };
+        const auto rulerY = view.rulerTop + 8.0f;
+        drag({view.xFor(0.5), rulerY}, {view.xFor(1.5), rulerY});
+        auto loopRange = session.edit->getTransport().getLoopRange();
+        require(close(loopRange.getStart().inSeconds(), 0.5) && close(loopRange.getEnd().inSeconds(), 1.5),
+                "Dragging the arrangement ruler selects the transport loop range");
+        require(session.edit->getTransport().looping, "Ruler loop selection enables transport looping");
+        session.refreshLoop();
+        loopRange = session.edit->getTransport().getLoopRange();
+        require(close(loopRange.getStart().inSeconds(), 0.5) && close(loopRange.getEnd().inSeconds(), 1.5),
+                "Manual ruler loop selection is not overwritten by auto loop refresh");
+        view.mouseDown(event({view.xFor(0.25), rulerY}, {view.xFor(0.25), rulerY}, false));
+        view.mouseUp(event({view.xFor(0.25), rulerY}, {view.xFor(0.25), rulerY}, false));
+        require(close(playheadTime(session.edit->getTransport()), 0.25), "Clicking the ruler still seeks the playhead");
         view.mouseDown(event({40, 82}, {40, 82}, false));
         require(view.selectedTrack == 0, "Clicking the pattern lane selects the pattern track");
         view.mouseDown(event({40, 180}, {40, 180}, false));

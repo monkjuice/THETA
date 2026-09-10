@@ -94,6 +94,8 @@ private:
     ClipGeometry original, preview;
     int originalTrack = 0, previewTrack = 0;
     double dragTime = 0.0, sourceDuration = 0.0;
+    bool selectingLoop = false;
+    double loopAnchor = 0.0, loopPreviewStart = 0.0, loopPreviewEnd = 0.0;
     float playhead = -1.0f;
     static constexpr float headerWidth = 148.0f, rulerTop = 32.0f, lanesTop = 56.0f;
 };

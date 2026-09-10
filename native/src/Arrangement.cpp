@@ -25,6 +25,7 @@ std::optional<Session::PatternPreset> patternPresetFromId(const juce::String& id
     if (id == "SirenLead")  return Session::PatternPreset::SirenLead;
     if (id == "WavePad")    return Session::PatternPreset::WavePad;
     if (id == "WaveBass")   return Session::PatternPreset::WaveBass;
+    if (id == "WavePluck")  return Session::PatternPreset::WavePluck;
     if (id == "HouseKit")   return Session::PatternPreset::HouseKit;
     if (id == "BreakKit")   return Session::PatternPreset::BreakKit;
     if (id == "MinimalKit") return Session::PatternPreset::MinimalKit;
@@ -229,6 +230,29 @@ void Arrangement::paint(juce::Graphics& g)
         g.setColour(juce::Colour(0xff8c99a4));
         g.drawText(juce::String(beat / 4 + 1) + "." + juce::String(beat % 4 + 1),
                    static_cast<int>(x) + 4, static_cast<int>(rulerTop), 64, 24, juce::Justification::centredLeft);
+    }
+    {
+        const auto loopRange = session.edit->getTransport().getLoopRange();
+        auto start = selectingLoop ? loopPreviewStart : loopRange.getStart().inSeconds();
+        auto end = selectingLoop ? loopPreviewEnd : loopRange.getEnd().inSeconds();
+        if (end < start) std::swap(start, end);
+        if ((selectingLoop || session.hasManualLoopRange()) && end - start > 0.02)
+        {
+            const auto x1 = xFor(start);
+            const auto x2 = xFor(end);
+            juce::Rectangle<float> loopBounds {std::max(headerWidth, std::min(x1, x2)), rulerTop,
+                                               std::max(0.0f, std::min(std::max(x1, x2), static_cast<float>(getWidth() - 14)) - std::max(headerWidth, std::min(x1, x2))),
+                                               getHeight() - rulerTop - 18.0f};
+            if (!loopBounds.isEmpty())
+            {
+                g.setColour(juce::Colour(0x245ab9d6));
+                g.fillRect(loopBounds);
+                g.setColour(juce::Colour(0xff5ab9d6));
+                g.fillRect(loopBounds.withHeight(3.0f));
+                g.drawVerticalLine(static_cast<int>(loopBounds.getX()), static_cast<int>(rulerTop), static_cast<int>(lanesTop));
+                g.drawVerticalLine(static_cast<int>(loopBounds.getRight()), static_cast<int>(rulerTop), static_cast<int>(lanesTop));
+            }
+        }
     }
     const auto dirty = g.getClipBounds().toFloat();
     bool hasAudio = false;
@@ -500,8 +524,10 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
         }
     if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
     {
-        session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(std::max(0.0, timeAt(event.position.x))));
-        updatePlayhead();
+        selectingLoop = true;
+        loopAnchor = snapped(std::max(0.0, timeAt(event.position.x)), event.mods.isAltDown());
+        loopPreviewStart = loopPreviewEnd = loopAnchor;
+        repaint();
         return;
     }
     const auto index = hit(event.position);
@@ -528,6 +554,14 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
 
 void Arrangement::mouseDrag(const juce::MouseEvent& event)
 {
+    if (selectingLoop)
+    {
+        const auto edge = snapped(std::max(0.0, timeAt(event.position.x)), event.mods.isAltDown());
+        loopPreviewStart = std::min(loopAnchor, edge);
+        loopPreviewEnd = std::max(loopAnchor, edge);
+        repaint();
+        return;
+    }
     if (!dragging) return;
     const auto anchor = gesture == ClipGesture::trimRight ? original.end : original.start;
     preview = previewClipEdit(original, gesture, snapped(anchor + timeAt(event.position.x) - dragTime, event.mods.isAltDown()), sourceDuration);
@@ -545,6 +579,24 @@ void Arrangement::mouseDrag(const juce::MouseEvent& event)
 
 void Arrangement::mouseUp(const juce::MouseEvent& event)
 {
+    if (selectingLoop)
+    {
+        mouseDrag(event);
+        selectingLoop = false;
+        if (event.getDistanceFromDragStart() >= 3)
+        {
+            const auto result = session.setLoopRange(loopPreviewStart, loopPreviewEnd);
+            if (result.failed() && status) status(result.getErrorMessage());
+            else if (status) status("Loop range selected");
+        }
+        else
+        {
+            session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(std::max(0.0, timeAt(event.position.x))));
+            updatePlayhead();
+        }
+        repaint();
+        return;
+    }
     if (!dragging) return;
     if (event.getDistanceFromDragStart() >= 3)
     {
@@ -563,7 +615,9 @@ void Arrangement::mouseMove(const juce::MouseEvent& event)
 {
     const auto index = hit(event.position);
     auto pointerStyle = juce::MouseCursor::NormalCursor;
-    if (index >= 0)
+    if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
+        pointerStyle = juce::MouseCursor::LeftRightResizeCursor;
+    else if (index >= 0)
     {
         const auto box = bounds(clips[static_cast<size_t>(index)]);
         const auto handle = std::min(7.0f, box.getWidth() * 0.25f);
@@ -730,7 +784,11 @@ void Arrangement::itemDropped(const juce::DragAndDropTarget::SourceDetails& deta
     if (result.failed() && status) status(result.getErrorMessage());
 }
 
-void Arrangement::cancelDrag() { dragging = false; }
+void Arrangement::cancelDrag()
+{
+    dragging = false;
+    selectingLoop = false;
+}
 
 void Arrangement::selectTrack(int track)
 {

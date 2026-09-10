@@ -33,6 +33,7 @@ PresetPattern presetPattern(Session::PatternPreset preset)
                                              {8, 60, 1}, {9, 55, 1}, {10, 48, 1}, {12, 60, 1}, {14, 67, 1}, {15, 72, 1}};
     static constexpr PresetNote wavePad[] {{0, 48, 8}, {0, 55, 8}, {0, 60, 8}, {8, 50, 8}, {8, 57, 8}, {8, 62, 8}};
     static constexpr PresetNote waveBass[] {{0, 36, 3}, {3, 36, 1}, {4, 43, 2}, {8, 34, 4}, {12, 39, 3}, {15, 41, 1}};
+    static constexpr PresetNote wavePluck[] {{0, 60, 1}, {2, 67, 1}, {4, 72, 2}, {7, 67, 1}, {8, 62, 1}, {10, 69, 1}, {12, 74, 2}, {15, 69, 1}};
     static constexpr PresetNote houseKit[] {{0, 48, 1}, {4, 48, 1}, {8, 48, 1}, {12, 48, 1}, {4, 53, 1}, {12, 53, 1},
                                             {2, 58, 1}, {6, 58, 1}, {10, 58, 1}, {14, 58, 1}};
     static constexpr PresetNote breakKit[] {{0, 48, 1}, {3, 48, 1}, {8, 48, 1}, {11, 48, 1}, {4, 53, 1}, {10, 53, 1},
@@ -51,6 +52,7 @@ PresetPattern presetPattern(Session::PatternPreset preset)
         case Session::PatternPreset::SirenLead:  return {sirenLead,  static_cast<int>(std::size(sirenLead)),  "Siren lead", false, false, SynthPatch::Default};
         case Session::PatternPreset::WavePad:    return {wavePad,    static_cast<int>(std::size(wavePad)),    "Wave pad", false, true,  SynthPatch::Default};
         case Session::PatternPreset::WaveBass:   return {waveBass,   static_cast<int>(std::size(waveBass)),   "Wave bass", false, true,  SynthPatch::Default};
+        case Session::PatternPreset::WavePluck:  return {wavePluck,  static_cast<int>(std::size(wavePluck)),  "Wave pluck", false, true,  SynthPatch::Default};
         case Session::PatternPreset::HouseKit:   return {houseKit,   static_cast<int>(std::size(houseKit)),   "House kit", true,  false, SynthPatch::Default};
         case Session::PatternPreset::BreakKit:   return {breakKit,   static_cast<int>(std::size(breakKit)),   "Break kit", true,  false, SynthPatch::Default};
         case Session::PatternPreset::MinimalKit: return {minimalKit, static_cast<int>(std::size(minimalKit)), "Minimal kit", true,  false, SynthPatch::Default};
@@ -72,6 +74,7 @@ juce::Colour presetColour(Session::PatternPreset preset)
         case Session::PatternPreset::SirenLead:  return juce::Colour(0xff8f4f67);
         case Session::PatternPreset::WavePad:    return juce::Colour(0xff5e55b8);
         case Session::PatternPreset::WaveBass:   return juce::Colour(0xff355a86);
+        case Session::PatternPreset::WavePluck:  return juce::Colour(0xff4c7a95);
         case Session::PatternPreset::HouseKit:   return juce::Colour(0xff657844);
         case Session::PatternPreset::BreakKit:   return juce::Colour(0xff6f7f43);
         case Session::PatternPreset::MinimalKit: return juce::Colour(0xff506d45);
@@ -344,33 +347,52 @@ void applyThetaWavePatch(Session::PatternPreset preset, ThetaWaveDevice& wave)
     {
         set(0, 0.38f);    // Position
         set(1, 0.72f);    // Shape
-        set(2, 0.08f);    // Sub
-        set(3, 5200.0f);  // Cutoff
-        set(4, 0.18f);    // Resonance
-        set(5, 0.22f);    // Attack
-        set(6, 0.85f);    // Decay
-        set(7, 0.78f);    // Sustain
-        set(8, 1.15f);    // Release
-        set(9, 3.0f);     // Unison
-        set(10, 0.13f);   // Detune
-        set(11, 0.78f);   // Width
-        set(12, -10.0f);  // Output
+        set(2, 0.35f);    // Motion
+        set(3, 0.08f);    // Sub
+        set(4, 5200.0f);  // Cutoff
+        set(5, 0.18f);    // Resonance
+        set(6, 0.22f);    // Attack
+        set(7, 0.85f);    // Decay
+        set(8, 0.78f);    // Sustain
+        set(9, 1.15f);    // Release
+        set(10, 3.0f);    // Unison
+        set(11, 0.13f);   // Detune
+        set(12, 0.78f);   // Width
+        set(13, -10.0f);  // Output
     }
     else if (preset == Session::PatternPreset::WaveBass)
     {
         set(0, 0.58f);
         set(1, 0.34f);
-        set(2, 0.42f);
-        set(3, 2600.0f);
-        set(4, 0.12f);
-        set(5, 0.006f);
-        set(6, 0.16f);
-        set(7, 0.7f);
+        set(2, 0.12f);
+        set(3, 0.42f);
+        set(4, 2600.0f);
+        set(5, 0.12f);
+        set(6, 0.006f);
+        set(7, 0.16f);
+        set(8, 0.7f);
+        set(9, 0.18f);
+        set(10, 1.0f);
+        set(11, 0.02f);
+        set(12, 0.18f);
+        set(13, -7.0f);
+    }
+    else if (preset == Session::PatternPreset::WavePluck)
+    {
+        set(0, 0.64f);
+        set(1, 0.82f);
+        set(2, 0.55f);
+        set(3, 0.1f);
+        set(4, 4200.0f);
+        set(5, 0.28f);
+        set(6, 0.004f);
+        set(7, 0.24f);
         set(8, 0.18f);
-        set(9, 1.0f);
-        set(10, 0.02f);
-        set(11, 0.18f);
-        set(12, -7.0f);
+        set(9, 0.22f);
+        set(10, 2.0f);
+        set(11, 0.06f);
+        set(12, 0.52f);
+        set(13, -8.5f);
     }
 }
 
@@ -1273,6 +1295,13 @@ void Session::setTempo(double bpm)
 
 void Session::refreshLoop()
 {
+    if (manualLoop)
+    {
+        edit->getTransport().setLoopRange(manualLoopRange);
+        edit->getTransport().looping = true;
+        return;
+    }
+
     auto end = tracktion::core::TimePosition::fromSeconds(0.0);
     const auto tracks = te::getAudioTracks(*edit);
     for (auto* track : tracks)
@@ -1282,6 +1311,25 @@ void Session::refreshLoop()
         end = edit->tempoSequence.toTime(tracktion::core::BeatPosition::fromBeats(4.0));
     edit->getTransport().setLoopRange({{}, end});
     edit->getTransport().looping = true;
+}
+
+juce::Result Session::setLoopRange(double startSeconds, double endSeconds)
+{
+    if (endSeconds < startSeconds)
+        std::swap(startSeconds, endSeconds);
+    startSeconds = std::max(0.0, startSeconds);
+    endSeconds = std::max(startSeconds, endSeconds);
+    if (endSeconds - startSeconds < 0.02)
+        return juce::Result::fail("Drag a longer span on the ruler to set a loop.");
+
+    manualLoop = true;
+    manualLoopRange = {tracktion::core::TimePosition::fromSeconds(startSeconds),
+                       tracktion::core::TimePosition::fromSeconds(endSeconds)};
+    edit->getTransport().setLoopRange(manualLoopRange);
+    edit->getTransport().looping = true;
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 void Session::undo()
