@@ -176,9 +176,19 @@ public:
     ThetaWaveDevice* thetaWave = nullptr; // owned by edit's plugin list
     DrumDevice* drums = nullptr; // owned by edit's plugin list
 private:
+    struct AutomationRuntime
+    {
+        DeviceTarget target;
+        float baseValue = 0.0f;
+        bool hasBaseValue = false;
+        bool overridden = false;
+        bool active = false;
+    };
     void refreshAfterUndoRedo(bool changed);
     void setPatternInstrument(bool useDrums);
     void ensureEditablePatternClip();
+    AutomationRuntime& automationRuntimeFor(DeviceTarget);
+    AutomationRuntime* findAutomationRuntime(DeviceTarget);
     te::MidiClip* patternClip = nullptr; // owned by edit
     te::EditItemID patternClipID;
     // Engine initialization also changes its edit flag asynchronously. Track
@@ -187,6 +197,7 @@ private:
     bool manualLoop = false;
     tracktion::core::TimeRange manualLoopRange;
     DeviceTarget lastTouchedParameter;
+    std::vector<AutomationRuntime> automationRuntime;
 };
 int runSelfTest();
 int runPatternTest();

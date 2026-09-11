@@ -164,6 +164,11 @@ double stepDurationBeats(int steps)
     return 4.0 / static_cast<double>(juce::jlimit(Session::defaultSteps, Session::steps, steps));
 }
 
+bool sameDeviceTarget(Session::DeviceTarget a, Session::DeviceTarget b)
+{
+    return a.track == b.track && a.slot == b.slot && a.parameter == b.parameter;
+}
+
 te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type)
 {
     for (auto* plugin : track.pluginList)
@@ -1421,6 +1426,8 @@ juce::Result Session::beginDeviceParameterGesture(int track, int slot, int param
     auto* parameter = exposedParameterAt(*plugin, parameterIndex);
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
     lastTouchedParameter = {track, slot, parameterIndex};
+    if (auto* runtime = findAutomationRuntime(lastTouchedParameter); runtime != nullptr && runtime->active)
+        runtime->overridden = true;
     parameter->parameterChangeGestureBegin();
     return juce::Result::ok();
 }
@@ -1437,6 +1444,11 @@ juce::Result Session::setDeviceParameter(int track, int slot, int parameterIndex
     lastTouchedParameter = {track, slot, parameterIndex};
     const auto range = parameter->getValueRange();
     const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
+    auto& runtime = automationRuntimeFor(lastTouchedParameter);
+    runtime.baseValue = next;
+    runtime.hasBaseValue = true;
+    if (runtime.active)
+        runtime.overridden = true;
     parameter->setParameter(next, juce::sendNotification);
     markModified();
     sendSynchronousChangeMessage();
@@ -1754,9 +1766,27 @@ juce::Result Session::setClipAutomationRamp(te::EditItemID id, DeviceTarget targ
     automation.setProperty(automationStartValueID, startValue, &edit->getUndoManager());
     automation.setProperty(automationEndValueID, endValue, &edit->getUndoManager());
     clip->state.addChild(automation, -1, &edit->getUndoManager());
+    if (auto* runtime = findAutomationRuntime(target))
+        runtime->overridden = false;
     markModified();
     sendSynchronousChangeMessage();
     return juce::Result::ok();
+}
+
+Session::AutomationRuntime& Session::automationRuntimeFor(DeviceTarget target)
+{
+    if (auto* runtime = findAutomationRuntime(target))
+        return *runtime;
+    automationRuntime.push_back({target});
+    return automationRuntime.back();
+}
+
+Session::AutomationRuntime* Session::findAutomationRuntime(DeviceTarget target)
+{
+    for (auto& runtime : automationRuntime)
+        if (sameDeviceTarget(runtime.target, target))
+            return &runtime;
+    return nullptr;
 }
 
 void Session::applyClipAutomationAt(double timelineSeconds)
@@ -1764,6 +1794,9 @@ void Session::applyClipAutomationAt(double timelineSeconds)
     if (!std::isfinite(timelineSeconds) || timelineSeconds < 0.0)
         return;
 
+    bool changed = false;
+    std::vector<DeviceTarget> activeTargets;
+    const auto targetTracks = te::getAudioTracks(*edit);
     for (auto* track : te::getAudioTracks(*edit))
         for (auto* clip : track->getClips())
         {
@@ -1777,7 +1810,6 @@ void Session::applyClipAutomationAt(double timelineSeconds)
 
             const auto amount = (local - automation.startSeconds) / (automation.endSeconds - automation.startSeconds);
             const auto value = static_cast<float>(automation.startValue + (automation.endValue - automation.startValue) * amount);
-            const auto targetTracks = te::getAudioTracks(*edit);
             if (!juce::isPositiveAndBelow(automation.target.track, targetTracks.size())
                 || !juce::isPositiveAndBelow(automation.target.slot, targetTracks[automation.target.track]->pluginList.size()))
                 continue;
@@ -1787,9 +1819,63 @@ void Session::applyClipAutomationAt(double timelineSeconds)
             if (auto* parameter = exposedParameterAt(*plugin, automation.target.parameter))
             {
                 const auto range = parameter->getValueRange();
-                parameter->setParameter(juce::jlimit(range.getStart(), range.getEnd(), value), juce::sendNotification);
+                auto& runtime = automationRuntimeFor(automation.target);
+                activeTargets.push_back(automation.target);
+                if (!runtime.hasBaseValue)
+                {
+                    runtime.baseValue = parameter->getCurrentValue();
+                    runtime.hasBaseValue = true;
+                }
+                runtime.active = true;
+                if (runtime.overridden)
+                    continue;
+
+                const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
+                if (std::abs(parameter->getCurrentValue() - next) > 0.0001f)
+                {
+                    parameter->setParameter(next, juce::sendNotification);
+                    changed = true;
+                }
             }
         }
+
+    for (auto& runtime : automationRuntime)
+    {
+        if (!runtime.active)
+            continue;
+        bool stillActive = false;
+        for (const auto target : activeTargets)
+            if (sameDeviceTarget(runtime.target, target))
+            {
+                stillActive = true;
+                break;
+            }
+        if (stillActive)
+            continue;
+
+        runtime.active = false;
+        if (runtime.overridden || !runtime.hasBaseValue)
+            continue;
+        if (!juce::isPositiveAndBelow(runtime.target.track, targetTracks.size())
+            || !juce::isPositiveAndBelow(runtime.target.slot, targetTracks[runtime.target.track]->pluginList.size()))
+            continue;
+        auto* plugin = targetTracks[runtime.target.track]->pluginList[runtime.target.slot];
+        if (plugin == nullptr)
+            continue;
+        if (auto* parameter = exposedParameterAt(*plugin, runtime.target.parameter))
+        {
+            const auto range = parameter->getValueRange();
+            const auto next = juce::jlimit(range.getStart(), range.getEnd(), runtime.baseValue);
+            if (std::abs(parameter->getCurrentValue() - next) > 0.0001f)
+            {
+                parameter->setParameter(next, juce::sendNotification);
+                changed = true;
+            }
+        }
+    }
+
+    if (changed)
+        sendSynchronousChangeMessage();
 }
 
 juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture, int targetTrack)

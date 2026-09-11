@@ -118,6 +118,7 @@ public:
         void timerCallback() override
         {
             animationPhase += 0.12f;
+            refreshParameterValues();
             repaint(isThetaWave ? getLocalBounds().reduced(28, 74).withHeight(154)
                                 : juce::Rectangle<int>(210, 88, 260, 126).expanded(2));
         }
@@ -203,6 +204,25 @@ public:
         }
 
     private:
+        void refreshParameterValues()
+        {
+            if (syncing)
+                return;
+            const auto next = session.deviceParameters(track, slot);
+            const auto count = std::min(std::min(static_cast<int>(next.size()), static_cast<int>(parameters.size())),
+                                        sliders.size());
+            syncing = true;
+            for (int i = 0; i < count; ++i)
+            {
+                parameters[static_cast<size_t>(i)] = next[static_cast<size_t>(i)];
+                sliders[i]->setValue(parameters[static_cast<size_t>(i)].value, juce::dontSendNotification);
+                values[i]->setText(parameters[static_cast<size_t>(i)].valueText, juce::dontSendNotification);
+                sliders[i]->setTooltip(parameters[static_cast<size_t>(i)].name + ": "
+                                       + parameters[static_cast<size_t>(i)].valueText);
+            }
+            syncing = false;
+        }
+
         float normalisedValue(int index) const
         {
             if (!juce::isPositiveAndBelow(index, parameters.size())) return 0.0f;

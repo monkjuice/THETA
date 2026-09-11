@@ -188,6 +188,7 @@ int runPatternTest()
         require(session.setDeviceParameter(0, 0, 0, previousAttack + 0.05f).wasOk(), "4OSC Attack macro can be edited from the rack");
         require(session.synth->ampAttack->getCurrentValue() > previousAttack, "4OSC Attack macro writes to the synth envelope");
         const auto automatedClip = session.pattern().itemID;
+        const auto manualAttack = session.synth->ampAttack->getCurrentValue();
         const auto attackMinimum = synthMacros[0].minimum;
         const auto attackMaximum = std::min(synthMacros[0].maximum, attackMinimum + 1.0f);
         require(session.setClipAutomationRamp(automatedClip, {0, 0, 0}, 0.0, 1.0, attackMinimum, attackMaximum).wasOk(),
@@ -199,6 +200,16 @@ int runPatternTest()
         session.applyClipAutomationAt(0.5);
         require(std::abs(session.synth->ampAttack->getCurrentValue() - (attackMinimum + attackMaximum) * 0.5f) < 0.02f,
                 "Clip automation applies interpolated parameter values during playback");
+        session.applyClipAutomationAt(1.5);
+        require(std::abs(session.synth->ampAttack->getCurrentValue() - manualAttack) < 0.02f,
+                "Clip automation restores the manual value after its lane");
+        session.applyClipAutomationAt(0.5);
+        const auto overrideAttack = juce::jlimit(attackMinimum, attackMaximum, attackMinimum + 0.2f);
+        require(session.setDeviceParameter(0, 0, 0, overrideAttack).wasOk(),
+                "Manual parameter edits can override active automation");
+        session.applyClipAutomationAt(0.75);
+        require(std::abs(session.synth->ampAttack->getCurrentValue() - overrideAttack) < 0.02f,
+                "Manual override wins over clip automation until automation is re-enabled");
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
                 "Reese bass preset loads sustained electronic bass notes");
