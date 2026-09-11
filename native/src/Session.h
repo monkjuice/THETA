@@ -111,6 +111,7 @@ public:
     static constexpr int steps = 64, defaultSteps = 16, pitches = 16, lowestNote = 48;
     te::MidiClip& pattern() const { return *patternClip; }
     int editorStepCount() const;
+    double patternLengthBeats() const;
     void setEditorStepCount(int newSteps);
     bool hasNote(int step, int pitch) const;
     void setNote(int step, int pitch, bool enabled);

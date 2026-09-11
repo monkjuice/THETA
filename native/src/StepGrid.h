@@ -37,6 +37,7 @@ private:
     bool copySelection();
     bool pasteSelection();
     bool deleteSelection();
+    bool fillSelectionToClipEnd();
     juce::Result moveCurrentNoteTo(int index);
     juce::Result resizeCurrentNoteTo(int index);
     int pitchForIndex(int index) const;

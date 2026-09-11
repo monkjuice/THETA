@@ -350,6 +350,28 @@ bool StepGrid::deleteSelection()
     return true;
 }
 
+bool StepGrid::fillSelectionToClipEnd()
+{
+    if (selectedNotes.none())
+        return false;
+
+    session.beginNoteGesture("Fill note to clip end");
+    const auto steps = session.editorStepCount();
+    auto changed = false;
+    for (int row = 0; row < Session::pitches; ++row)
+    for (int step = 0; step < steps; ++step)
+    {
+        const auto index = row * Session::steps + step;
+        if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
+            if (session.resizeNote(step, pitchForIndex(index), steps - step).wasOk())
+                changed = true;
+    }
+    session.endNoteGesture();
+    if (changed)
+        repaint();
+    return changed;
+}
+
 int StepGrid::pitchForIndex(int index) const
 {
     return lowestVisiblePitch + Session::pitches - 1 - index / Session::steps;
@@ -434,6 +456,8 @@ bool StepGrid::keyPressed(const juce::KeyPress& key)
         return copySelection();
     if (command && key.getKeyCode() == 'V')
         return pasteSelection();
+    if (key.getKeyCode() == 'F')
+        return fillSelectionToClipEnd();
     if (key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
         return deleteSelection();
     if (key.getKeyCode() == juce::KeyPress::escapeKey)
@@ -559,10 +583,11 @@ float StepGrid::playheadXForTime(double seconds) const
     const auto editBeat = session.edit->tempoSequence.toBeats(tracktion::core::TimePosition::fromSeconds(seconds)).inBeats();
     const auto clipStartBeat = session.edit->tempoSequence.toBeats(position.time.getStart()).inBeats();
     const auto offsetBeat = position.offset.inSeconds() * session.tempo() / 60.0;
-    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, 4.0);
+    const auto clipBeats = session.patternLengthBeats();
+    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, clipBeats);
     if (localBeat < 0.0)
-        localBeat += 4.0;
-    const auto step = localBeat / 4.0 * session.editorStepCount();
+        localBeat += clipBeats;
+    const auto step = localBeat / clipBeats * session.editorStepCount();
     if (step < stepScroll || step > stepScroll + visibleStepSpan())
         return -1.0f;
     return static_cast<float>(labelWidth + (step - stepScroll) * cellWidth());
