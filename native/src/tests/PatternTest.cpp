@@ -109,6 +109,16 @@ int runPatternTest()
                 thirtySecondNote = note;
         require(thirtySecondNote != nullptr && std::abs(thirtySecondNote->getStartBeat().inBeats() - 0.125) < 0.0001,
                 "32-step grid places notes halfway between 16th steps");
+        const auto originalGridClip = session.pattern().itemID;
+        require(session.insertPatternPreset(Session::PatternPreset::HouseKit, 0, 2.0).wasOk(),
+                "Can add another MIDI clip while testing clip-local grid resolution");
+        const auto newGridClip = te::getAudioTracks(*session.edit)[0]->getClips().getLast()->itemID;
+        require(session.selectPatternClip(newGridClip).wasOk() && session.editorStepCount() == Session::defaultSteps,
+                "Newly selected MIDI clips keep the default editor grid");
+        require(session.selectPatternClip(originalGridClip).wasOk() && session.editorStepCount() == 32,
+                "Switching back restores the source clip's editor grid");
+        session.undo();
+        require(session.selectPatternClip(originalGridClip).wasOk(), "Original grid clip remains editable after undoing the extra clip");
         session.setEditorStepCount(Session::defaultSteps);
         session.applyPatternPreset(Session::PatternPreset::HouseKit);
         require(sequence.getNumNotes() == 10, "Drum kit preset loads notes");

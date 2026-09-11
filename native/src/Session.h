@@ -90,7 +90,7 @@ public:
     void releaseAudioDevice();
     static constexpr int steps = 64, defaultSteps = 16, pitches = 16, lowestNote = 48;
     te::MidiClip& pattern() const { return *patternClip; }
-    int editorStepCount() const { return editorSteps; }
+    int editorStepCount() const;
     void setEditorStepCount(int newSteps);
     bool hasNote(int step, int pitch) const;
     void setNote(int step, int pitch, bool enabled);
@@ -151,7 +151,6 @@ private:
     void ensureEditablePatternClip();
     te::MidiClip* patternClip = nullptr; // owned by edit
     te::EditItemID patternClipID;
-    int editorSteps = defaultSteps;
     // Engine initialization also changes its edit flag asynchronously. Track
     // user commands separately so startup cannot dirty an untouched document.
     juce::int64 changeRevision = 0, savedRevision = 0;
