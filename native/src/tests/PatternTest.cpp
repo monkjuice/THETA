@@ -240,6 +240,10 @@ int runPatternTest()
         require(std::abs(session.synth->ampAttack->getCurrentValue()
                          - (attackMinimum + (attackMaximum - attackMinimum) * 0.75f)) < 0.02f,
                 "Re-enabled automation drives the parameter again");
+        require(session.deleteClipAutomation(automatedClip, {0, 0, 1}).wasOk(),
+                "A single automation lane can be deleted");
+        require(session.clipAutomations(automatedClip).size() == 1 && session.deviceParameters(0, 0)[0].automated,
+                "Deleting one automation lane preserves other automation lanes");
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
                 "Reese bass preset loads sustained electronic bass notes");

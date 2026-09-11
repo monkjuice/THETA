@@ -264,13 +264,24 @@ void Arrangement::paint(juce::Graphics& g)
             g.drawText("FX" + juce::String(clip.clipPlugins), badge, juce::Justification::centred, true);
         }
         const auto position = dragging && clip.id == selected ? preview : clip.position;
+        const auto automationStack = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
+        const auto activeLane = activeAutomationIndex(clip);
         const auto automationAreaFor = [&] (int laneIndex, int laneCount)
         {
-            const auto stack = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
+            if (activeLane >= 0)
+            {
+                if (laneIndex == activeLane)
+                    return automationStack.reduced(0.0f, 2.0f);
+                const auto stripHeight = std::min(12.0f, std::max(8.0f, automationStack.getHeight()
+                                                                  / static_cast<float>(clip.automations.size() + 3)));
+                const auto stripTop = automationStack.getBottom() - stripHeight * static_cast<float>(clip.automations.size());
+                return juce::Rectangle<float>(automationStack.getX(), stripTop + stripHeight * laneIndex,
+                                              automationStack.getWidth(), stripHeight).reduced(0.0f, 1.0f);
+            }
             const auto count = std::max(1, laneCount);
-            const auto laneHeight = stack.getHeight() / static_cast<float>(count);
-            return juce::Rectangle<float>(stack.getX(), stack.getY() + laneHeight * laneIndex,
-                                          stack.getWidth(), std::max(8.0f, laneHeight)).reduced(0.0f, 2.0f);
+            const auto laneHeight = automationStack.getHeight() / static_cast<float>(count);
+            return juce::Rectangle<float>(automationStack.getX(), automationStack.getY() + laneHeight * laneIndex,
+                                          automationStack.getWidth(), std::max(8.0f, laneHeight)).reduced(0.0f, 2.0f);
         };
         const auto drawAutomation = [&] (const Session::ClipAutomation& automation, double startTime,
                                          double endTime, float startValue, float endValue, bool previewLine,
@@ -289,14 +300,18 @@ void Arrangement::paint(juce::Graphics& g)
             const auto x2 = xFor(endTime);
             const auto y1 = yFor(startValue);
             const auto y2 = yFor(endValue);
-            g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(0.25f));
+            const auto laneActive = activeLane < 0 || laneIndex == activeLane || previewLine;
+            g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(laneActive ? 0.25f : 0.14f));
             g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
             g.setColour(juce::Colour(0x5511191f));
             g.drawRect(autoArea.reduced(0.5f), 1.0f);
-            g.setColour(previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff));
-            g.drawLine(x1, y1, x2, y2, 2.0f);
-            g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x1, y1}));
-            g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x2, y2}));
+            g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(laneActive ? 1.0f : 0.75f));
+            g.drawLine(x1, y1, x2, y2, laneActive ? 2.0f : 1.2f);
+            if (laneActive)
+            {
+                g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x1, y1}));
+                g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x2, y2}));
+            }
             if (!automation.parameterName.isEmpty())
             {
                 g.setFont(juce::FontOptions(11.0f));
@@ -493,6 +508,21 @@ void Arrangement::sync()
         }
     }
     std::erase_if(waveforms, [&usedFiles](const auto& item) { return !usedFiles.contains(item.first); });
+    if (activeAutomationClip != te::EditItemID())
+    {
+        bool foundActive = false;
+        for (const auto& clip : clips)
+            if (clip.id == activeAutomationClip && activeAutomationIndex(clip) >= 0)
+            {
+                foundActive = true;
+                break;
+            }
+        if (!foundActive)
+        {
+            activeAutomationClip = {};
+            activeAutomationTarget = {};
+        }
+    }
     updateScroll();
     repaint();
 }
@@ -616,6 +646,16 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
         const auto result = session.selectPatternClip(selected);
         if (result.failed() && status) status(result.getErrorMessage());
     }
+    const auto clickedAutomationLane = automationLaneAt(clip, event.position);
+    if (!automationButton.getToggleState() && clickedAutomationLane >= 0)
+    {
+        activeAutomationClip = clip.id;
+        activeAutomationTarget = clip.automations[static_cast<size_t>(clickedAutomationLane)].target;
+        if (status)
+            status("Automation lane: " + clip.automations[static_cast<size_t>(clickedAutomationLane)].parameterName);
+        repaint();
+        return;
+    }
     repaint();
     if (automationButton.getToggleState())
     {
@@ -631,6 +671,8 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
             if (status) status("The last moved knob is no longer available.");
             return;
         }
+        activeAutomationClip = clip.id;
+        activeAutomationTarget = automationTarget;
         automationDragging = true;
         automationStartTime = automationEndTime = snapped(std::clamp(timeAt(event.position.x), clip.position.start, clip.position.end), event.mods.isAltDown());
         automationStartValue = automationEndValue = automationValueForY(clip, event.position.y, automationTarget);
@@ -730,6 +772,11 @@ void Arrangement::mouseUp(const juce::MouseEvent& event)
                 : juce::String("parameter");
             status(result.wasOk() ? "Clip automation: " + name : result.getErrorMessage());
         }
+        if (result.wasOk())
+        {
+            activeAutomationClip = selected;
+            activeAutomationTarget = automationTarget;
+        }
         repaint();
         return;
     }
@@ -781,6 +828,8 @@ void Arrangement::mouseMove(const juce::MouseEvent& event)
     {
         if (automationButton.getToggleState())
             pointerStyle = juce::MouseCursor::CrosshairCursor;
+        else if (automationLaneAt(clips[static_cast<size_t>(index)], event.position) >= 0)
+            pointerStyle = juce::MouseCursor::PointingHandCursor;
         else
         {
             const auto box = bounds(clips[static_cast<size_t>(index)]);
@@ -845,6 +894,17 @@ bool Arrangement::keyPressed(const juce::KeyPress& key)
     if (key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
     {
         cancelDrag();
+        if (activeAutomationClip == selected && activeAutomationTarget.isValid())
+        {
+            const auto result = session.deleteClipAutomation(selected, activeAutomationTarget);
+            if (result.wasOk())
+            {
+                activeAutomationClip = {};
+                activeAutomationTarget = {};
+            }
+            if (status) status(result.wasOk() ? "Automation lane deleted" : result.getErrorMessage());
+            return true;
+        }
         session.deleteClip(selected);
         return true;
     }

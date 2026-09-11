@@ -71,6 +71,8 @@ private:
     double snapped(double seconds, bool bypass) const;
     double snappedClipMoveStart(double desiredStart, double length, int targetTrack, bool bypass) const;
     float automationValueForY(const ClipView&, float y, Session::DeviceTarget) const;
+    int activeAutomationIndex(const ClipView&) const;
+    int automationLaneAt(const ClipView&, juce::Point<float>) const;
     LoopGesture loopGestureAt(juce::Point<float>) const;
     juce::Rectangle<float> lane(int track) const;
     float laneHeight() const;
@@ -103,6 +105,8 @@ private:
     double loopAnchor = 0.0, loopOriginalStart = 0.0, loopOriginalEnd = 0.0, loopPreviewStart = 0.0, loopPreviewEnd = 0.0;
     bool automationDragging = false;
     Session::DeviceTarget automationTarget;
+    te::EditItemID activeAutomationClip;
+    Session::DeviceTarget activeAutomationTarget;
     double automationStartTime = 0.0, automationEndTime = 0.0;
     float automationStartValue = 0.0f, automationEndValue = 0.0f;
     float playhead = -1.0f;

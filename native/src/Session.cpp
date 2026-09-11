@@ -1831,6 +1831,42 @@ juce::Result Session::setClipAutomationRamp(te::EditItemID id, DeviceTarget targ
     return juce::Result::ok();
 }
 
+juce::Result Session::deleteClipAutomation(te::EditItemID id, DeviceTarget target)
+{
+    auto* clip = findClip(id);
+    if (clip == nullptr)
+        return juce::Result::fail("Select a clip first.");
+    if (!target.isValid())
+        return juce::Result::fail("Select an automation lane first.");
+
+    for (int i = clip->state.getNumChildren(); --i >= 0;)
+    {
+        const auto existing = clip->state.getChild(i);
+        if (!existing.hasType(clipAutomationID))
+            continue;
+        const DeviceTarget existingTarget {
+            static_cast<int>(existing.getProperty(automationTrackID, -1)),
+            static_cast<int>(existing.getProperty(automationSlotID, -1)),
+            static_cast<int>(existing.getProperty(automationParameterID, -1))
+        };
+        if (sameDeviceTarget(existingTarget, target))
+        {
+            edit->getUndoManager().beginNewTransaction("Delete clip automation");
+            clip->state.removeChild(existing, &edit->getUndoManager());
+            if (auto* runtime = findAutomationRuntime(target))
+            {
+                runtime->active = false;
+                runtime->overridden = false;
+            }
+            markModified();
+            edit->getUndoManager().beginNewTransaction();
+            sendSynchronousChangeMessage();
+            return juce::Result::ok();
+        }
+    }
+    return juce::Result::fail("Automation lane was not found.");
+}
+
 Session::AutomationRuntime& Session::automationRuntimeFor(DeviceTarget target)
 {
     if (auto* runtime = findAutomationRuntime(target))

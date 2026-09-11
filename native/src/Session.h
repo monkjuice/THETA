@@ -161,6 +161,7 @@ public:
     std::vector<ClipAutomation> clipAutomations(te::EditItemID) const;
     juce::Result setClipAutomationRamp(te::EditItemID, DeviceTarget, double startSeconds, double endSeconds,
                                        float startValue, float endValue);
+    juce::Result deleteClipAutomation(te::EditItemID, DeviceTarget);
     juce::Result toggleParameterAutomationOverride(int track, int slot, int parameter);
     void applyClipAutomationAt(double timelineSeconds);
     juce::Result moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch);
