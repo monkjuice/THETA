@@ -97,6 +97,26 @@ int runSelfTest()
         bloom->restorePluginStateFromValueTree(bloomState);
         require(std::abs(bloom->getAutomatableParameterByID("chorus")->getCurrentValue() - 0.25f) < 1.0e-5f);
         bloom->deinitialise();
+
+        auto wavePlugin = session.edit->getPluginCache().createNewPlugin(ThetaWaveDevice::xmlTypeName, {});
+        auto* wave = dynamic_cast<ThetaWaveDevice*>(wavePlugin.get());
+        require(wave != nullptr);
+        wave->initialise({{}, 48000.0, 512});
+        juce::AudioBuffer<float> waveBuffer(2, 4096);
+        te::MidiMessageArray lowMidi;
+        lowMidi.addMidiMessage(juce::MidiMessage::noteOn(1, 5, 1.0f), 0.0, {});
+        te::PluginRenderContext waveContext(&waveBuffer, 0, waveBuffer.getNumSamples(), &lowMidi, 0.0, {}, true, false, true, false);
+        wave->applyToBuffer(waveContext);
+        float wavePeak = 0.0f;
+        for (int c = 0; c < waveBuffer.getNumChannels(); ++c)
+            for (int i = 0; i < waveBuffer.getNumSamples(); ++i)
+            {
+                const auto sample = waveBuffer.getSample(c, i);
+                require(std::isfinite(sample));
+                wavePeak = std::max(wavePeak, std::abs(sample));
+            }
+        require(wavePeak < 1.0f);
+        wave->deinitialise();
         session.releaseAudioDevice();
         return 0;
     }

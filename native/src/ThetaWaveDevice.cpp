@@ -169,7 +169,7 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
         voice.envelope = std::max(sustainLevel, voice.envelope - (1.0f - sustainLevel) * dt / decaySeconds);
     }
 
-    const auto frequency = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(voice.note));
+    const auto frequency = std::max(16.35f, static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(voice.note)));
     const auto unisonCount = juce::jlimit(1, 4, juce::roundToInt(unisonParam->getCurrentValue()));
     voice.motionPhase += dt * (0.08f + motionParam->getCurrentValue() * 3.2f);
     if (voice.motionPhase >= 1.0f)

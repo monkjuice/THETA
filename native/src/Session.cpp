@@ -466,6 +466,24 @@ te::AutomatableParameter* fourOscMacroParameterAt(te::FourOscPlugin& synth, int 
     return nullptr;
 }
 
+te::AutomatableParameter* thetaWaveMacroParameterAt(ThetaWaveDevice& wave, int index)
+{
+    const auto id = [index]() -> const char*
+    {
+        switch (index)
+        {
+            case 0: return "position";
+            case 1: return "shape";
+            case 2: return "motion";
+            case 3: return "osc2Level";
+            case 4: return "osc2Tune";
+            case 5: return "cutoff";
+            default: return nullptr;
+        }
+    }();
+    return id != nullptr ? wave.getAutomatableParameterByID(id) : nullptr;
+}
+
 juce::String fourOscMacroName(int index)
 {
     switch (index)
@@ -476,6 +494,20 @@ juce::String fourOscMacroName(int index)
         case 3: return "Release";
         case 4: return "Filter";
         case 5: return "Glide";
+    }
+    return {};
+}
+
+juce::String thetaWaveMacroName(int index)
+{
+    switch (index)
+    {
+        case 0: return "Position";
+        case 1: return "Shape";
+        case 2: return "Motion";
+        case 3: return "Osc 2";
+        case 4: return "Tune 2";
+        case 5: return "Cutoff";
     }
     return {};
 }
@@ -493,10 +525,23 @@ juce::String formatFourOscMacroValue(int index, float value, te::AutomatablePara
     }
 }
 
+juce::String formatThetaWaveMacroValue(int index, float value, te::AutomatableParameter& parameter)
+{
+    switch (index)
+    {
+        case 4:
+            return juce::String(value > 0.0f ? "+" : "") + juce::String(juce::roundToInt(value)) + " st";
+        default:
+            return parameter.getCurrentValueAsStringWithLabel();
+    }
+}
+
 te::AutomatableParameter* exposedParameterAt(te::Plugin& plugin, int index)
 {
     if (auto* synthPlugin = dynamic_cast<te::FourOscPlugin*>(&plugin))
         return fourOscMacroParameterAt(*synthPlugin, index);
+    if (auto* wavePlugin = dynamic_cast<ThetaWaveDevice*>(&plugin))
+        return thetaWaveMacroParameterAt(*wavePlugin, index);
     return activeParameterAt(plugin, index);
 }
 
@@ -1236,6 +1281,24 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
                     continue;
                 parameters.push_back({fourOscMacroName(i),
                                       formatFourOscMacroValue(i, parameter->getCurrentValue(), *parameter),
+                                      parameter->getCurrentValue(),
+                                      range.getStart(),
+                                      range.getEnd(),
+                                      parameter->isDiscrete()});
+            }
+        return parameters;
+    }
+
+    if (auto* wavePlugin = dynamic_cast<ThetaWaveDevice*>(plugin))
+    {
+        for (int i = 0; i < 6; ++i)
+            if (auto* parameter = thetaWaveMacroParameterAt(*wavePlugin, i))
+            {
+                const auto range = parameter->getValueRange();
+                if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
+                    continue;
+                parameters.push_back({thetaWaveMacroName(i),
+                                      formatThetaWaveMacroValue(i, parameter->getCurrentValue(), *parameter),
                                       parameter->getCurrentValue(),
                                       range.getStart(),
                                       range.getEnd(),
