@@ -1165,7 +1165,17 @@ juce::Result Arrangement::applyBrowserDrop(const juce::String& description, int 
     return juce::Result::fail("Drop sounds, drums, instruments, MIDI FX, or audio effects on the arrangement.");
 }
 
-void Arrangement::changeListenerCallback(juce::ChangeBroadcaster*) { sync(); }
+void Arrangement::changeListenerCallback(juce::ChangeBroadcaster*)
+{
+    // Playback automation can publish parameter changes every block. Keep the
+    // gesture snapshot stable until the pointer is released.
+    if (dragging || automationDragging)
+    {
+        repaint();
+        return;
+    }
+    sync();
+}
 void Arrangement::editWillChange() { cancelDrag(); clips.clear(); waveforms.clear(); selected = {}; }
 void Arrangement::editDidChange() { sync(); fit(); }
 
