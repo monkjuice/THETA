@@ -626,6 +626,12 @@ int runArrangementTest()
         require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys::ctrlModifier, 'v')),
                 "Ctrl-V pastes selected notes");
         selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
+        require(selectionGrid.keyPressed(juce::KeyPress('A', juce::ModifierKeys::ctrlModifier, 'a')),
+                "Ctrl-A selects every note in the editor on Windows");
+        require(selectionGrid.selectedNotes.count() == selectionGrid.notes.count(),
+                "Ctrl-A selects all currently visible editor notes");
+        require(selectionGrid.keyPressed(juce::KeyPress('C', juce::ModifierKeys::ctrlModifier, 'c')),
+                "Ctrl-C copies every note after Ctrl-A");
         const auto sourceCell = selectionGrid.cell(1, rowForPitch(48)).getCentre();
         const auto targetCell = selectionGrid.cell(1, rowForPitch(50)).getCentre();
         const auto shiftLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier);

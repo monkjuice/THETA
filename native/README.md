@@ -9,7 +9,7 @@ Windows validation includes the Release build and four CTest cases. They cover d
 ## Use
 
 - Startup shows engine, device, and workspace phases before opening the editor. Phases correspond to actual initialization steps, not an estimated percentage. Engine construction still requires the message thread, so the loading screen may remain static during an individual phase.
-- Draw notes in the 16-step grid; drag an existing note or right-drag to erase. Each stroke is one undo action. The initial octave is MIDI 48–59; pitch-name labels use C4 for middle C.
+- Draw notes in the 16-step grid; drag an existing note or right-drag to erase. Each stroke is one undo action. Click the grid to focus it; its cyan border marks where note shortcuts apply. Ctrl+A (Command+A on macOS) selects all notes, and Ctrl/Command+C and V copy and paste the selection. The initial octave is MIDI 48–59; pitch-name labels use C4 for middle C.
 - Press Play to hear the pattern through 4OSC. Change BPM to keep the pattern one bar long. Synth Gain controls the Utility after the instrument.
 - Use Undo/Redo or Ctrl+Z / Ctrl+Shift+Z (Command on macOS). Space toggles playback when the grid is focused.
 - Save/Open use `.thetaedit` projects. Ctrl+S saves, Ctrl+Shift+S chooses another file, and Ctrl+O opens. An asterisk marks unsaved changes; opening/closing offers Save, Discard, or Cancel.

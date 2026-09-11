@@ -76,6 +76,11 @@ double StepGrid::visibleStepSpan() const
 void StepGrid::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xff1d2228));
+    if (hasKeyboardFocus(true))
+    {
+        g.setColour(juce::Colour(0xff55c7eb).withAlpha(0.12f));
+        g.fillRect(getLocalBounds().removeFromTop(static_cast<int>(headerHeight)));
+    }
     g.setFont(juce::FontOptions(12.0f));
     const auto dirty = g.getClipBounds().toFloat();
     const auto steps = session.editorStepCount();
@@ -121,15 +126,16 @@ void StepGrid::paint(juce::Graphics& g)
             if (bounds.getRight() < labelWidth || !dirty.intersects(bounds))
                 continue;
 
-            g.setColour(juce::Colour(0xffc6d58c));
+            const auto selected = selectedNotes.test(static_cast<size_t>(index));
+            g.setColour(selected ? juce::Colour(0xffe9a84a) : juce::Colour(0xffc6d58c));
             g.fillRect(bounds);
-            g.setColour(juce::Colour(0x55363f46));
+            g.setColour(selected ? juce::Colour(0x77482d15) : juce::Colour(0x55363f46));
             g.fillRect(bounds.withWidth(2.0f));
-            g.setColour(juce::Colour(0xffe8f2aa));
+            g.setColour(selected ? juce::Colour(0xffffe3a3) : juce::Colour(0xffe8f2aa));
             g.fillRect(bounds.withX(bounds.getRight() - 3.0f).withWidth(3.0f));
-            if (selectedNotes.test(static_cast<size_t>(index)))
+            if (selected)
             {
-                g.setColour(juce::Colour(0xfff4f0b0));
+                g.setColour(juce::Colour(0xfffff0c2));
                 g.drawRect(bounds.reduced(1.0f), 2.0f);
             }
         }
@@ -151,6 +157,11 @@ void StepGrid::paint(juce::Graphics& g)
     {
         g.setColour(playheadColour);
         g.fillRect(playhead, headerHeight, 2.0f, rowAreaHeight());
+    }
+    if (hasKeyboardFocus(true))
+    {
+        g.setColour(juce::Colour(0xff55c7eb));
+        g.drawRect(getLocalBounds().toFloat().reduced(1.0f), 2.0f);
     }
 }
 
@@ -252,6 +263,23 @@ void StepGrid::toggleSelection(int index)
     }
     selectedNotes.flip(static_cast<size_t>(index));
     repaint(cell(index % Session::steps, index / Session::steps).getSmallestIntegerContainer().expanded(3));
+}
+
+bool StepGrid::selectAllNotes()
+{
+    const auto before = selectedNotes;
+    selectedNotes.reset();
+    const auto steps = session.editorStepCount();
+    for (int row = 0; row < Session::pitches; ++row)
+        for (int step = 0; step < steps; ++step)
+        {
+            const auto index = row * Session::steps + step;
+            if (notes.test(static_cast<size_t>(index)))
+                selectedNotes.set(static_cast<size_t>(index));
+        }
+    if (selectedNotes != before)
+        repaint();
+    return selectedNotes.any();
 }
 
 void StepGrid::clearSelection()
@@ -452,6 +480,8 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
 bool StepGrid::keyPressed(const juce::KeyPress& key)
 {
     const auto command = isShortcutDown(key.getModifiers());
+    if (command && key.getKeyCode() == 'A')
+        return selectAllNotes();
     if (command && key.getKeyCode() == 'C')
         return copySelection();
     if (command && key.getKeyCode() == 'V')
@@ -466,6 +496,16 @@ bool StepGrid::keyPressed(const juce::KeyPress& key)
         return true;
     }
     return false;
+}
+
+void StepGrid::focusGained(juce::Component::FocusChangeType)
+{
+    repaint();
+}
+
+void StepGrid::focusLost(juce::Component::FocusChangeType)
+{
+    repaint();
 }
 
 void StepGrid::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)

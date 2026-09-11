@@ -17,6 +17,8 @@ public:
     void mouseUp(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed(const juce::KeyPress&) override;
+    void focusGained(juce::Component::FocusChangeType) override;
+    void focusLost(juce::Component::FocusChangeType) override;
     void resized() override;
 private:
     friend int runArrangementTest();
@@ -33,6 +35,7 @@ private:
     int resizeHit(juce::Point<float>) const;
     void apply(int index);
     void toggleSelection(int index);
+    bool selectAllNotes();
     void clearSelection();
     bool copySelection();
     bool pasteSelection();
