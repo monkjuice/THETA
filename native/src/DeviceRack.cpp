@@ -49,7 +49,7 @@ public:
         {
             setOpaque(true);
             refresh();
-            setSize(isThetaWave ? 920 : 680, isThetaWave ? 620 : 430);
+            setSize(isThetaWave ? 920 : 680, isThetaWave ? 700 : 430);
             startTimerHz(30);
         }
 
@@ -319,9 +319,15 @@ public:
             const auto cellW = area.getWidth() / columns;
             const auto cellH = area.getHeight() / rows;
             const juce::Rectangle<int> cell(area.getX() + column * cellW, area.getY() + row * cellH + yOffset, cellW, cellH);
-            labels[index]->setBounds(cell.getX() + 4, cell.getY(), cell.getWidth() - 8, 18);
-            sliders[index]->setBounds(cell.withSizeKeepingCentre(knobSize, knobSize).translated(0, 6));
-            values[index]->setBounds(cell.getX() + 4, cell.getBottom() - 18, cell.getWidth() - 8, 18);
+            const auto labelHeight = 18;
+            const auto valueHeight = 18;
+            const auto gap = 4;
+            const auto availableKnobHeight = std::max(34, cell.getHeight() - labelHeight - valueHeight - gap * 2);
+            const auto fittedKnob = std::min({knobSize, std::max(34, cell.getWidth() - 22), availableKnobHeight});
+            labels[index]->setBounds(cell.getX() + 4, cell.getY(), cell.getWidth() - 8, labelHeight);
+            values[index]->setBounds(cell.getX() + 4, cell.getBottom() - valueHeight, cell.getWidth() - 8, valueHeight);
+            const auto knobArea = cell.withTrimmedTop(labelHeight + gap).withTrimmedBottom(valueHeight + gap);
+            sliders[index]->setBounds(knobArea.withSizeKeepingCentre(fittedKnob, fittedKnob));
         }
 
         void layoutThetaWave()
@@ -329,7 +335,7 @@ public:
             const auto bounds = getLocalBounds().reduced(28);
             const auto top = bounds.getY() + 60;
             const auto gap = 14;
-            const auto topHeight = 252;
+            const auto topHeight = 300;
             const auto bottomHeight = bounds.getBottom() - top - topHeight - gap;
             oscillatorArea = {bounds.getX(), top, 548, topHeight};
             filterArea = {oscillatorArea.getRight() + 14, oscillatorArea.getY(), bounds.getRight() - oscillatorArea.getRight() - 14, oscillatorArea.getHeight()};
