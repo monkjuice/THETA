@@ -41,6 +41,7 @@ private:
     juce::ListBox list {"Devices", this};
     juce::OwnedArray<juce::Label> parameterLabels, parameterValues;
     juce::OwnedArray<juce::Slider> parameterSliders;
+    juce::OwnedArray<juce::TextButton> parameterAutomation;
     std::unique_ptr<FloatingDeviceWindow> floatingWindow;
 };
 }

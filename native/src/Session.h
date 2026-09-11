@@ -67,6 +67,8 @@ public:
         float minimum = 0.0f;
         float maximum = 1.0f;
         bool discrete = false;
+        bool automated = false;
+        bool automationOverridden = false;
     };
     struct DeviceTarget
     {
@@ -158,6 +160,7 @@ public:
     ClipAutomation clipAutomation(te::EditItemID) const;
     juce::Result setClipAutomationRamp(te::EditItemID, DeviceTarget, double startSeconds, double endSeconds,
                                        float startValue, float endValue);
+    juce::Result toggleParameterAutomationOverride(int track, int slot, int parameter);
     void applyClipAutomationAt(double timelineSeconds);
     juce::Result moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch);
     juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture, int targetTrack = -1);
@@ -189,6 +192,7 @@ private:
     void ensureEditablePatternClip();
     AutomationRuntime& automationRuntimeFor(DeviceTarget);
     AutomationRuntime* findAutomationRuntime(DeviceTarget);
+    const AutomationRuntime* findAutomationRuntime(DeviceTarget) const;
     te::MidiClip* patternClip = nullptr; // owned by edit
     te::EditItemID patternClipID;
     // Engine initialization also changes its edit flag asynchronously. Track

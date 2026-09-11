@@ -36,6 +36,23 @@ std::optional<Session::MidiEffect> midiEffectFromBrowserDrop(const juce::String&
     if (id == "ThetaArp") return Session::MidiEffect::ThetaArp;
     return std::nullopt;
 }
+
+void styleAutomationButton(juce::TextButton& button, const Session::DeviceParameter& parameter)
+{
+    button.setButtonText("A");
+    button.setEnabled(parameter.automated);
+    const auto fill = !parameter.automated ? juce::Colour(0xff242a30)
+        : parameter.automationOverridden ? juce::Colour(0xff8a6a2e)
+        : juce::Colour(0xff2f7d55);
+    const auto text = parameter.automated ? juce::Colour(0xffeef5ef) : juce::Colour(0xff63707a);
+    button.setColour(juce::TextButton::buttonColourId, fill);
+    button.setColour(juce::TextButton::buttonOnColourId, fill);
+    button.setColour(juce::TextButton::textColourOffId, text);
+    button.setColour(juce::TextButton::textColourOnId, text);
+    button.setTooltip(!parameter.automated ? "No automation for this parameter"
+        : parameter.automationOverridden ? "Manual override. Click to follow automation"
+        : "Following automation. Click to hold manual value");
+}
 }
 
 class DeviceRack::FloatingDeviceWindow final : public juce::DocumentWindow
@@ -112,6 +129,7 @@ public:
                 labels[i]->setBounds(x, y, cellWidth - 14, 18);
                 sliders[i]->setBounds(x + (cellWidth - 78) / 2, y + 20, 78, 58);
                 values[i]->setBounds(x, y + 78, cellWidth - 14, 18);
+                automationButtons[i]->setBounds(sliders[i]->getRight() - 10, sliders[i]->getY() - 2, 20, 18);
             }
         }
 
@@ -139,6 +157,7 @@ public:
                 auto* label = labels.add(new juce::Label());
                 auto* value = values.add(new juce::Label());
                 auto* slider = sliders.add(new juce::Slider());
+                auto* automation = automationButtons.add(new juce::TextButton());
                 label->setColour(juce::Label::textColourId, juce::Colour(0xffdce5ea));
                 label->setFont(juce::FontOptions(12.0f));
                 label->setJustificationType(juce::Justification::centred);
@@ -175,9 +194,16 @@ public:
                     session.endDeviceParameterGesture(track, slot, index);
                     refresh();
                 };
+                automation->onClick = [this, index]
+                {
+                    const auto result = session.toggleParameterAutomationOverride(track, slot, index);
+                    juce::ignoreUnused(result);
+                    refresh();
+                };
                 addAndMakeVisible(label);
                 addAndMakeVisible(value);
                 addAndMakeVisible(slider);
+                addAndMakeVisible(automation);
             }
 
             syncing = true;
@@ -187,6 +213,7 @@ public:
                 labels[i]->setVisible(visible);
                 values[i]->setVisible(visible);
                 sliders[i]->setVisible(visible);
+                automationButtons[i]->setVisible(visible);
                 if (!visible) continue;
                 const auto& parameter = parameters[static_cast<size_t>(i)];
                 const auto accent = thetaWaveAccent(i);
@@ -197,6 +224,7 @@ public:
                 sliders[i]->setColour(juce::Slider::trackColourId, isThetaWave ? accent : juce::Colour(0xff8cc5d2));
                 sliders[i]->setColour(juce::Slider::thumbColourId, isThetaWave ? accent.brighter(0.25f) : juce::Colour(0xffc6d58c));
                 sliders[i]->setTooltip(parameter.name + ": " + parameter.valueText);
+                styleAutomationButton(*automationButtons[i], parameter);
             }
             syncing = false;
             resized();
@@ -219,6 +247,7 @@ public:
                 values[i]->setText(parameters[static_cast<size_t>(i)].valueText, juce::dontSendNotification);
                 sliders[i]->setTooltip(parameters[static_cast<size_t>(i)].name + ": "
                                        + parameters[static_cast<size_t>(i)].valueText);
+                styleAutomationButton(*automationButtons[i], parameters[static_cast<size_t>(i)]);
             }
             syncing = false;
         }
@@ -367,6 +396,7 @@ public:
             values[index]->setBounds(cell.getX() + 4, cell.getBottom() - valueHeight, cell.getWidth() - 8, valueHeight);
             const auto knobArea = cell.withTrimmedTop(labelHeight + gap).withTrimmedBottom(valueHeight + gap);
             sliders[index]->setBounds(knobArea.withSizeKeepingCentre(fittedKnob, fittedKnob));
+            automationButtons[index]->setBounds(sliders[index]->getRight() - 12, sliders[index]->getY() - 2, 20, 18);
         }
 
         void layoutThetaWave()
@@ -387,6 +417,7 @@ public:
                 labels[i]->setVisible(visible);
                 values[i]->setVisible(visible);
                 sliders[i]->setVisible(visible);
+                automationButtons[i]->setVisible(visible);
             }
 
             const auto oscControls = oscillatorArea.reduced(18).removeFromBottom(96);
@@ -426,6 +457,7 @@ public:
         std::vector<Session::DeviceParameter> parameters;
         juce::OwnedArray<juce::Label> labels, values;
         juce::OwnedArray<juce::Slider> sliders;
+        juce::OwnedArray<juce::TextButton> automationButtons;
     };
 
     FloatingDeviceWindow(Session& session, int track, int slot)
@@ -527,16 +559,19 @@ void DeviceRack::resized()
         auto* name = parameterLabels[i];
         auto* slider = parameterSliders[i];
         auto* value = parameterValues[i];
+        auto* automation = parameterAutomation[i];
         if (i >= paramCount)
         {
             name->setVisible(false);
             slider->setVisible(false);
             value->setVisible(false);
+            automation->setVisible(false);
             continue;
         }
         name->setVisible(true);
         slider->setVisible(true);
         value->setVisible(true);
+        automation->setVisible(true);
         const auto col = i % columns;
         const auto row = i / columns;
         const juce::Rectangle<int> cell(parameterArea.getX() + col * cellWidth,
@@ -546,6 +581,7 @@ void DeviceRack::resized()
         name->setBounds(cell.getX() + 4, cell.getY(), cell.getWidth() - 8, 18);
         slider->setBounds(cell.withSizeKeepingCentre(knobSize, knobSize).translated(0, 4));
         value->setBounds(cell.getX() + 4, cell.getBottom() - 20, cell.getWidth() - 8, 18);
+        automation->setBounds(slider->getRight() - 10, slider->getY() - 2, 20, 18);
     }
 }
 
@@ -625,6 +661,7 @@ void DeviceRack::rebuildParameterControls()
         auto* name = parameterLabels.add(new juce::Label());
         auto* value = parameterValues.add(new juce::Label());
         auto* slider = parameterSliders.add(new juce::Slider());
+        auto* automation = parameterAutomation.add(new juce::TextButton());
         name->setColour(juce::Label::textColourId, juce::Colour(0xffdfe6ea));
         name->setFont(juce::FontOptions(12.0f));
         name->setJustificationType(juce::Justification::centred);
@@ -652,9 +689,16 @@ void DeviceRack::rebuildParameterControls()
             const auto result = session.endDeviceParameterGesture(selectedTrack, selectedSlot, index);
             if (result.failed() && status) status(result.getErrorMessage());
         };
+        automation->onClick = [this, index]
+        {
+            const auto result = session.toggleParameterAutomationOverride(selectedTrack, selectedSlot, index);
+            if (status)
+                status(result.wasOk() ? "Toggled parameter automation" : result.getErrorMessage());
+        };
         addAndMakeVisible(name);
         addAndMakeVisible(value);
         addAndMakeVisible(slider);
+        addAndMakeVisible(automation);
     }
 
     syncing = true;
@@ -664,6 +708,7 @@ void DeviceRack::rebuildParameterControls()
         parameterLabels[i]->setVisible(visible);
         parameterValues[i]->setVisible(visible);
         parameterSliders[i]->setVisible(visible);
+        parameterAutomation[i]->setVisible(visible);
         if (!visible) continue;
         const auto& parameter = parameters[static_cast<size_t>(i)];
         parameterLabels[i]->setText(parameter.name, juce::dontSendNotification);
@@ -671,6 +716,7 @@ void DeviceRack::rebuildParameterControls()
         parameterSliders[i]->setRange(parameter.minimum, parameter.maximum, parameter.discrete ? 1.0 : 0.0);
         parameterSliders[i]->setValue(parameter.value, juce::dontSendNotification);
         parameterSliders[i]->setTooltip(parameter.name + ": " + parameter.valueText);
+        styleAutomationButton(*parameterAutomation[i], parameter);
     }
     syncing = false;
     resized();

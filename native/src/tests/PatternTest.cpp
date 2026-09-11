@@ -197,6 +197,9 @@ int runPatternTest()
         require(storedAutomation.active && storedAutomation.target.track == 0 && storedAutomation.target.slot == 0
                 && storedAutomation.target.parameter == 0,
                 "Clip automation restores its target parameter");
+        synthMacros = session.deviceParameters(0, 0);
+        require(synthMacros[0].automated && !synthMacros[0].automationOverridden,
+                "Automated parameters report following state to device panels");
         session.applyClipAutomationAt(0.5);
         require(std::abs(session.synth->ampAttack->getCurrentValue() - (attackMinimum + attackMaximum) * 0.5f) < 0.02f,
                 "Clip automation applies interpolated parameter values during playback");
@@ -210,6 +213,15 @@ int runPatternTest()
         session.applyClipAutomationAt(0.75);
         require(std::abs(session.synth->ampAttack->getCurrentValue() - overrideAttack) < 0.02f,
                 "Manual override wins over clip automation until automation is re-enabled");
+        synthMacros = session.deviceParameters(0, 0);
+        require(synthMacros[0].automated && synthMacros[0].automationOverridden,
+                "Device panels can show manual automation override state");
+        require(session.toggleParameterAutomationOverride(0, 0, 0).wasOk(),
+                "Automation indicators can return a parameter to automation");
+        session.applyClipAutomationAt(0.75);
+        require(std::abs(session.synth->ampAttack->getCurrentValue()
+                         - (attackMinimum + (attackMaximum - attackMinimum) * 0.75f)) < 0.02f,
+                "Re-enabled automation drives the parameter again");
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
                 "Reese bass preset loads sustained electronic bass notes");

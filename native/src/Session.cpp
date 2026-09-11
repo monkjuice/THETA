@@ -169,6 +169,25 @@ bool sameDeviceTarget(Session::DeviceTarget a, Session::DeviceTarget b)
     return a.track == b.track && a.slot == b.slot && a.parameter == b.parameter;
 }
 
+bool hasClipAutomationTarget(const te::Edit& edit, Session::DeviceTarget target)
+{
+    for (auto* track : te::getAudioTracks(edit))
+        for (auto* clip : track->getClips())
+        {
+            const auto state = clip->state.getChildWithName(clipAutomationID);
+            if (!state.isValid())
+                continue;
+            const Session::DeviceTarget clipTarget {
+                static_cast<int>(state.getProperty(automationTrackID, -1)),
+                static_cast<int>(state.getProperty(automationSlotID, -1)),
+                static_cast<int>(state.getProperty(automationParameterID, -1))
+            };
+            if (sameDeviceTarget(clipTarget, target))
+                return true;
+        }
+    return false;
+}
+
 te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type)
 {
     for (auto* plugin : track.pluginList)
@@ -1371,12 +1390,16 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
                 const auto range = parameter->getValueRange();
                 if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
                     continue;
+                const DeviceTarget target {track, slot, i};
+                const auto* runtime = findAutomationRuntime(target);
                 parameters.push_back({fourOscMacroName(i),
                                       formatFourOscMacroValue(i, parameter->getCurrentValue(), *parameter),
                                       parameter->getCurrentValue(),
                                       range.getStart(),
                                       range.getEnd(),
-                                      parameter->isDiscrete()});
+                                      parameter->isDiscrete(),
+                                      hasClipAutomationTarget(*edit, target),
+                                      runtime != nullptr && runtime->overridden});
             }
         return parameters;
     }
@@ -1389,29 +1412,39 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
                 const auto range = parameter->getValueRange();
                 if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
                     continue;
+                const DeviceTarget target {track, slot, i};
+                const auto* runtime = findAutomationRuntime(target);
                 parameters.push_back({thetaWaveMacroName(i),
                                       formatThetaWaveMacroValue(i, parameter->getCurrentValue(), *parameter),
                                       parameter->getCurrentValue(),
                                       range.getStart(),
                                       range.getEnd(),
-                                      parameter->isDiscrete()});
+                                      parameter->isDiscrete(),
+                                      hasClipAutomationTarget(*edit, target),
+                                      runtime != nullptr && runtime->overridden});
             }
         return parameters;
     }
 
+    int parameterIndex = 0;
     for (auto* parameter : plugin->getAutomatableParameters())
     {
         if (parameter == nullptr || !parameter->isParameterActive())
             continue;
+        const auto currentIndex = parameterIndex++;
         const auto range = parameter->getValueRange();
         if (!std::isfinite(range.getStart()) || !std::isfinite(range.getEnd()) || range.getLength() <= 0.0f)
             continue;
+        const DeviceTarget target {track, slot, currentIndex};
+        const auto* runtime = findAutomationRuntime(target);
         parameters.push_back({parameter->getParameterShortName(18),
                               parameter->getCurrentValueAsStringWithLabel(),
                               parameter->getCurrentValue(),
                               range.getStart(),
                               range.getEnd(),
-                              parameter->isDiscrete()});
+                              parameter->isDiscrete(),
+                              hasClipAutomationTarget(*edit, target),
+                              runtime != nullptr && runtime->overridden});
     }
     return parameters;
 }
@@ -1787,6 +1820,40 @@ Session::AutomationRuntime* Session::findAutomationRuntime(DeviceTarget target)
         if (sameDeviceTarget(runtime.target, target))
             return &runtime;
     return nullptr;
+}
+
+const Session::AutomationRuntime* Session::findAutomationRuntime(DeviceTarget target) const
+{
+    for (const auto& runtime : automationRuntime)
+        if (sameDeviceTarget(runtime.target, target))
+            return &runtime;
+    return nullptr;
+}
+
+juce::Result Session::toggleParameterAutomationOverride(int track, int slot, int parameter)
+{
+    const DeviceTarget target {track, slot, parameter};
+    if (!target.isValid())
+        return juce::Result::fail("Select an automated parameter first.");
+    if (!hasClipAutomationTarget(*edit, target))
+        return juce::Result::fail("This parameter has no clip automation.");
+
+    const auto tracks = te::getAudioTracks(*edit);
+    if (!juce::isPositiveAndBelow(track, tracks.size()) || !juce::isPositiveAndBelow(slot, tracks[track]->pluginList.size()))
+        return juce::Result::fail("Select a device first.");
+    auto* plugin = tracks[track]->pluginList[slot];
+    if (plugin == nullptr)
+        return juce::Result::fail("Select a device first.");
+    auto* pluginParameter = exposedParameterAt(*plugin, parameter);
+    if (pluginParameter == nullptr)
+        return juce::Result::fail("Select a parameter first.");
+
+    auto& runtime = automationRuntimeFor(target);
+    runtime.baseValue = pluginParameter->getCurrentValue();
+    runtime.hasBaseValue = true;
+    runtime.overridden = !runtime.overridden;
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 void Session::applyClipAutomationAt(double timelineSeconds)
