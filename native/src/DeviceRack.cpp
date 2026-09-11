@@ -66,7 +66,7 @@ public:
             g.drawText(deviceName, 34, 28, getWidth() - 68, 34, juce::Justification::centredLeft, true);
             g.setColour(juce::Colour(0xff8cc5d2));
             g.setFont(juce::FontOptions(11.0f));
-            g.drawText("THETA FX", 36, 62, 120, 18, juce::Justification::centredLeft, true);
+            g.drawText(deviceTypeLabel, 36, 62, 160, 18, juce::Justification::centredLeft, true);
 
             const juce::Rectangle<float> scope(210.0f, 88.0f, 260.0f, 126.0f);
             g.setColour(juce::Colour(0xff171b20));
@@ -87,16 +87,19 @@ public:
         void resized() override
         {
             const auto count = static_cast<int>(sliders.size());
-            const int top = 244;
+            const int top = 238;
+            const int cellWidth = 182;
+            const int cellHeight = 104;
+            const int left = 68;
             for (int i = 0; i < count; ++i)
             {
                 const int col = i % 3;
                 const int row = i / 3;
-                const int x = 36 + col * 210;
-                const int y = top + row * 74;
-                sliders[i]->setBounds(x, y, 82, 58);
-                labels[i]->setBounds(x + 90, y + 4, 94, 22);
-                values[i]->setBounds(x + 90, y + 28, 76, 22);
+                const int x = left + col * cellWidth;
+                const int y = top + row * cellHeight;
+                labels[i]->setBounds(x, y, cellWidth - 14, 18);
+                sliders[i]->setBounds(x + (cellWidth - 78) / 2, y + 20, 78, 58);
+                values[i]->setBounds(x, y + 78, cellWidth - 14, 18);
             }
         }
 
@@ -111,6 +114,10 @@ public:
         {
             const auto deviceSlots = session.deviceSlots(track);
             deviceName = juce::isPositiveAndBelow(slot, deviceSlots.size()) ? deviceSlots[static_cast<size_t>(slot)].name : "Device";
+            const auto deviceType = juce::isPositiveAndBelow(slot, deviceSlots.size()) ? deviceSlots[static_cast<size_t>(slot)].type : juce::String();
+            deviceTypeLabel = deviceType == ThetaWaveDevice::xmlTypeName ? "THETA SYNTH"
+                : deviceType == DrumDevice::xmlTypeName || deviceType == te::FourOscPlugin::xmlTypeName ? "THETA INSTRUMENT"
+                : "THETA FX";
             parameters = session.deviceParameters(track, slot);
             while (labels.size() < static_cast<int>(parameters.size()))
             {
@@ -120,9 +127,10 @@ public:
                 auto* slider = sliders.add(new juce::Slider());
                 label->setColour(juce::Label::textColourId, juce::Colour(0xffdce5ea));
                 label->setFont(juce::FontOptions(12.0f));
+                label->setJustificationType(juce::Justification::centred);
                 value->setColour(juce::Label::textColourId, juce::Colour(0xff94a9b4));
                 value->setFont(juce::FontOptions(12.0f));
-                value->setJustificationType(juce::Justification::centredRight);
+                value->setJustificationType(juce::Justification::centred);
                 slider->setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
                 slider->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
                 slider->setColour(juce::Slider::trackColourId, juce::Colour(0xff8cc5d2));
@@ -173,7 +181,7 @@ public:
         int track = 0, slot = 0;
         bool syncing = false;
         float animationPhase = 0.0f;
-        juce::String deviceName;
+        juce::String deviceName, deviceTypeLabel;
         std::vector<Session::DeviceParameter> parameters;
         juce::OwnedArray<juce::Label> labels, values;
         juce::OwnedArray<juce::Slider> sliders;
