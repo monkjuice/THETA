@@ -50,6 +50,7 @@ private:
         int track = 0;
         juce::Colour colour;
         int clipPlugins = 0;
+        Session::ClipAutomation automation;
     };
     enum class LoopGesture { none, create, move, trimStart, trimEnd };
     void sync();
@@ -69,6 +70,7 @@ private:
     double timeAt(float x) const;
     double snapped(double seconds, bool bypass) const;
     double snappedClipMoveStart(double desiredStart, double length, int targetTrack, bool bypass) const;
+    float automationValueForY(const ClipView&, float y, Session::DeviceTarget) const;
     LoopGesture loopGestureAt(juce::Point<float>) const;
     juce::Rectangle<float> lane(int track) const;
     float laneHeight() const;
@@ -84,7 +86,7 @@ private:
     juce::AudioThumbnailCache thumbnailCache {32};
     std::map<juce::String, std::unique_ptr<Waveform>> waveforms;
     std::vector<ClipView> clips;
-    juce::TextButton fitButton, zoomIn, zoomOut, splitButton, duplicateButton, addTrack, removeTrack, snap;
+    juce::TextButton fitButton, zoomIn, zoomOut, splitButton, duplicateButton, addTrack, removeTrack, snap, automationButton;
     juce::ComboBox snapSize;
     std::vector<std::unique_ptr<juce::TextButton>> mute, solo;
     juce::ScrollBar scroll {false}, trackScrollBar {true};
@@ -99,6 +101,10 @@ private:
     double dragTime = 0.0, sourceDuration = 0.0;
     LoopGesture loopGesture = LoopGesture::none;
     double loopAnchor = 0.0, loopOriginalStart = 0.0, loopOriginalEnd = 0.0, loopPreviewStart = 0.0, loopPreviewEnd = 0.0;
+    bool automationDragging = false;
+    Session::DeviceTarget automationTarget;
+    double automationStartTime = 0.0, automationEndTime = 0.0;
+    float automationStartValue = 0.0f, automationEndValue = 0.0f;
     float playhead = -1.0f;
     static constexpr float headerWidth = 148.0f, rulerTop = 32.0f, lanesTop = 56.0f;
 };

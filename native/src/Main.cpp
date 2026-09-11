@@ -5,6 +5,7 @@
 #include "Arrangement.h"
 #include "BrowserPanel.h"
 #include "DeviceRack.h"
+#include "Playhead.h"
 #include "StartupScreen.h"
 #include <cmath>
 #include <stdexcept>
@@ -197,7 +198,7 @@ public:
         changeListenerCallback(nullptr);
         // This updates a text readout only. Pointer events and control painting
         // are not throttled to this timer; there is no full-window repaint loop.
-        startTimerHz(10);
+        startTimerHz(30);
     }
 
     ~ControlWindow() override
@@ -443,6 +444,8 @@ private:
 
     void timerCallback() override
     {
+        if (session.edit->getTransport().isPlaying())
+            session.applyClipAutomationAt(playheadTime(session.edit->getTransport()));
         const auto text = juce::String(session.edit->getTransport().getPosition().inSeconds(), 1) + " s";
         if (position.getText() != text)
             position.setText(text, juce::dontSendNotification);

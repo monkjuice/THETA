@@ -110,6 +110,7 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     addTrack.setButtonText(L"+");
     removeTrack.setButtonText(L"\u2212");
     snap.setButtonText(L"\u2317");
+    automationButton.setButtonText("A");
     fitButton.setTooltip("Fit arrangement");
     zoomOut.setTooltip("Zoom out");
     zoomIn.setTooltip("Zoom in");
@@ -118,13 +119,22 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     addTrack.setTooltip("Add track");
     removeTrack.setTooltip("Remove selected track");
     snap.setTooltip("Toggle clip snap");
+    automationButton.setTooltip("Draw automation for the last moved device knob");
     snap.setClickingTogglesState(true);
     snap.setToggleState(true, juce::dontSendNotification);
+    automationButton.setClickingTogglesState(true);
     fitButton.onClick = [this] { fit(); };
     zoomIn.onClick = [this] { zoom(0.5, viewStart + viewSpan * 0.5); };
     zoomOut.onClick = [this] { zoom(2.0, viewStart + viewSpan * 0.5); };
     splitButton.onClick = [this] { splitSelectedAtPlayhead(); };
     duplicateButton.onClick = [this] { duplicateSelected(); };
+    automationButton.onClick = [this]
+    {
+        if (automationButton.getToggleState() && status)
+            status(session.lastTouchedDeviceParameter().isValid()
+                ? "Automation draw: drag across a clip to write the last moved knob"
+                : "Move a device knob first, then draw automation");
+    };
     addTrack.onClick = [this]
     {
         const auto result = session.addAudioTrack();
@@ -142,7 +152,7 @@ Arrangement::Arrangement(Session& s) : session(s), vblank(this, [this] { updateP
     snapSize.setSelectedId(1, juce::dontSendNotification);
     snapSize.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff262c32));
     snapSize.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff46515a));
-    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &addTrack, &removeTrack, &snap, &scroll, &trackScrollBar})
+    for (auto* control : std::initializer_list<juce::Component*>{&fitButton, &zoomIn, &zoomOut, &splitButton, &duplicateButton, &addTrack, &removeTrack, &snap, &automationButton, &scroll, &trackScrollBar})
         addAndMakeVisible(control);
     addAndMakeVisible(snapSize);
     sync();
@@ -254,6 +264,61 @@ void Arrangement::paint(juce::Graphics& g)
             g.drawText("FX" + juce::String(clip.clipPlugins), badge, juce::Justification::centred, true);
         }
         const auto position = dragging && clip.id == selected ? preview : clip.position;
+        const auto drawAutomation = [&] (const Session::ClipAutomation& automation, double startTime,
+                                         double endTime, float startValue, float endValue, bool previewLine)
+        {
+            if (!automation.active && !previewLine) return;
+            const auto minValue = automation.maximum > automation.minimum ? automation.minimum : 0.0f;
+            const auto maxValue = automation.maximum > automation.minimum ? automation.maximum : 1.0f;
+            const auto autoArea = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
+            const auto yFor = [autoArea, minValue, maxValue](float value)
+            {
+                const auto amount = std::clamp((value - minValue) / std::max(0.0001f, maxValue - minValue), 0.0f, 1.0f);
+                return autoArea.getBottom() - amount * autoArea.getHeight();
+            };
+            const auto x1 = xFor(startTime);
+            const auto x2 = xFor(endTime);
+            const auto y1 = yFor(startValue);
+            const auto y2 = yFor(endValue);
+            g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(0.25f));
+            g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
+            g.setColour(previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff));
+            g.drawLine(x1, y1, x2, y2, 2.0f);
+            g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x1, y1}));
+            g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x2, y2}));
+            if (!automation.parameterName.isEmpty())
+            {
+                g.setFont(juce::FontOptions(11.0f));
+                g.drawText(automation.parameterName, autoArea.withHeight(16.0f).reduced(4.0f, 0.0f),
+                           juce::Justification::centredRight, true);
+            }
+        };
+        if (clip.automation.active)
+        {
+            drawAutomation(clip.automation,
+                           position.start + clip.automation.startSeconds,
+                           position.start + clip.automation.endSeconds,
+                           clip.automation.startValue,
+                           clip.automation.endValue,
+                           false);
+        }
+        if (automationDragging && clip.id == selected)
+        {
+            auto previewAutomation = clip.automation;
+            previewAutomation.active = true;
+            previewAutomation.target = automationTarget;
+            previewAutomation.startSeconds = 0.0;
+            previewAutomation.endSeconds = 1.0;
+            const auto parameters = session.deviceParameters(automationTarget.track, automationTarget.slot);
+            if (juce::isPositiveAndBelow(automationTarget.parameter, parameters.size()))
+            {
+                previewAutomation.parameterName = parameters[static_cast<size_t>(automationTarget.parameter)].name;
+                previewAutomation.minimum = parameters[static_cast<size_t>(automationTarget.parameter)].minimum;
+                previewAutomation.maximum = parameters[static_cast<size_t>(automationTarget.parameter)].maximum;
+            }
+            drawAutomation(previewAutomation, automationStartTime, automationEndTime,
+                           automationStartValue, automationEndValue, true);
+        }
         if (clip.waveform)
         {
             auto waveArea = visible.withTop(box.getY() + 26.0f).reduced(0, 5).getSmallestIntegerContainer();
@@ -335,7 +400,8 @@ void Arrangement::resized()
     addTrack.setBounds(352, 3, 34, 26);
     removeTrack.setBounds(392, 3, 34, 26);
     snap.setBounds(436, 3, 34, 26);
-    snapSize.setBounds(476, 3, 74, 26);
+    automationButton.setBounds(476, 3, 34, 26);
+    snapSize.setBounds(516, 3, 74, 26);
     syncTrackControls();
     for (int i = 0; i < session.trackCount(); ++i)
     {
@@ -370,7 +436,8 @@ void Arrangement::sync()
                 continue;
             const auto p = clip->getPosition();
             ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(),
-                           p.offset.inSeconds() + p.time.getLength().inSeconds(), track, clip->getColour(), session.clipPluginCount(clip->itemID)};
+                           p.offset.inSeconds() + p.time.getLength().inSeconds(), track, clip->getColour(), session.clipPluginCount(clip->itemID),
+                           session.clipAutomation(clip->itemID)};
             if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
             {
                 const auto file = clip->getSourceFileReference().getFile();
@@ -520,6 +587,26 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
         if (result.failed() && status) status(result.getErrorMessage());
     }
     repaint();
+    if (automationButton.getToggleState())
+    {
+        automationTarget = session.lastTouchedDeviceParameter();
+        if (!automationTarget.isValid())
+        {
+            if (status) status("Move a device knob first, then draw automation.");
+            return;
+        }
+        const auto parameters = session.deviceParameters(automationTarget.track, automationTarget.slot);
+        if (!juce::isPositiveAndBelow(automationTarget.parameter, parameters.size()))
+        {
+            if (status) status("The last moved knob is no longer available.");
+            return;
+        }
+        automationDragging = true;
+        automationStartTime = automationEndTime = snapped(std::clamp(timeAt(event.position.x), clip.position.start, clip.position.end), event.mods.isAltDown());
+        automationStartValue = automationEndValue = automationValueForY(clip, event.position.y, automationTarget);
+        repaint(bounds(clip).getSmallestIntegerContainer());
+        return;
+    }
     original = preview = clip.position;
     originalTrack = previewTrack = clip.track;
     sourceDuration = clip.sourceDuration;
@@ -533,6 +620,17 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
 
 void Arrangement::mouseDrag(const juce::MouseEvent& event)
 {
+    if (automationDragging)
+    {
+        for (const auto& clip : clips)
+            if (clip.id == selected)
+            {
+                automationEndTime = snapped(std::clamp(timeAt(event.position.x), clip.position.start, clip.position.end), event.mods.isAltDown());
+                automationEndValue = automationValueForY(clip, event.position.y, automationTarget);
+                repaint(bounds(clip).getSmallestIntegerContainer());
+                return;
+            }
+    }
     if (loopGesture != LoopGesture::none)
     {
         constexpr auto minimumLoopSeconds = 0.02;
@@ -588,6 +686,23 @@ void Arrangement::mouseDrag(const juce::MouseEvent& event)
 
 void Arrangement::mouseUp(const juce::MouseEvent& event)
 {
+    if (automationDragging)
+    {
+        mouseDrag(event);
+        automationDragging = false;
+        const auto result = session.setClipAutomationRamp(selected, automationTarget, automationStartTime, automationEndTime,
+                                                          automationStartValue, automationEndValue);
+        if (status)
+        {
+            const auto parameters = session.deviceParameters(automationTarget.track, automationTarget.slot);
+            const auto name = juce::isPositiveAndBelow(automationTarget.parameter, parameters.size())
+                ? parameters[static_cast<size_t>(automationTarget.parameter)].name
+                : juce::String("parameter");
+            status(result.wasOk() ? "Clip automation: " + name : result.getErrorMessage());
+        }
+        repaint();
+        return;
+    }
     if (loopGesture != LoopGesture::none)
     {
         mouseDrag(event);
@@ -634,10 +749,15 @@ void Arrangement::mouseMove(const juce::MouseEvent& event)
         pointerStyle = juce::MouseCursor::CrosshairCursor;
     else if (index >= 0)
     {
-        const auto box = bounds(clips[static_cast<size_t>(index)]);
-        const auto handle = std::min(7.0f, box.getWidth() * 0.25f);
-        pointerStyle = event.position.x - box.getX() < handle || box.getRight() - event.position.x < handle
-            ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor;
+        if (automationButton.getToggleState())
+            pointerStyle = juce::MouseCursor::CrosshairCursor;
+        else
+        {
+            const auto box = bounds(clips[static_cast<size_t>(index)]);
+            const auto handle = std::min(7.0f, box.getWidth() * 0.25f);
+            pointerStyle = event.position.x - box.getX() < handle || box.getRight() - event.position.x < handle
+                ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor;
+        }
     }
     setMouseCursor(pointerStyle);
 }

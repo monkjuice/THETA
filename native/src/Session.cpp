@@ -6,6 +6,14 @@ namespace
 {
 const juce::Identifier starterPlaceholderID {"thetaStarterPlaceholder"};
 const juce::Identifier editorStepsID {"thetaEditorSteps"};
+const juce::Identifier clipAutomationID {"thetaClipAutomation"};
+const juce::Identifier automationTrackID {"track"};
+const juce::Identifier automationSlotID {"slot"};
+const juce::Identifier automationParameterID {"parameter"};
+const juce::Identifier automationStartID {"start"};
+const juce::Identifier automationEndID {"end"};
+const juce::Identifier automationStartValueID {"startValue"};
+const juce::Identifier automationEndValueID {"endValue"};
 bool commandLineTestMode = false;
 
 struct PresetNote { int step, pitch, length; };
@@ -1357,6 +1365,7 @@ juce::Result Session::beginDeviceParameterGesture(int track, int slot, int param
     if (plugin == nullptr) return juce::Result::fail("Select a device first.");
     auto* parameter = exposedParameterAt(*plugin, parameterIndex);
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
+    lastTouchedParameter = {track, slot, parameterIndex};
     parameter->parameterChangeGestureBegin();
     return juce::Result::ok();
 }
@@ -1370,6 +1379,7 @@ juce::Result Session::setDeviceParameter(int track, int slot, int parameterIndex
     if (plugin == nullptr) return juce::Result::fail("Select a device first.");
     auto* parameter = exposedParameterAt(*plugin, parameterIndex);
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
+    lastTouchedParameter = {track, slot, parameterIndex};
     const auto range = parameter->getValueRange();
     const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
     parameter->setParameter(next, juce::sendNotification);
@@ -1612,6 +1622,119 @@ bool Session::shouldShowClipInArrangement(te::Clip& clip) const
         return true;
     return !static_cast<bool>(clip.state.getProperty(starterPlaceholderID, false))
         || midi->getSequence().getNumNotes() > 0;
+}
+
+Session::ClipAutomation Session::clipAutomation(te::EditItemID id) const
+{
+    ClipAutomation automation;
+    auto* clip = findClip(id);
+    if (clip == nullptr)
+        return automation;
+
+    const auto state = clip->state.getChildWithName(clipAutomationID);
+    if (!state.isValid())
+        return automation;
+
+    automation.target.track = static_cast<int>(state.getProperty(automationTrackID, -1));
+    automation.target.slot = static_cast<int>(state.getProperty(automationSlotID, -1));
+    automation.target.parameter = static_cast<int>(state.getProperty(automationParameterID, -1));
+    automation.startSeconds = static_cast<double>(state.getProperty(automationStartID, 0.0));
+    automation.endSeconds = static_cast<double>(state.getProperty(automationEndID, 0.0));
+    automation.startValue = static_cast<float>(state.getProperty(automationStartValueID, 0.0));
+    automation.endValue = static_cast<float>(state.getProperty(automationEndValueID, 0.0));
+    automation.active = automation.target.isValid()
+        && std::isfinite(automation.startSeconds)
+        && std::isfinite(automation.endSeconds)
+        && automation.endSeconds > automation.startSeconds;
+
+    const auto parameters = deviceParameters(automation.target.track, automation.target.slot);
+    if (juce::isPositiveAndBelow(automation.target.parameter, parameters.size()))
+    {
+        const auto& parameter = parameters[static_cast<size_t>(automation.target.parameter)];
+        automation.parameterName = parameter.name;
+        automation.minimum = parameter.minimum;
+        automation.maximum = parameter.maximum;
+    }
+    return automation;
+}
+
+juce::Result Session::setClipAutomationRamp(te::EditItemID id, DeviceTarget target, double startSeconds, double endSeconds,
+                                            float startValue, float endValue)
+{
+    auto* clip = findClip(id);
+    if (clip == nullptr)
+        return juce::Result::fail("Select a clip first.");
+    if (!target.isValid())
+        return juce::Result::fail("Move a device knob first, then draw automation.");
+
+    auto parameters = deviceParameters(target.track, target.slot);
+    if (!juce::isPositiveAndBelow(target.parameter, parameters.size()))
+        return juce::Result::fail("The last touched knob is no longer available.");
+    const auto& parameter = parameters[static_cast<size_t>(target.parameter)];
+
+    if (endSeconds < startSeconds)
+    {
+        std::swap(startSeconds, endSeconds);
+        std::swap(startValue, endValue);
+    }
+    const auto clipStart = clip->getPosition().time.getStart().inSeconds();
+    const auto clipEnd = clip->getPosition().time.getEnd().inSeconds();
+    startSeconds = juce::jlimit(clipStart, clipEnd, startSeconds);
+    endSeconds = juce::jlimit(clipStart, clipEnd, endSeconds);
+    if (endSeconds - startSeconds < 0.02)
+        return juce::Result::fail("Draw a longer automation span.");
+
+    startValue = juce::jlimit(parameter.minimum, parameter.maximum, startValue);
+    endValue = juce::jlimit(parameter.minimum, parameter.maximum, endValue);
+
+    edit->getUndoManager().beginNewTransaction("Draw clip automation");
+    if (const auto existing = clip->state.getChildWithName(clipAutomationID); existing.isValid())
+        clip->state.removeChild(existing, &edit->getUndoManager());
+    juce::ValueTree automation(clipAutomationID);
+    automation.setProperty(automationTrackID, target.track, &edit->getUndoManager());
+    automation.setProperty(automationSlotID, target.slot, &edit->getUndoManager());
+    automation.setProperty(automationParameterID, target.parameter, &edit->getUndoManager());
+    automation.setProperty(automationStartID, startSeconds - clipStart, &edit->getUndoManager());
+    automation.setProperty(automationEndID, endSeconds - clipStart, &edit->getUndoManager());
+    automation.setProperty(automationStartValueID, startValue, &edit->getUndoManager());
+    automation.setProperty(automationEndValueID, endValue, &edit->getUndoManager());
+    clip->state.addChild(automation, -1, &edit->getUndoManager());
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+void Session::applyClipAutomationAt(double timelineSeconds)
+{
+    if (!std::isfinite(timelineSeconds) || timelineSeconds < 0.0)
+        return;
+
+    for (auto* track : te::getAudioTracks(*edit))
+        for (auto* clip : track->getClips())
+        {
+            const auto automation = clipAutomation(clip->itemID);
+            if (!automation.active)
+                continue;
+            const auto clipStart = clip->getPosition().time.getStart().inSeconds();
+            const auto local = timelineSeconds - clipStart;
+            if (local < automation.startSeconds || local > automation.endSeconds)
+                continue;
+
+            const auto amount = (local - automation.startSeconds) / (automation.endSeconds - automation.startSeconds);
+            const auto value = static_cast<float>(automation.startValue + (automation.endValue - automation.startValue) * amount);
+            const auto targetTracks = te::getAudioTracks(*edit);
+            if (!juce::isPositiveAndBelow(automation.target.track, targetTracks.size())
+                || !juce::isPositiveAndBelow(automation.target.slot, targetTracks[automation.target.track]->pluginList.size()))
+                continue;
+            auto* plugin = targetTracks[automation.target.track]->pluginList[automation.target.slot];
+            if (plugin == nullptr)
+                continue;
+            if (auto* parameter = exposedParameterAt(*plugin, automation.target.parameter))
+            {
+                const auto range = parameter->getValueRange();
+                parameter->setParameter(juce::jlimit(range.getStart(), range.getEnd(), value), juce::sendNotification);
+            }
+        }
 }
 
 juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture gesture, int targetTrack)

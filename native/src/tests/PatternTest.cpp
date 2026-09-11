@@ -187,6 +187,18 @@ int runPatternTest()
         const auto previousAttack = session.synth->ampAttack->getCurrentValue();
         require(session.setDeviceParameter(0, 0, 0, previousAttack + 0.05f).wasOk(), "4OSC Attack macro can be edited from the rack");
         require(session.synth->ampAttack->getCurrentValue() > previousAttack, "4OSC Attack macro writes to the synth envelope");
+        const auto automatedClip = session.pattern().itemID;
+        const auto attackMinimum = synthMacros[0].minimum;
+        const auto attackMaximum = std::min(synthMacros[0].maximum, attackMinimum + 1.0f);
+        require(session.setClipAutomationRamp(automatedClip, {0, 0, 0}, 0.0, 1.0, attackMinimum, attackMaximum).wasOk(),
+                "Clip automation stores a device parameter ramp");
+        const auto storedAutomation = session.clipAutomation(automatedClip);
+        require(storedAutomation.active && storedAutomation.target.track == 0 && storedAutomation.target.slot == 0
+                && storedAutomation.target.parameter == 0,
+                "Clip automation restores its target parameter");
+        session.applyClipAutomationAt(0.5);
+        require(std::abs(session.synth->ampAttack->getCurrentValue() - (attackMinimum + attackMaximum) * 0.5f) < 0.02f,
+                "Clip automation applies interpolated parameter values during playback");
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
                 "Reese bass preset loads sustained electronic bass notes");

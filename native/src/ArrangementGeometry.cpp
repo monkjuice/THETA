@@ -79,6 +79,17 @@ double Arrangement::snappedClipMoveStart(double desiredStart, double length, int
     return std::max(0.0, bestPixels < std::numeric_limits<float>::max() ? bestStart : snapped(desiredStart, false));
 }
 
+float Arrangement::automationValueForY(const ClipView& clip, float y, Session::DeviceTarget target) const
+{
+    const auto parameters = session.deviceParameters(target.track, target.slot);
+    if (!juce::isPositiveAndBelow(target.parameter, parameters.size()))
+        return 0.0f;
+    const auto& parameter = parameters[static_cast<size_t>(target.parameter)];
+    const auto area = bounds(clip).reduced(7.0f, 8.0f).withTop(bounds(clip).getY() + 22.0f);
+    const auto amount = 1.0f - std::clamp((y - area.getY()) / std::max(1.0f, area.getHeight()), 0.0f, 1.0f);
+    return parameter.minimum + (parameter.maximum - parameter.minimum) * amount;
+}
+
 int Arrangement::hit(juce::Point<float> point) const
 {
     if (point.x < headerWidth) return -1;

@@ -56,6 +56,13 @@ void Session::stop()
 {
     edit->getTransport().stop(false, false);
     edit->getTransport().setPosition({});
+    for (auto* track : te::getAudioTracks(*edit))
+        for (auto* plugin : track->pluginList)
+            if (plugin != nullptr)
+            {
+                plugin->midiPanic();
+                plugin->reset();
+            }
 }
 
 void Session::releaseAudioDevice()

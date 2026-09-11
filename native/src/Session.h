@@ -68,6 +68,25 @@ public:
         float maximum = 1.0f;
         bool discrete = false;
     };
+    struct DeviceTarget
+    {
+        int track = -1;
+        int slot = -1;
+        int parameter = -1;
+        bool isValid() const { return track >= 0 && slot >= 0 && parameter >= 0; }
+    };
+    struct ClipAutomation
+    {
+        bool active = false;
+        DeviceTarget target;
+        juce::String parameterName;
+        double startSeconds = 0.0;
+        double endSeconds = 0.0;
+        float startValue = 0.0f;
+        float endValue = 0.0f;
+        float minimum = 0.0f;
+        float maximum = 1.0f;
+    };
     struct Listener
     {
         virtual ~Listener() = default;
@@ -115,6 +134,7 @@ public:
     juce::Result removeAudioTrack(int track);
     std::vector<DeviceSlot> deviceSlots(int track) const;
     std::vector<DeviceParameter> deviceParameters(int track, int slot) const;
+    DeviceTarget lastTouchedDeviceParameter() const { return lastTouchedParameter; }
     juce::Result beginDeviceParameterGesture(int track, int slot, int parameter);
     juce::Result setDeviceParameter(int track, int slot, int parameter, float value);
     juce::Result endDeviceParameterGesture(int track, int slot, int parameter);
@@ -131,6 +151,10 @@ public:
     te::Clip* findClip(te::EditItemID) const;
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
     bool shouldShowClipInArrangement(te::Clip&) const;
+    ClipAutomation clipAutomation(te::EditItemID) const;
+    juce::Result setClipAutomationRamp(te::EditItemID, DeviceTarget, double startSeconds, double endSeconds,
+                                       float startValue, float endValue);
+    void applyClipAutomationAt(double timelineSeconds);
     juce::Result moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch);
     juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture, int targetTrack = -1);
     juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
@@ -158,6 +182,7 @@ private:
     juce::int64 changeRevision = 0, savedRevision = 0;
     bool manualLoop = false;
     tracktion::core::TimeRange manualLoopRange;
+    DeviceTarget lastTouchedParameter;
 };
 int runSelfTest();
 int runPatternTest();
