@@ -155,6 +155,8 @@ public:
                     if (!syncing)
                     {
                         session.setDeviceParameter(track, slot, index, static_cast<float>(slider->getValue()));
+                        if (juce::isPositiveAndBelow(index, parameters.size()))
+                            parameters[static_cast<size_t>(index)].value = static_cast<float>(slider->getValue());
                         const auto next = session.deviceParameters(track, slot);
                         if (juce::isPositiveAndBelow(index, next.size()))
                         {
@@ -248,10 +250,20 @@ public:
             for (int i = 0; i < 128; ++i)
             {
                 const auto phase = static_cast<float>(i) / 127.0f;
-                const auto sine = std::sin((phase + positionValue * 0.18f) * juce::MathConstants<float>::twoPi);
-                const auto fold = std::sin((phase * (2.0f + shapeValue * 5.0f) + animationPhase * 0.015f) * juce::MathConstants<float>::twoPi);
-                const auto shimmer = std::sin((phase * 9.0f + animationPhase * (0.22f + motionValue)) * juce::MathConstants<float>::twoPi);
-                const auto y = sine * (0.46f - shapeValue * 0.16f) + fold * (0.18f + shapeValue * 0.2f) + shimmer * motionValue * 0.08f;
+                const auto motionWarp = std::sin((phase * 2.0f + animationPhase * (0.1f + motionValue * 0.9f))
+                                                 * juce::MathConstants<float>::twoPi)
+                    * motionValue * 0.085f;
+                const auto animatedPhase = phase + positionValue * 0.18f + motionWarp;
+                const auto sine = std::sin(animatedPhase * juce::MathConstants<float>::twoPi);
+                const auto fold = std::sin((phase * (2.0f + shapeValue * 5.0f + motionValue * 2.4f)
+                                            + animationPhase * (0.015f + motionValue * 0.028f))
+                                           * juce::MathConstants<float>::twoPi);
+                const auto shimmer = std::sin((phase * (9.0f + motionValue * 8.0f)
+                                               + animationPhase * (0.22f + motionValue * 1.8f))
+                                              * juce::MathConstants<float>::twoPi);
+                const auto y = sine * (0.46f - shapeValue * 0.16f)
+                    + fold * (0.18f + shapeValue * 0.2f)
+                    + shimmer * motionValue * 0.16f;
                 const auto point = juce::Point<float>(scope.getX() + phase * scope.getWidth(),
                                                       scope.getCentreY() - y * scope.getHeight() * 0.38f);
                 if (i == 0) wavePath.startNewSubPath(point);
