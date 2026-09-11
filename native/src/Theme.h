@@ -105,13 +105,13 @@ public:
         g.drawRect(0, 0, width, height);
 
         const auto arrow = juce::Rectangle<float>(static_cast<float>(buttonX), static_cast<float>(buttonY),
-                                                 static_cast<float>(buttonW), static_cast<float>(buttonH)).reduced(6.0f, 8.0f);
+                                                 static_cast<float>(buttonW), static_cast<float>(buttonH)).reduced(8.0f, 9.0f);
         juce::Path path;
         path.startNewSubPath(arrow.getX(), arrow.getY());
         path.lineTo(arrow.getCentreX(), arrow.getBottom());
         path.lineTo(arrow.getRight(), arrow.getY());
         g.setColour(box.findColour(juce::ComboBox::arrowColourId));
-        g.strokePath(path, juce::PathStrokeType(1.5f));
+        g.strokePath(path, juce::PathStrokeType(1.2f));
     }
 
     void fillTextEditorBackground(juce::Graphics& g, int width, int height, juce::TextEditor& textEditor) override

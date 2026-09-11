@@ -69,8 +69,7 @@ float StepGrid::cellWidth() const
 
 float StepGrid::gridRight() const
 {
-    const auto boxX = resolutionBox.getBounds().getX();
-    return static_cast<float>(boxX > 0 ? boxX - 8 : getWidth());
+    return static_cast<float>(getWidth());
 }
 
 float StepGrid::gridWidth() const
@@ -610,7 +609,7 @@ void StepGrid::scrollBarMoved(juce::ScrollBar* bar, double start)
 
 void StepGrid::resized()
 {
-    resolutionBox.setBounds(std::max(0, getWidth() - 86), 3, 78, 20);
+    resolutionBox.setBounds(std::max(0, getWidth() - 74), 3, 66, 20);
     syncHorizontalScroll();
     horizontalScroll.setBounds(static_cast<int>(labelWidth), getHeight() - static_cast<int>(scrollHeight),
                                std::max(1, static_cast<int>(gridRight() - labelWidth)), static_cast<int>(scrollHeight));

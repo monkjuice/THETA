@@ -55,6 +55,15 @@ public:
         rack.status = files.status;
         browserToggle.onClick = [this] { browserOpen = !browserOpen; resized(); repaint(); };
         rackToggle.onClick = [this] { rackOpen = !rackOpen; resized(); repaint(); };
+        browserToggle.setTooltip("Hide browser");
+        rackToggle.setTooltip("Hide device rack");
+        for (auto* toggle : {&browserToggle, &rackToggle})
+        {
+            toggle->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff252b31));
+            toggle->setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff252b31));
+            toggle->setColour(juce::TextButton::textColourOffId, juce::Colour(0xffaeb8c1));
+            toggle->setColour(juce::TextButton::textColourOnId, juce::Colour(0xffdce5ea));
+        }
         open.onClick = [this] { files.open(); };
         save.onClick = [this] { files.save(); };
         title.setText("THETA", juce::dontSendNotification);
@@ -233,8 +242,9 @@ public:
         position.setBounds(getWidth() - 165, 82, 140, 34);
         browser.setVisible(browserOpen);
         browser.setBounds(0, browserTop, browserWidth, getHeight() - browserTop);
-        browserToggle.setButtonText(browserOpen ? "<" : ">");
-        browserToggle.setBounds(leftWidth + 4, browserTop + 4, 24, 24);
+        browserToggle.setButtonText(browserOpen ? "<" : "B");
+        browserToggle.setTooltip(browserOpen ? "Hide browser" : "Show browser");
+        browserToggle.setBounds(browserOpen ? leftWidth - 28 : 6, browserTop + 6, browserOpen ? 22 : 28, browserOpen ? 22 : 46);
         arrangement.setBounds(editorX, arrangementTop, editorW, arrangementHeight);
         patternLabel.setBounds(editorX, arrangementBottom + 10, lowerW, 24);
         grid.setBounds(editorX, lowerTop, lowerW, lowerH);
@@ -243,8 +253,10 @@ public:
             rack.setBounds(editorX + lowerW + gap, lowerTop, rackWidth, lowerH);
         else
             rack.setBounds(getWidth(), lowerTop, 0, lowerH);
-        rackToggle.setButtonText(rackOpen ? ">" : "<");
-        rackToggle.setBounds(getWidth() - 52, arrangementBottom + 10, 28, 24);
+        rackToggle.setButtonText(rackOpen ? ">" : "R");
+        rackToggle.setTooltip(rackOpen ? "Hide device rack" : "Show device rack");
+        rackToggle.setBounds(rackOpen ? rack.getRight() - 28 : getWidth() - 34, rackOpen ? rack.getY() + 5 : lowerTop + 6,
+                             rackOpen ? 22 : 28, rackOpen ? 22 : 46);
         browserToggle.toFront(false);
         rackToggle.toFront(false);
         hint.setBounds(0, 0, 0, 0);

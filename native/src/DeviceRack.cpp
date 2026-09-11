@@ -198,16 +198,16 @@ public:
 DeviceRack::DeviceRack(Session& s) : session(s)
 {
     setOpaque(true);
-    title.setText("DEVICE RACK", juce::dontSendNotification);
+    title.setText("RACK", juce::dontSendNotification);
     title.setColour(juce::Label::textColourId, juce::Colour(0xffcbd6de));
     title.setFont(juce::FontOptions(13.0f));
     pattern.setClickingTogglesState(true);
     audio.setClickingTogglesState(true);
-    pattern.setButtonText("P");
-    audio.setButtonText("A");
-    open.setButtonText(L"\u25a1");
-    bypass.setButtonText(L"\u23fb");
-    remove.setButtonText(L"\u00d7");
+    pattern.setButtonText("Pat");
+    audio.setButtonText("Trk");
+    open.setButtonText("Edit");
+    bypass.setButtonText("On");
+    remove.setButtonText("Del");
     pattern.setTooltip("Pattern devices");
     audio.setTooltip("Selected audio track devices");
     open.setTooltip("Open selected device editor");
@@ -247,22 +247,16 @@ void DeviceRack::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1b2025));
     g.setColour(juce::Colour(0xff303840));
     g.drawRect(getLocalBounds());
-    if (selectedTrack > 0)
-    {
-        g.setColour(juce::Colour(0xff697680));
-        g.setFont(juce::FontOptions(11.0f));
-        g.drawText("Drop FX here", getWidth() - 190, 6, 92, 20, juce::Justification::centredRight, true);
-    }
 }
 
 void DeviceRack::resized()
 {
-    title.setBounds(12, 4, 104, 24);
-    pattern.setBounds(120, 5, 30, 24);
-    audio.setBounds(156, 5, 30, 24);
-    open.setBounds(getWidth() - 112, 5, 30, 24);
-    bypass.setBounds(getWidth() - 76, 5, 30, 24);
-    remove.setBounds(getWidth() - 40, 5, 30, 24);
+    title.setBounds(12, 4, 56, 24);
+    pattern.setBounds(74, 5, 34, 24);
+    audio.setBounds(112, 5, 34, 24);
+    open.setBounds(getWidth() - 158, 5, 44, 24);
+    bypass.setBounds(getWidth() - 108, 5, 34, 24);
+    remove.setBounds(getWidth() - 68, 5, 34, 24);
     const auto paramCount = std::min(6, static_cast<int>(parameters.size()));
     const auto columns = paramCount > 3 ? 3 : std::max(1, paramCount);
     const auto rows = paramCount > 3 ? 2 : 1;
@@ -441,7 +435,7 @@ void DeviceRack::selectTrack(int track)
 {
     selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), track);
     pattern.setToggleState(selectedTrack == 0, juce::dontSendNotification);
-    audio.setButtonText(selectedTrack > 0 ? "A" : "A");
+    audio.setButtonText("Trk");
     audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     selectedSlot = 0;
     sync();
@@ -451,7 +445,7 @@ void DeviceRack::sync()
 {
     selectedTrack = juce::jlimit(0, std::max(0, session.trackCount() - 1), selectedTrack);
     pattern.setToggleState(selectedTrack == 0, juce::dontSendNotification);
-    audio.setButtonText("A");
+    audio.setButtonText("Trk");
     audio.setToggleState(selectedTrack > 0, juce::dontSendNotification);
     slots = session.deviceSlots(selectedTrack);
     selectedSlot = juce::jlimit(0, std::max(0, static_cast<int>(slots.size()) - 1), selectedSlot);
@@ -462,7 +456,7 @@ void DeviceRack::sync()
     bypass.setEnabled(!slots.empty());
     open.setEnabled(!slots.empty());
     remove.setEnabled(!slots.empty() && slots[static_cast<size_t>(selectedSlot)].removable);
-    bypass.setButtonText(!slots.empty() && !slots[static_cast<size_t>(selectedSlot)].enabled ? juce::String(L"\u23fb") : juce::String(L"\u23fb"));
+    bypass.setButtonText(!slots.empty() && !slots[static_cast<size_t>(selectedSlot)].enabled ? "Off" : "On");
     rebuildParameterControls();
 }
 }
