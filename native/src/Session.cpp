@@ -478,6 +478,18 @@ te::AutomatableParameter* thetaWaveMacroParameterAt(ThetaWaveDevice& wave, int i
             case 3: return "osc2Level";
             case 4: return "osc2Tune";
             case 5: return "cutoff";
+            case 6: return "filterEnv";
+            case 7: return "driveDb";
+            case 8: return "sub";
+            case 9: return "resonance";
+            case 10: return "attack";
+            case 11: return "decay";
+            case 12: return "sustain";
+            case 13: return "release";
+            case 14: return "unison";
+            case 15: return "detune";
+            case 16: return "width";
+            case 17: return "outputDb";
             default: return nullptr;
         }
     }();
@@ -508,6 +520,18 @@ juce::String thetaWaveMacroName(int index)
         case 3: return "Osc 2";
         case 4: return "Tune 2";
         case 5: return "Cutoff";
+        case 6: return "Env";
+        case 7: return "Drive";
+        case 8: return "Sub";
+        case 9: return "Resonance";
+        case 10: return "Attack";
+        case 11: return "Decay";
+        case 12: return "Sustain";
+        case 13: return "Release";
+        case 14: return "Unison";
+        case 15: return "Detune";
+        case 16: return "Width";
+        case 17: return "Output";
     }
     return {};
 }
@@ -1291,7 +1315,7 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
 
     if (auto* wavePlugin = dynamic_cast<ThetaWaveDevice*>(plugin))
     {
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < 18; ++i)
             if (auto* parameter = thetaWaveMacroParameterAt(*wavePlugin, i))
             {
                 const auto range = parameter->getValueRange();

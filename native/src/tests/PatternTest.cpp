@@ -78,10 +78,11 @@ int runPatternTest()
             }
             require(waveSlot >= 0, "Theta Wave is inserted in the target track chain");
             auto waveParameters = parameterSession.deviceParameters(1, waveSlot);
-            require(waveParameters.size() == 6 && waveParameters[0].name == "Position"
+            require(waveParameters.size() >= 18 && waveParameters[0].name == "Position"
                     && waveParameters[2].name == "Motion" && waveParameters[3].name == "Osc 2"
-                    && waveParameters[4].name == "Tune 2" && waveParameters[5].name == "Cutoff",
-                    "Theta Wave exposes its primary oscillator macros in the rack");
+                    && waveParameters[4].name == "Tune 2" && waveParameters[5].name == "Cutoff"
+                    && waveParameters[10].name == "Attack" && waveParameters[17].name == "Output",
+                    "Theta Wave exposes a full synth panel surface after the rack macros");
         }
         auto& sequence = session.pattern().getSequence();
         require(sequence.getNumNotes() == 0, "New pattern must be empty");

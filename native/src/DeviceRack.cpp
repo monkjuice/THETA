@@ -48,14 +48,20 @@ public:
         Editor(Session& s, int t, int sl) : session(s), track(t), slot(sl)
         {
             setOpaque(true);
-            setSize(680, 430);
             refresh();
+            setSize(isThetaWave ? 860 : 680, isThetaWave ? 540 : 430);
             startTimerHz(30);
         }
 
         void paint(juce::Graphics& g) override
         {
             g.fillAll(juce::Colour(0xff111316));
+            if (isThetaWave)
+            {
+                paintThetaWave(g);
+                return;
+            }
+
             const auto bounds = getLocalBounds().toFloat();
             g.setColour(juce::Colour(0xff1a1d21));
             g.fillRect(bounds.reduced(18.0f, 18.0f));
@@ -86,6 +92,12 @@ public:
 
         void resized() override
         {
+            if (isThetaWave)
+            {
+                layoutThetaWave();
+                return;
+            }
+
             const auto count = static_cast<int>(sliders.size());
             const int top = 238;
             const int cellWidth = 182;
@@ -106,8 +118,8 @@ public:
         void timerCallback() override
         {
             animationPhase += 0.12f;
-            const juce::Rectangle<int> scope(210, 88, 260, 126);
-            repaint(scope.expanded(2));
+            repaint(isThetaWave ? getLocalBounds().reduced(28, 74).withHeight(154)
+                                : juce::Rectangle<int>(210, 88, 260, 126).expanded(2));
         }
 
         void refresh()
@@ -115,6 +127,7 @@ public:
             const auto deviceSlots = session.deviceSlots(track);
             deviceName = juce::isPositiveAndBelow(slot, deviceSlots.size()) ? deviceSlots[static_cast<size_t>(slot)].name : "Device";
             const auto deviceType = juce::isPositiveAndBelow(slot, deviceSlots.size()) ? deviceSlots[static_cast<size_t>(slot)].type : juce::String();
+            isThetaWave = deviceType == ThetaWaveDevice::xmlTypeName;
             deviceTypeLabel = deviceType == ThetaWaveDevice::xmlTypeName ? "THETA SYNTH"
                 : deviceType == DrumDevice::xmlTypeName || deviceType == te::FourOscPlugin::xmlTypeName ? "THETA INSTRUMENT"
                 : "THETA FX";
@@ -160,16 +173,20 @@ public:
             syncing = true;
             for (int i = 0; i < labels.size(); ++i)
             {
-                const auto visible = i < static_cast<int>(parameters.size()) && i < 6;
+                const auto visible = i < static_cast<int>(parameters.size()) && (isThetaWave || i < 6);
                 labels[i]->setVisible(visible);
                 values[i]->setVisible(visible);
                 sliders[i]->setVisible(visible);
                 if (!visible) continue;
                 const auto& parameter = parameters[static_cast<size_t>(i)];
+                const auto accent = thetaWaveAccent(i);
                 labels[i]->setText(parameter.name, juce::dontSendNotification);
                 values[i]->setText(parameter.valueText, juce::dontSendNotification);
                 sliders[i]->setRange(parameter.minimum, parameter.maximum, parameter.discrete ? 1.0 : 0.0);
                 sliders[i]->setValue(parameter.value, juce::dontSendNotification);
+                sliders[i]->setColour(juce::Slider::trackColourId, isThetaWave ? accent : juce::Colour(0xff8cc5d2));
+                sliders[i]->setColour(juce::Slider::thumbColourId, isThetaWave ? accent.brighter(0.25f) : juce::Colour(0xffc6d58c));
+                sliders[i]->setTooltip(parameter.name + ": " + parameter.valueText);
             }
             syncing = false;
             resized();
@@ -177,11 +194,186 @@ public:
         }
 
     private:
+        float normalisedValue(int index) const
+        {
+            if (!juce::isPositiveAndBelow(index, parameters.size())) return 0.0f;
+            const auto& parameter = parameters[static_cast<size_t>(index)];
+            const auto length = parameter.maximum - parameter.minimum;
+            if (length <= 0.0f) return 0.0f;
+            return std::clamp((parameter.value - parameter.minimum) / length, 0.0f, 1.0f);
+        }
+
+        juce::Colour thetaWaveAccent(int index) const
+        {
+            if (index <= 4) return juce::Colour(0xff75d3e6);
+            if (index <= 9) return juce::Colour(0xffc8de8f);
+            if (index <= 13) return juce::Colour(0xffd9a5ff);
+            return juce::Colour(0xffffbf7a);
+        }
+
+        void paintSection(juce::Graphics& g, juce::Rectangle<int> area, const juce::String& title,
+                          juce::Colour accent) const
+        {
+            const auto box = area.toFloat();
+            g.setColour(juce::Colour(0xff171b20));
+            g.fillRoundedRectangle(box, 5.0f);
+            g.setColour(juce::Colour(0xff323b45));
+            g.drawRoundedRectangle(box, 5.0f, 1.0f);
+            g.setColour(accent.withAlpha(0.2f));
+            g.fillRect(area.getX(), area.getY(), area.getWidth(), 3);
+            g.setColour(juce::Colour(0xffdce5ea));
+            g.setFont(juce::FontOptions(12.0f));
+            g.drawText(title.toUpperCase(), area.reduced(14, 8).withHeight(18), juce::Justification::centredLeft, true);
+        }
+
+        void paintWaveScope(juce::Graphics& g, juce::Rectangle<int> area) const
+        {
+            const auto scope = area.toFloat().reduced(18.0f, 38.0f).withTrimmedBottom(12.0f);
+            g.setColour(juce::Colour(0xff101419));
+            g.fillRect(scope);
+            g.setColour(juce::Colour(0xff2c3740));
+            g.drawRect(scope, 1.0f);
+
+            const auto positionValue = normalisedValue(0);
+            const auto shapeValue = normalisedValue(1);
+            const auto motionValue = normalisedValue(2);
+            juce::Path wavePath;
+            for (int i = 0; i < 128; ++i)
+            {
+                const auto phase = static_cast<float>(i) / 127.0f;
+                const auto sine = std::sin((phase + positionValue * 0.18f) * juce::MathConstants<float>::twoPi);
+                const auto fold = std::sin((phase * (2.0f + shapeValue * 5.0f) + animationPhase * 0.015f) * juce::MathConstants<float>::twoPi);
+                const auto shimmer = std::sin((phase * 9.0f + animationPhase * (0.22f + motionValue)) * juce::MathConstants<float>::twoPi);
+                const auto y = sine * (0.46f - shapeValue * 0.16f) + fold * (0.18f + shapeValue * 0.2f) + shimmer * motionValue * 0.08f;
+                const auto point = juce::Point<float>(scope.getX() + phase * scope.getWidth(),
+                                                      scope.getCentreY() - y * scope.getHeight() * 0.38f);
+                if (i == 0) wavePath.startNewSubPath(point);
+                else wavePath.lineTo(point);
+            }
+            g.setColour(juce::Colour(0xff75d3e6).withAlpha(0.18f));
+            for (int i = 0; i < 5; ++i)
+                g.drawVerticalLine(static_cast<int>(scope.getX() + scope.getWidth() * i / 4.0f),
+                                   scope.getY(), scope.getBottom());
+            g.setColour(juce::Colour(0xff75d3e6));
+            g.strokePath(wavePath, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.setColour(juce::Colour(0xffd9a5ff).withAlpha(0.55f));
+            g.strokePath(wavePath, juce::PathStrokeType(5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+
+        void paintEnvelope(juce::Graphics& g, juce::Rectangle<int> area) const
+        {
+            const auto graph = area.toFloat().reduced(18.0f, 42.0f).withTrimmedBottom(54.0f);
+            g.setColour(juce::Colour(0xff101419));
+            g.fillRect(graph);
+            g.setColour(juce::Colour(0xff2c3740));
+            g.drawRect(graph, 1.0f);
+            const auto attackValue = normalisedValue(10);
+            const auto decayValue = normalisedValue(11);
+            const auto sustainValue = normalisedValue(12);
+            const auto releaseValue = normalisedValue(13);
+            const auto aX = graph.getX() + graph.getWidth() * (0.12f + attackValue * 0.18f);
+            const auto dX = aX + graph.getWidth() * (0.12f + decayValue * 0.16f);
+            const auto sX = graph.getRight() - graph.getWidth() * (0.18f + releaseValue * 0.2f);
+            const auto top = graph.getY() + 12.0f;
+            const auto sustainY = graph.getBottom() - 12.0f - sustainValue * (graph.getHeight() - 24.0f);
+            juce::Path envelope;
+            envelope.startNewSubPath(graph.getX() + 8.0f, graph.getBottom() - 10.0f);
+            envelope.lineTo(aX, top);
+            envelope.lineTo(dX, sustainY);
+            envelope.lineTo(sX, sustainY);
+            envelope.lineTo(graph.getRight() - 8.0f, graph.getBottom() - 10.0f);
+            g.setColour(juce::Colour(0xffd9a5ff));
+            g.strokePath(envelope, juce::PathStrokeType(2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+
+        void paintThetaWave(juce::Graphics& g)
+        {
+            const auto bounds = getLocalBounds();
+            g.setGradientFill(juce::ColourGradient(juce::Colour(0xff11161b), 0.0f, 0.0f,
+                                                   juce::Colour(0xff0e1115), 0.0f, static_cast<float>(bounds.getBottom()), false));
+            g.fillAll();
+            g.setColour(juce::Colour(0xff27313a));
+            g.drawRect(bounds.reduced(16), 1);
+
+            g.setColour(juce::Colour(0xfff3f7fa));
+            g.setFont(juce::FontOptions(30.0f));
+            g.drawText("Theta Wave", 30, 24, 240, 36, juce::Justification::centredLeft, true);
+            g.setColour(juce::Colour(0xff75d3e6));
+            g.setFont(juce::FontOptions(11.0f));
+            g.drawText("MORPHING WAVETABLE SYNTH", 33, 58, 220, 18, juce::Justification::centredLeft, true);
+            g.setColour(juce::Colour(0xffc8de8f));
+            g.drawText(deviceName, bounds.getWidth() - 250, 34, 210, 18, juce::Justification::centredRight, true);
+
+            paintSection(g, oscillatorArea, "Oscillators", juce::Colour(0xff75d3e6));
+            paintSection(g, filterArea, "Filter + Tone", juce::Colour(0xffc8de8f));
+            paintSection(g, envelopeArea, "Amp Envelope", juce::Colour(0xffd9a5ff));
+            paintSection(g, voiceArea, "Movement + Output", juce::Colour(0xffffbf7a));
+            paintWaveScope(g, oscillatorArea);
+            paintEnvelope(g, envelopeArea);
+        }
+
+        void placeControl(int index, juce::Rectangle<int> area, int column, int row, int columns, int rows,
+                          int knobSize = 66, int yOffset = 0)
+        {
+            if (!juce::isPositiveAndBelow(index, sliders.size())) return;
+            const auto cellW = area.getWidth() / columns;
+            const auto cellH = area.getHeight() / rows;
+            const juce::Rectangle<int> cell(area.getX() + column * cellW, area.getY() + row * cellH + yOffset, cellW, cellH);
+            labels[index]->setBounds(cell.getX() + 4, cell.getY(), cell.getWidth() - 8, 18);
+            sliders[index]->setBounds(cell.withSizeKeepingCentre(knobSize, knobSize).translated(0, 6));
+            values[index]->setBounds(cell.getX() + 4, cell.getBottom() - 18, cell.getWidth() - 8, 18);
+        }
+
+        void layoutThetaWave()
+        {
+            const auto bounds = getLocalBounds().reduced(28);
+            oscillatorArea = {bounds.getX(), bounds.getY() + 60, 510, 206};
+            filterArea = {oscillatorArea.getRight() + 14, oscillatorArea.getY(), bounds.getRight() - oscillatorArea.getRight() - 14, oscillatorArea.getHeight()};
+            envelopeArea = {bounds.getX(), oscillatorArea.getBottom() + 14, 392, bounds.getBottom() - oscillatorArea.getBottom() - 14};
+            voiceArea = {envelopeArea.getRight() + 14, envelopeArea.getY(), bounds.getRight() - envelopeArea.getRight() - 14, envelopeArea.getHeight()};
+
+            for (int i = 0; i < labels.size(); ++i)
+            {
+                const auto visible = i < static_cast<int>(parameters.size());
+                labels[i]->setVisible(visible);
+                values[i]->setVisible(visible);
+                sliders[i]->setVisible(visible);
+            }
+
+            const auto oscControls = oscillatorArea.reduced(18).removeFromBottom(86);
+            placeControl(0, oscControls, 0, 0, 4, 1);
+            placeControl(1, oscControls, 1, 0, 4, 1);
+            placeControl(3, oscControls, 2, 0, 4, 1);
+            placeControl(4, oscControls, 3, 0, 4, 1);
+
+            const auto filterControls = filterArea.reduced(18, 42);
+            placeControl(5, filterControls, 0, 0, 2, 2);
+            placeControl(9, filterControls, 1, 0, 2, 2);
+            placeControl(6, filterControls, 0, 1, 2, 2);
+            placeControl(7, filterControls, 1, 1, 2, 2);
+
+            const auto envControls = envelopeArea.reduced(18).removeFromBottom(86);
+            placeControl(10, envControls, 0, 0, 4, 1, 60);
+            placeControl(11, envControls, 1, 0, 4, 1, 60);
+            placeControl(12, envControls, 2, 0, 4, 1, 60);
+            placeControl(13, envControls, 3, 0, 4, 1, 60);
+
+            const auto voiceControls = voiceArea.reduced(18, 42);
+            placeControl(2, voiceControls, 0, 0, 3, 2, 62);
+            placeControl(8, voiceControls, 1, 0, 3, 2, 62);
+            placeControl(14, voiceControls, 2, 0, 3, 2, 62);
+            placeControl(15, voiceControls, 0, 1, 3, 2, 62);
+            placeControl(16, voiceControls, 1, 1, 3, 2, 62);
+            placeControl(17, voiceControls, 2, 1, 3, 2, 62);
+        }
+
         Session& session;
         int track = 0, slot = 0;
         bool syncing = false;
+        bool isThetaWave = false;
         float animationPhase = 0.0f;
         juce::String deviceName, deviceTypeLabel;
+        juce::Rectangle<int> oscillatorArea, filterArea, envelopeArea, voiceArea;
         std::vector<Session::DeviceParameter> parameters;
         juce::OwnedArray<juce::Label> labels, values;
         juce::OwnedArray<juce::Slider> sliders;
@@ -192,8 +384,10 @@ public:
     {
         setUsingNativeTitleBar(true);
         setResizable(false, false);
-        setContentOwned(new Editor(session, track, slot), true);
-        centreWithSize(680, 430);
+        auto* editor = new Editor(session, track, slot);
+        const auto editorSize = editor->getBounds();
+        setContentOwned(editor, true);
+        centreWithSize(editorSize.getWidth(), editorSize.getHeight());
         setVisible(true);
     }
 
