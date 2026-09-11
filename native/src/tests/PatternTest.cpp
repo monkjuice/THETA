@@ -210,11 +210,14 @@ int runPatternTest()
                 "MIDI clips can be extended to long sustained parts");
         require(session.pattern().getPosition().time.getLength().inSeconds() > 29.9,
                 "Extended MIDI clip keeps the requested duration");
-        require(session.resizeNote(0, 36, session.editorStepCount()).wasOk()
-                && session.noteLengthSteps(0, 36) == session.editorStepCount(),
+        session.setNote(3, 55, true);
+        require(session.hasNote(3, 55) && !session.hasNote(7, 55),
+                "Drawing into an extended MIDI clip keeps the clicked editor step");
+        require(session.fillNoteToClipEnd(0, 36).wasOk()
+                && session.noteLengthSteps(0, 36) > session.editorStepCount(),
                 "A MIDI note can sustain to the end of an extended clip");
         require(session.patternLengthBeats() > 50.0,
-                "Note editor timing follows the extended clip length");
+                "Selected MIDI clip exposes extended length for fill operations");
         require(session.synth->chorusMix->getCurrentValue() > 0.1f && session.synth->oscParams[0]->detune->getCurrentValue() > 0.05f
                 && static_cast<int>(session.synth->state.getProperty("voices")) == 1,
                 "Reese bass preset shapes the 4OSC patch for detuned bass movement");

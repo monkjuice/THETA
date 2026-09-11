@@ -363,7 +363,7 @@ bool StepGrid::fillSelectionToClipEnd()
     {
         const auto index = row * Session::steps + step;
         if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
-            if (session.resizeNote(step, pitchForIndex(index), steps - step).wasOk())
+            if (session.fillNoteToClipEnd(step, pitchForIndex(index)).wasOk())
                 changed = true;
     }
     session.endNoteGesture();
@@ -583,11 +583,10 @@ float StepGrid::playheadXForTime(double seconds) const
     const auto editBeat = session.edit->tempoSequence.toBeats(tracktion::core::TimePosition::fromSeconds(seconds)).inBeats();
     const auto clipStartBeat = session.edit->tempoSequence.toBeats(position.time.getStart()).inBeats();
     const auto offsetBeat = position.offset.inSeconds() * session.tempo() / 60.0;
-    const auto clipBeats = session.patternLengthBeats();
-    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, clipBeats);
+    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, 4.0);
     if (localBeat < 0.0)
-        localBeat += clipBeats;
-    const auto step = localBeat / clipBeats * session.editorStepCount();
+        localBeat += 4.0;
+    const auto step = localBeat / 4.0 * session.editorStepCount();
     if (step < stepScroll || step > stepScroll + visibleStepSpan())
         return -1.0f;
     return static_cast<float>(labelWidth + (step - stepScroll) * cellWidth());

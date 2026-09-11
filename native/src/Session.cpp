@@ -159,9 +159,9 @@ void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoMan
     clip.setName(preset.name);
 }
 
-double stepDurationBeats(int steps, double lengthBeats)
+double stepDurationBeats(int steps)
 {
-    return std::max(0.0001, lengthBeats) / static_cast<double>(juce::jlimit(Session::defaultSteps, Session::steps, steps));
+    return 4.0 / static_cast<double>(juce::jlimit(Session::defaultSteps, Session::steps, steps));
 }
 
 te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type)
@@ -751,7 +751,7 @@ bool Session::hasNote(int step, int pitch) const
     const auto gridSteps = editorStepCount();
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return false;
-    const auto beat = step * stepDurationBeats(gridSteps, patternLengthBeats());
+    const auto beat = step * stepDurationBeats(gridSteps);
     for (auto* note : pattern().getSequence().getNotes())
         if (note->getNoteNumber() == pitch
             && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
@@ -794,7 +794,7 @@ void Session::setNote(int step, int pitch, bool enabled)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps, patternLengthBeats());
+    const auto stepBeats = stepDurationBeats(gridSteps);
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return;
     const auto beat = step * stepBeats;
@@ -844,7 +844,7 @@ void Session::setNote(int step, int pitch, bool enabled)
 int Session::noteLengthSteps(int step, int pitch) const
 {
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps, patternLengthBeats());
+    const auto stepBeats = stepDurationBeats(gridSteps);
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return 0;
     const auto beat = step * stepBeats;
@@ -859,7 +859,7 @@ juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps, patternLengthBeats());
+    const auto stepBeats = stepDurationBeats(gridSteps);
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return juce::Result::fail("Resize notes inside the visible grid.");
     lengthSteps = juce::jlimit(1, gridSteps - step, lengthSteps);
@@ -886,11 +886,45 @@ juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
     return juce::Result::fail("Select a note to resize.");
 }
 
+juce::Result Session::fillNoteToClipEnd(int step, int pitch)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    const auto gridSteps = editorStepCount();
+    const auto stepBeats = stepDurationBeats(gridSteps);
+    if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
+        return juce::Result::fail("Select a note inside the visible grid.");
+
+    const auto beat = step * stepBeats;
+    const auto endBeat = patternLengthBeats();
+    if (endBeat <= beat + 0.0001)
+        return juce::Result::fail("The selected note already starts at the clip end.");
+
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    auto nextNoteBeat = endBeat;
+    for (auto* note : sequence.getNotes())
+        if (note->getNoteNumber() == pitch && note->getStartBeat().inBeats() > beat + 0.0001)
+            nextNoteBeat = std::min(nextNoteBeat, note->getStartBeat().inBeats());
+
+    for (auto* note : sequence.getNotes())
+        if (note->getNoteNumber() == pitch
+            && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
+        {
+            const auto start = tracktion::core::BeatPosition::fromBeats(beat);
+            const auto length = tracktion::core::BeatDuration::fromBeats(std::max(0.0001, nextNoteBeat - beat));
+            note->setStartAndLength(start, length, undoManager);
+            markModified();
+            sendSynchronousChangeMessage();
+            return juce::Result::ok();
+        }
+    return juce::Result::fail("Select a note to fill.");
+}
+
 juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps, patternLengthBeats());
+    const auto stepBeats = stepDurationBeats(gridSteps);
     if (sourceStep < 0 || sourceStep >= gridSteps || targetStep < 0 || targetStep >= gridSteps
         || sourcePitch < 0 || sourcePitch > 127
         || targetPitch < 0 || targetPitch > 127)
