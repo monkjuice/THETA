@@ -85,7 +85,21 @@ float Arrangement::automationValueForY(const ClipView& clip, float y, Session::D
     if (!juce::isPositiveAndBelow(target.parameter, parameters.size()))
         return 0.0f;
     const auto& parameter = parameters[static_cast<size_t>(target.parameter)];
-    const auto area = bounds(clip).reduced(7.0f, 8.0f).withTop(bounds(clip).getY() + 22.0f);
+    auto laneIndex = static_cast<int>(clip.automations.size());
+    for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
+    {
+        const auto& automation = clip.automations[static_cast<size_t>(i)];
+        if (automation.target.track == target.track && automation.target.slot == target.slot && automation.target.parameter == target.parameter)
+        {
+            laneIndex = i;
+            break;
+        }
+    }
+    const auto laneCount = std::max(static_cast<int>(clip.automations.size()), laneIndex + 1);
+    const auto stack = bounds(clip).reduced(7.0f, 8.0f).withTop(bounds(clip).getY() + 22.0f);
+    const auto laneHeight = stack.getHeight() / static_cast<float>(std::max(1, laneCount));
+    const auto area = juce::Rectangle<float>(stack.getX(), stack.getY() + laneHeight * laneIndex,
+                                            stack.getWidth(), std::max(8.0f, laneHeight)).reduced(0.0f, 2.0f);
     const auto amount = 1.0f - std::clamp((y - area.getY()) / std::max(1.0f, area.getHeight()), 0.0f, 1.0f);
     return parameter.minimum + (parameter.maximum - parameter.minimum) * amount;
 }

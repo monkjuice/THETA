@@ -264,13 +264,22 @@ void Arrangement::paint(juce::Graphics& g)
             g.drawText("FX" + juce::String(clip.clipPlugins), badge, juce::Justification::centred, true);
         }
         const auto position = dragging && clip.id == selected ? preview : clip.position;
+        const auto automationAreaFor = [&] (int laneIndex, int laneCount)
+        {
+            const auto stack = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
+            const auto count = std::max(1, laneCount);
+            const auto laneHeight = stack.getHeight() / static_cast<float>(count);
+            return juce::Rectangle<float>(stack.getX(), stack.getY() + laneHeight * laneIndex,
+                                          stack.getWidth(), std::max(8.0f, laneHeight)).reduced(0.0f, 2.0f);
+        };
         const auto drawAutomation = [&] (const Session::ClipAutomation& automation, double startTime,
-                                         double endTime, float startValue, float endValue, bool previewLine)
+                                         double endTime, float startValue, float endValue, bool previewLine,
+                                         int laneIndex, int laneCount)
         {
             if (!automation.active && !previewLine) return;
             const auto minValue = automation.maximum > automation.minimum ? automation.minimum : 0.0f;
             const auto maxValue = automation.maximum > automation.minimum ? automation.maximum : 1.0f;
-            const auto autoArea = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
+            const auto autoArea = automationAreaFor(laneIndex, laneCount);
             const auto yFor = [autoArea, minValue, maxValue](float value)
             {
                 const auto amount = std::clamp((value - minValue) / std::max(0.0001f, maxValue - minValue), 0.0f, 1.0f);
@@ -282,6 +291,8 @@ void Arrangement::paint(juce::Graphics& g)
             const auto y2 = yFor(endValue);
             g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(0.25f));
             g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
+            g.setColour(juce::Colour(0x5511191f));
+            g.drawRect(autoArea.reduced(0.5f), 1.0f);
             g.setColour(previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff));
             g.drawLine(x1, y1, x2, y2, 2.0f);
             g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x1, y1}));
@@ -293,18 +304,35 @@ void Arrangement::paint(juce::Graphics& g)
                            juce::Justification::centredRight, true);
             }
         };
-        if (clip.automation.active)
+        auto previewLaneIndex = static_cast<int>(clip.automations.size());
+        auto displayLaneCount = static_cast<int>(clip.automations.size());
+        for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
         {
-            drawAutomation(clip.automation,
-                           position.start + clip.automation.startSeconds,
-                           position.start + clip.automation.endSeconds,
-                           clip.automation.startValue,
-                           clip.automation.endValue,
-                           false);
+            const auto& automation = clip.automations[static_cast<size_t>(i)];
+            if (automationTarget.isValid() && automation.target.track == automationTarget.track
+                && automation.target.slot == automationTarget.slot && automation.target.parameter == automationTarget.parameter)
+            {
+                previewLaneIndex = i;
+                break;
+            }
+        }
+        if (automationDragging && clip.id == selected)
+            displayLaneCount = std::max(displayLaneCount, previewLaneIndex + 1);
+        for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
+        {
+            const auto& automation = clip.automations[static_cast<size_t>(i)];
+            drawAutomation(automation,
+                           position.start + automation.startSeconds,
+                           position.start + automation.endSeconds,
+                           automation.startValue,
+                           automation.endValue,
+                           false,
+                           i,
+                           displayLaneCount);
         }
         if (automationDragging && clip.id == selected)
         {
-            auto previewAutomation = clip.automation;
+            Session::ClipAutomation previewAutomation;
             previewAutomation.active = true;
             previewAutomation.target = automationTarget;
             previewAutomation.startSeconds = 0.0;
@@ -317,7 +345,9 @@ void Arrangement::paint(juce::Graphics& g)
                 previewAutomation.maximum = parameters[static_cast<size_t>(automationTarget.parameter)].maximum;
             }
             drawAutomation(previewAutomation, automationStartTime, automationEndTime,
-                           automationStartValue, automationEndValue, true);
+                           automationStartValue, automationEndValue, true,
+                           previewLaneIndex,
+                           displayLaneCount);
         }
         if (clip.waveform)
         {
@@ -437,7 +467,7 @@ void Arrangement::sync()
             const auto p = clip->getPosition();
             ClipView view {clip->itemID, clip->getName(), {p.time.getStart().inSeconds(), p.time.getEnd().inSeconds(), p.offset.inSeconds()}, nullptr, {}, clip->getSpeedRatio(),
                            p.offset.inSeconds() + p.time.getLength().inSeconds(), track, clip->getColour(), session.clipPluginCount(clip->itemID),
-                           session.clipAutomation(clip->itemID)};
+                           session.clipAutomations(clip->itemID)};
             if (auto* audio = dynamic_cast<te::WaveAudioClip*>(clip))
             {
                 const auto file = clip->getSourceFileReference().getFile();

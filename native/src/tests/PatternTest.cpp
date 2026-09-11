@@ -197,12 +197,30 @@ int runPatternTest()
         require(storedAutomation.active && storedAutomation.target.track == 0 && storedAutomation.target.slot == 0
                 && storedAutomation.target.parameter == 0,
                 "Clip automation restores its target parameter");
+        const auto decayMinimum = synthMacros[1].minimum;
+        const auto decayMaximum = std::min(synthMacros[1].maximum, decayMinimum + 1.0f);
+        require(session.setClipAutomationRamp(automatedClip, {0, 0, 1}, 0.25, 1.25, decayMinimum, decayMaximum).wasOk(),
+                "A clip can store automation for a second parameter");
+        const auto storedAutomations = session.clipAutomations(automatedClip);
+        require(storedAutomations.size() == 2,
+                "Clip automation stores multiple parameter lanes");
+        session.beginNoteGesture("Draw note after automation");
+        session.setNote(15, 80, true);
+        session.endNoteGesture();
+        require(session.hasNote(15, 80), "Notes can be drawn after clip automation");
+        session.undo();
+        require(!session.hasNote(15, 80) && session.clipAutomations(automatedClip).size() == 2,
+                "Undo after automation removes the new note without deleting automation");
         synthMacros = session.deviceParameters(0, 0);
-        require(synthMacros[0].automated && !synthMacros[0].automationOverridden,
+        require(synthMacros[0].automated && synthMacros[1].automated
+                && !synthMacros[0].automationOverridden && !synthMacros[1].automationOverridden,
                 "Automated parameters report following state to device panels");
         session.applyClipAutomationAt(0.5);
         require(std::abs(session.synth->ampAttack->getCurrentValue() - (attackMinimum + attackMaximum) * 0.5f) < 0.02f,
                 "Clip automation applies interpolated parameter values during playback");
+        require(std::abs(session.synth->ampDecay->getCurrentValue()
+                         - (decayMinimum + (decayMaximum - decayMinimum) * 0.25f)) < 0.02f,
+                "Multiple clip automation lanes apply together");
         session.applyClipAutomationAt(1.5);
         require(std::abs(session.synth->ampAttack->getCurrentValue() - manualAttack) < 0.02f,
                 "Clip automation restores the manual value after its lane");

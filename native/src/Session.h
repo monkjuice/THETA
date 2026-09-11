@@ -158,6 +158,7 @@ public:
     te::WaveAudioClip* findAudioClip(te::EditItemID) const;
     bool shouldShowClipInArrangement(te::Clip&) const;
     ClipAutomation clipAutomation(te::EditItemID) const;
+    std::vector<ClipAutomation> clipAutomations(te::EditItemID) const;
     juce::Result setClipAutomationRamp(te::EditItemID, DeviceTarget, double startSeconds, double endSeconds,
                                        float startValue, float endValue);
     juce::Result toggleParameterAutomationOverride(int track, int slot, int parameter);

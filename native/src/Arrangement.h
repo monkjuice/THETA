@@ -50,7 +50,7 @@ private:
         int track = 0;
         juce::Colour colour;
         int clipPlugins = 0;
-        Session::ClipAutomation automation;
+        std::vector<Session::ClipAutomation> automations;
     };
     enum class LoopGesture { none, create, move, trimStart, trimEnd };
     void sync();
