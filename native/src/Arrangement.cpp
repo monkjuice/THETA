@@ -266,17 +266,19 @@ void Arrangement::paint(juce::Graphics& g)
         const auto position = dragging && clip.id == selected ? preview : clip.position;
         const auto automationStack = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
         const auto activeLane = activeAutomationIndex(clip);
+        const auto overviewStripHeight = activeLane >= 0
+            ? std::min(14.0f, std::max(9.0f, automationStack.getHeight() / static_cast<float>(clip.automations.size() + 3)))
+            : 0.0f;
+        const auto overviewHeight = overviewStripHeight * static_cast<float>(clip.automations.size());
         const auto automationAreaFor = [&] (int laneIndex, int laneCount)
         {
             if (activeLane >= 0)
             {
                 if (laneIndex == activeLane)
-                    return automationStack.reduced(0.0f, 2.0f);
-                const auto stripHeight = std::min(12.0f, std::max(8.0f, automationStack.getHeight()
-                                                                  / static_cast<float>(clip.automations.size() + 3)));
-                const auto stripTop = automationStack.getBottom() - stripHeight * static_cast<float>(clip.automations.size());
-                return juce::Rectangle<float>(automationStack.getX(), stripTop + stripHeight * laneIndex,
-                                              automationStack.getWidth(), stripHeight).reduced(0.0f, 1.0f);
+                    return automationStack.withTrimmedBottom(overviewHeight + 3.0f).reduced(0.0f, 2.0f);
+                const auto stripTop = automationStack.getBottom() - overviewHeight;
+                return juce::Rectangle<float>(automationStack.getX(), stripTop + overviewStripHeight * laneIndex,
+                                              automationStack.getWidth(), overviewStripHeight).reduced(0.0f, 1.0f);
             }
             const auto count = std::max(1, laneCount);
             const auto laneHeight = automationStack.getHeight() / static_cast<float>(count);
@@ -301,6 +303,13 @@ void Arrangement::paint(juce::Graphics& g)
             const auto y1 = yFor(startValue);
             const auto y2 = yFor(endValue);
             const auto laneActive = activeLane < 0 || laneIndex == activeLane || previewLine;
+            if (laneActive && activeLane >= 0 && !previewLine)
+            {
+                g.setColour(juce::Colour(0x332f151f));
+                g.fillRect(autoArea);
+                g.setColour(juce::Colour(0xffffbf7a).withAlpha(0.9f));
+                g.drawRect(autoArea.reduced(0.5f), 2.0f);
+            }
             g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(laneActive ? 0.25f : 0.14f));
             g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
             g.setColour(juce::Colour(0x5511191f));
@@ -315,8 +324,25 @@ void Arrangement::paint(juce::Graphics& g)
             if (!automation.parameterName.isEmpty())
             {
                 g.setFont(juce::FontOptions(11.0f));
-                g.drawText(automation.parameterName, autoArea.withHeight(16.0f).reduced(4.0f, 0.0f),
-                           juce::Justification::centredRight, true);
+                const auto labelArea = laneActive && activeLane >= 0 && !previewLine
+                    ? autoArea.withHeight(18.0f).reduced(5.0f, 1.0f)
+                    : autoArea.withHeight(std::min(16.0f, autoArea.getHeight())).reduced(4.0f, 0.0f);
+                if (laneActive && activeLane >= 0 && !previewLine)
+                {
+                    const auto textWidth = static_cast<float>(automation.parameterName.length()) * 6.5f;
+                    const auto badge = labelArea.withWidth(std::min(96.0f, std::max(46.0f, textWidth + 18.0f)));
+                    g.setColour(juce::Colour(0xee11161b));
+                    g.fillRect(badge);
+                    g.setColour(juce::Colour(0xffffbf7a));
+                    g.drawRect(badge.reduced(0.5f), 1.0f);
+                    g.setColour(juce::Colour(0xfff4e0bb));
+                    g.drawText(automation.parameterName, badge.reduced(5.0f, 0.0f), juce::Justification::centredLeft, true);
+                }
+                else
+                {
+                    g.setColour(laneActive ? juce::Colour(0xffe7c5ff) : juce::Colour(0xffd0a4e8));
+                    g.drawText(automation.parameterName, labelArea, juce::Justification::centredRight, true);
+                }
             }
         };
         auto previewLaneIndex = static_cast<int>(clip.automations.size());
@@ -333,8 +359,22 @@ void Arrangement::paint(juce::Graphics& g)
         }
         if (automationDragging && clip.id == selected)
             displayLaneCount = std::max(displayLaneCount, previewLaneIndex + 1);
+        if (activeLane >= 0 && juce::isPositiveAndBelow(activeLane, clip.automations.size()))
+        {
+            const auto& automation = clip.automations[static_cast<size_t>(activeLane)];
+            drawAutomation(automation,
+                           position.start + automation.startSeconds,
+                           position.start + automation.endSeconds,
+                           automation.startValue,
+                           automation.endValue,
+                           false,
+                           activeLane,
+                           displayLaneCount);
+        }
         for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
         {
+            if (i == activeLane)
+                continue;
             const auto& automation = clip.automations[static_cast<size_t>(i)];
             drawAutomation(automation,
                            position.start + automation.startSeconds,

@@ -88,7 +88,12 @@ float Arrangement::automationValueForY(const ClipView& clip, float y, Session::D
     const auto stack = bounds(clip).reduced(7.0f, 8.0f).withTop(bounds(clip).getY() + 22.0f);
     auto area = stack;
     const auto active = activeAutomationIndex(clip);
-    if (active < 0)
+    if (active >= 0)
+    {
+        const auto stripHeight = std::min(14.0f, std::max(9.0f, stack.getHeight() / static_cast<float>(clip.automations.size() + 3)));
+        area = stack.withTrimmedBottom(stripHeight * static_cast<float>(clip.automations.size()) + 3.0f).reduced(0.0f, 2.0f);
+    }
+    else
     {
         auto laneIndex = static_cast<int>(clip.automations.size());
         for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
@@ -133,7 +138,7 @@ int Arrangement::automationLaneAt(const ClipView& clip, juce::Point<float> point
     const auto active = activeAutomationIndex(clip);
     if (active >= 0)
     {
-        const auto stripHeight = std::min(12.0f, std::max(8.0f, stack.getHeight() / static_cast<float>(clip.automations.size() + 3)));
+        const auto stripHeight = std::min(14.0f, std::max(9.0f, stack.getHeight() / static_cast<float>(clip.automations.size() + 3)));
         const auto stripTop = stack.getBottom() - stripHeight * static_cast<float>(clip.automations.size());
         if (point.y >= stripTop)
         {
