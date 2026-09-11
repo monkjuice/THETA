@@ -436,7 +436,7 @@ private:
                              juce::dontSendNotification);
         {
             const juce::ScopedValueSetter<bool> scope(updatingEditorResolution, true);
-            editorResolution.setSelectedId(session.editorStepCount(), juce::dontSendNotification);
+            editorResolution.setSelectedId(session.editorStepResolution(), juce::dontSendNotification);
         }
         const auto name = session.projectFile == juce::File{} ? juce::String("Untitled") : session.projectFile.getFileNameWithoutExtension();
         documentName.setText(name + (session.hasUnsavedChanges() ? " *" : ""), juce::dontSendNotification);

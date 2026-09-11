@@ -751,7 +751,7 @@ bool Session::hasNote(int step, int pitch) const
     const auto gridSteps = editorStepCount();
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return false;
-    const auto beat = step * stepDurationBeats(gridSteps);
+    const auto beat = step * stepDurationBeats(editorStepResolution());
     for (auto* note : pattern().getSequence().getNotes())
         if (note->getNoteNumber() == pitch
             && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
@@ -764,9 +764,16 @@ void Session::endNoteGesture() { edit->getUndoManager().beginNewTransaction(); }
 
 int Session::editorStepCount() const
 {
+    const auto resolution = editorStepResolution();
+    const auto bars = std::max(1.0, std::ceil(patternLengthBeats() / 4.0));
+    return juce::jlimit(defaultSteps, steps, static_cast<int>(std::ceil(resolution * bars)));
+}
+
+int Session::editorStepResolution() const
+{
     if (patternClip == nullptr)
         return defaultSteps;
-    return juce::jlimit(defaultSteps, steps,
+    return juce::jlimit(defaultSteps, 64,
                         static_cast<int>(patternClip->state.getProperty(editorStepsID, defaultSteps)));
 }
 
@@ -782,8 +789,8 @@ double Session::patternLengthBeats() const
 
 void Session::setEditorStepCount(int newSteps)
 {
-    const auto clamped = juce::jlimit(defaultSteps, steps, newSteps);
-    if (patternClip == nullptr || editorStepCount() == clamped)
+    const auto clamped = juce::jlimit(defaultSteps, 64, newSteps);
+    if (patternClip == nullptr || editorStepResolution() == clamped)
         return;
     patternClip->state.setProperty(editorStepsID, clamped, &edit->getUndoManager());
     markModified();
@@ -794,7 +801,7 @@ void Session::setNote(int step, int pitch, bool enabled)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps);
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return;
     const auto beat = step * stepBeats;
@@ -844,7 +851,7 @@ void Session::setNote(int step, int pitch, bool enabled)
 int Session::noteLengthSteps(int step, int pitch) const
 {
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps);
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return 0;
     const auto beat = step * stepBeats;
@@ -859,7 +866,7 @@ juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps);
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return juce::Result::fail("Resize notes inside the visible grid.");
     lengthSteps = juce::jlimit(1, gridSteps - step, lengthSteps);
@@ -890,7 +897,7 @@ juce::Result Session::fillNoteToClipEnd(int step, int pitch)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps);
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return juce::Result::fail("Select a note inside the visible grid.");
 
@@ -924,7 +931,7 @@ juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, 
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
-    const auto stepBeats = stepDurationBeats(gridSteps);
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
     if (sourceStep < 0 || sourceStep >= gridSteps || targetStep < 0 || targetStep >= gridSteps
         || sourcePitch < 0 || sourcePitch > 127
         || targetPitch < 0 || targetPitch > 127)
@@ -949,7 +956,7 @@ juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, 
         return juce::Result::fail("Select a note to move.");
 
     const auto targetStart = tracktion::core::BeatPosition::fromBeats(targetBeat);
-    const auto maximumLength = tracktion::core::BeatDuration::fromBeats(4.0 - targetStart.inBeats());
+    const auto maximumLength = tracktion::core::BeatDuration::fromBeats(patternLengthBeats() - targetStart.inBeats());
     if (maximumLength <= tracktion::core::BeatDuration())
         return juce::Result::fail("Move notes inside the clip.");
     moving->setStartAndLength(targetStart, std::min(moving->getLengthBeats(), maximumLength), undoManager);

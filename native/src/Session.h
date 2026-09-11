@@ -108,8 +108,9 @@ public:
     void stop();
     void panicReset(bool restartAudioDevice = true);
     void releaseAudioDevice();
-    static constexpr int steps = 64, defaultSteps = 16, pitches = 16, lowestNote = 48;
+    static constexpr int steps = 512, defaultSteps = 16, pitches = 16, lowestNote = 48;
     te::MidiClip& pattern() const { return *patternClip; }
+    int editorStepResolution() const;
     int editorStepCount() const;
     double patternLengthBeats() const;
     void setEditorStepCount(int newSteps);

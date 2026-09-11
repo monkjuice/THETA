@@ -522,7 +522,7 @@ void StepGrid::rebuildVisibleNotes()
     std::array<int, Session::steps * Session::pitches> nextLengths {};
     const auto nextDrumLabels = session.isPatternDrums();
     const auto steps = session.editorStepCount();
-    const auto beatsPerStep = 4.0 / static_cast<double>(steps);
+    const auto beatsPerStep = 4.0 / static_cast<double>(session.editorStepResolution());
     for (auto* note : session.pattern().getSequence().getNotes())
     {
         const auto row = lowestVisiblePitch + Session::pitches - 1 - note->getNoteNumber();
@@ -583,10 +583,10 @@ float StepGrid::playheadXForTime(double seconds) const
     const auto editBeat = session.edit->tempoSequence.toBeats(tracktion::core::TimePosition::fromSeconds(seconds)).inBeats();
     const auto clipStartBeat = session.edit->tempoSequence.toBeats(position.time.getStart()).inBeats();
     const auto offsetBeat = position.offset.inSeconds() * session.tempo() / 60.0;
-    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, 4.0);
+    auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, session.patternLengthBeats());
     if (localBeat < 0.0)
-        localBeat += 4.0;
-    const auto step = localBeat / 4.0 * session.editorStepCount();
+        localBeat += session.patternLengthBeats();
+    const auto step = localBeat / 4.0 * session.editorStepResolution();
     if (step < stepScroll || step > stepScroll + visibleStepSpan())
         return -1.0f;
     return static_cast<float>(labelWidth + (step - stepScroll) * cellWidth());
@@ -595,7 +595,7 @@ float StepGrid::playheadXForTime(double seconds) const
 void StepGrid::syncHorizontalScroll()
 {
     const auto steps = session.editorStepCount();
-    stepZoom = std::clamp(static_cast<double>(steps) / static_cast<double>(Session::defaultSteps), 1.0, 4.0);
+    stepZoom = std::max(1.0, static_cast<double>(steps) / static_cast<double>(Session::defaultSteps));
     const auto visible = visibleStepSpan();
     const auto maximumStart = std::max(0.0, static_cast<double>(steps) - visible);
     stepScroll = std::clamp(stepScroll, 0.0, maximumStart);

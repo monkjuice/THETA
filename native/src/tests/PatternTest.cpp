@@ -206,15 +206,19 @@ int runPatternTest()
                 && session.noteLengthSteps(8, 39) == 2,
                 "Pattern notes expose and edit musical step lengths");
         const auto longClipStart = session.pattern().getPosition().time.getStart().inSeconds();
+        require(session.editClip(session.pattern().itemID, {longClipStart, longClipStart + 4.0, 0.0}, ClipGesture::trimRight).wasOk(),
+                "MIDI clips can be extended to multi-bar parts");
+        require(session.editorStepCount() == 32,
+                "A two-bar MIDI clip exposes two bars of sixteenth-note editor cells");
+        session.setNote(3, 55, true);
+        require(session.hasNote(3, 55) && !session.hasNote(7, 55),
+                "Drawing into an extended MIDI clip keeps the clicked editor step");
         require(session.editClip(session.pattern().itemID, {longClipStart, longClipStart + 30.0, 0.0}, ClipGesture::trimRight).wasOk(),
                 "MIDI clips can be extended to long sustained parts");
         require(session.pattern().getPosition().time.getLength().inSeconds() > 29.9,
                 "Extended MIDI clip keeps the requested duration");
-        session.setNote(3, 55, true);
-        require(session.hasNote(3, 55) && !session.hasNote(7, 55),
-                "Drawing into an extended MIDI clip keeps the clicked editor step");
         require(session.fillNoteToClipEnd(0, 36).wasOk()
-                && session.noteLengthSteps(0, 36) > session.editorStepCount(),
+                && session.noteLengthSteps(0, 36) == session.editorStepCount(),
                 "A MIDI note can sustain to the end of an extended clip");
         require(session.patternLengthBeats() > 50.0,
                 "Selected MIDI clip exposes extended length for fill operations");
