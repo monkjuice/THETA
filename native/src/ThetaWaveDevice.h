@@ -33,7 +33,7 @@ private:
     {
         bool active = false, released = false;
         int note = 0;
-        float velocity = 0.0f, phase = 0.0f, subPhase = 0.0f, motionPhase = 0.0f, envelope = 0.0f, releaseStart = 0.0f;
+        float velocity = 0.0f, phase = 0.0f, osc2Phase = 0.0f, subPhase = 0.0f, motionPhase = 0.0f, envelope = 0.0f, releaseStart = 0.0f;
     };
 
     void trigger(int note, float velocity);
@@ -43,9 +43,11 @@ private:
 
     juce::CachedValue<float> position, shape, motion, cutoff, filterEnv, driveDb, sub, resonance, attack, decay, sustain, releaseTime;
     juce::CachedValue<float> unison, detune, width, outputDb;
+    juce::CachedValue<float> osc2Level, osc2Tune;
     te::AutomatableParameter::Ptr positionParam, shapeParam, motionParam, cutoffParam, filterEnvParam, driveParam, subParam, resonanceParam;
     te::AutomatableParameter::Ptr attackParam, decayParam, sustainParam, releaseParam;
     te::AutomatableParameter::Ptr unisonParam, detuneParam, widthParam, outputParam;
+    te::AutomatableParameter::Ptr osc2LevelParam, osc2TuneParam;
     std::array<Voice, 12> voices;
     double sampleRate = 48000.0;
     size_t nextVoice = 0;

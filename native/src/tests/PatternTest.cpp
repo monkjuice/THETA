@@ -78,9 +78,10 @@ int runPatternTest()
             }
             require(waveSlot >= 0, "Theta Wave is inserted in the target track chain");
             auto waveParameters = parameterSession.deviceParameters(1, waveSlot);
-            require(waveParameters.size() >= 10 && waveParameters[0].name == "Position"
+            require(waveParameters.size() >= 18 && waveParameters[0].name == "Position"
                     && waveParameters[2].name == "Motion" && waveParameters[4].name == "Env"
-                    && waveParameters[5].name == "Drive" && waveParameters[8].name == "Attack",
+                    && waveParameters[5].name == "Drive" && waveParameters[8].name == "Attack"
+                    && waveParameters[16].name == "Osc 2" && waveParameters[17].name == "Tune 2",
                     "Theta Wave exposes wavetable and envelope macros");
         }
         auto& sequence = session.pattern().getSequence();

@@ -368,6 +368,8 @@ void applyThetaWavePatch(Session::PatternPreset preset, ThetaWaveDevice& wave)
         set(13, 0.13f);   // Detune
         set(14, 0.78f);   // Width
         set(15, -12.0f);  // Output
+        set(16, 0.34f);   // Osc 2
+        set(17, 12.0f);   // Tune 2
     }
     else if (preset == Session::PatternPreset::WaveBass)
     {
@@ -387,6 +389,8 @@ void applyThetaWavePatch(Session::PatternPreset preset, ThetaWaveDevice& wave)
         set(13, 0.02f);
         set(14, 0.18f);
         set(15, -10.0f);
+        set(16, 0.28f);
+        set(17, -12.0f);
     }
     else if (preset == Session::PatternPreset::WavePluck)
     {
@@ -406,6 +410,8 @@ void applyThetaWavePatch(Session::PatternPreset preset, ThetaWaveDevice& wave)
         set(13, 0.06f);
         set(14, 0.52f);
         set(15, -11.0f);
+        set(16, 0.22f);
+        set(17, 7.0f);
     }
 }
 

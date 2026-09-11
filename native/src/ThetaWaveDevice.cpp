@@ -23,6 +23,8 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     detune.referTo(state, "detune", undo, 0.08f);
     width.referTo(state, "width", undo, 0.42f);
     outputDb.referTo(state, "outputDb", undo, -8.0f);
+    osc2Level.referTo(state, "osc2Level", undo, 0.0f);
+    osc2Tune.referTo(state, "osc2Tune", undo, 0.0f);
 
     positionParam = addParam("position", "Position", {0.0f, 1.0f});
     shapeParam = addParam("shape", "Shape", {0.0f, 1.0f});
@@ -40,12 +42,15 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     detuneParam = addParam("detune", "Detune", {0.0f, 0.35f});
     widthParam = addParam("width", "Width", {0.0f, 1.0f});
     outputParam = addParam("outputDb", "Output", {-36.0f, 6.0f});
+    osc2LevelParam = addParam("osc2Level", "Osc 2", {0.0f, 1.0f});
+    osc2TuneParam = addParam("osc2Tune", "Tune 2", {-24.0f, 24.0f, 1.0f});
 
     for (auto pair : std::initializer_list<std::pair<te::AutomatableParameter::Ptr*, juce::CachedValue<float>*>>{
              {&positionParam, &position}, {&shapeParam, &shape}, {&motionParam, &motion}, {&cutoffParam, &cutoff},
              {&filterEnvParam, &filterEnv}, {&driveParam, &driveDb}, {&subParam, &sub}, {&resonanceParam, &resonance}, {&attackParam, &attack}, {&decayParam, &decay},
              {&sustainParam, &sustain}, {&releaseParam, &releaseTime}, {&unisonParam, &unison},
-             {&detuneParam, &detune}, {&widthParam, &width}, {&outputParam, &outputDb}})
+             {&detuneParam, &detune}, {&widthParam, &width}, {&outputParam, &outputDb},
+             {&osc2LevelParam, &osc2Level}, {&osc2TuneParam, &osc2Tune}})
         (*pair.first)->attachToCurrentValue(*pair.second);
 
     auto percentText = [] (float value) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; };
@@ -66,6 +71,11 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     detuneParam->valueToStringFunction = percentText;
     widthParam->valueToStringFunction = percentText;
     outputParam->valueToStringFunction = [] (float value) { return juce::String(value, 1) + " dB"; };
+    osc2LevelParam->valueToStringFunction = percentText;
+    osc2TuneParam->valueToStringFunction = [] (float value)
+    {
+        return juce::String(value > 0.0f ? "+" : "") + juce::String(juce::roundToInt(value)) + " st";
+    };
 }
 
 ThetaWaveDevice::~ThetaWaveDevice()
@@ -167,17 +177,27 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
     const auto motionOffset = std::sin(voice.motionPhase * juce::MathConstants<float>::twoPi)
         * motionParam->getCurrentValue() * 0.18f;
     auto sample = 0.0f;
+    const auto osc2Mix = std::clamp(osc2LevelParam->getCurrentValue(), 0.0f, 1.0f);
+    const auto osc2Ratio = std::pow(2.0f, osc2TuneParam->getCurrentValue() / 12.0f);
     const auto basePhase = voice.phase;
+    const auto baseOsc2Phase = voice.osc2Phase;
     for (int i = 0; i < unisonCount; ++i)
     {
         const auto spread = unisonCount == 1 ? 0.0f : (static_cast<float>(i) / static_cast<float>(unisonCount - 1) - 0.5f);
         const auto cents = spread * detuneParam->getCurrentValue() * 48.0f;
         const auto detunedPhase = basePhase * std::pow(2.0f, cents / 1200.0f);
-        sample += wave(detunedPhase + spread * widthParam->getCurrentValue() * 0.12f, motionOffset + spread * motionParam->getCurrentValue() * 0.04f);
+        const auto osc1 = wave(detunedPhase + spread * widthParam->getCurrentValue() * 0.12f,
+                               motionOffset + spread * motionParam->getCurrentValue() * 0.04f);
+        const auto osc2 = wave(baseOsc2Phase + spread * widthParam->getCurrentValue() * 0.16f + 0.25f,
+                               motionOffset + 0.18f + spread * motionParam->getCurrentValue() * 0.05f);
+        sample += osc1 * (1.0f - osc2Mix) + osc2 * osc2Mix;
     }
     voice.phase += frequency * dt;
     if (voice.phase >= 1.0f)
         voice.phase -= std::floor(voice.phase);
+    voice.osc2Phase += frequency * osc2Ratio * dt;
+    if (voice.osc2Phase >= 1.0f)
+        voice.osc2Phase -= std::floor(voice.osc2Phase);
     sample /= static_cast<float>(unisonCount);
 
     voice.subPhase += frequency * 0.5f * dt;
@@ -240,7 +260,7 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
 void ThetaWaveDevice::restorePluginStateFromValueTree(const juce::ValueTree& source)
 {
     te::copyPropertiesToCachedValues(source, position, shape, motion, cutoff, filterEnv, driveDb, sub, resonance, attack, decay, sustain, releaseTime,
-                                     unison, detune, width, outputDb);
+                                     unison, detune, width, outputDb, osc2Level, osc2Tune);
     for (auto* parameter : getAutomatableParameters())
         parameter->updateFromAttachedValue();
 }
