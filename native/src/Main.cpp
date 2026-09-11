@@ -17,6 +17,25 @@ juce::File thetaLogFile()
         .getChildFile("Theta").getChildFile("theta.log");
 }
 
+void avoidLegacyDirectSound(te::Engine& engine)
+{
+   #if JUCE_WINDOWS
+    auto& manager = engine.getDeviceManager().deviceManager;
+    if (manager.getCurrentAudioDeviceType() != "DirectSound")
+        return;
+
+    for (auto* type : manager.getAvailableDeviceTypes())
+        if (type != nullptr && type->getTypeName() == "Windows Audio")
+        {
+            juce::Logger::writeToLog("Theta: switching audio backend from DirectSound to Windows Audio");
+            manager.setCurrentAudioDeviceType("Windows Audio", true);
+            return;
+        }
+   #else
+    juce::ignoreUnused(engine);
+   #endif
+}
+
 class ControlWindow final : public juce::Component,
                             public juce::DragAndDropContainer,
                             private Session::Listener,
@@ -497,7 +516,10 @@ private:
             if (startupStage == 0)
                 session = std::make_unique<Session>();
             else if (startupStage == 1)
+            {
                 session->engine.getDeviceManager().initialise(0, 2);
+                avoidLegacyDirectSound(session->engine);
+            }
             else
             {
                 window->setUsingNativeTitleBar(true);
