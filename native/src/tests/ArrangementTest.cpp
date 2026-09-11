@@ -290,6 +290,20 @@ int runArrangementTest()
             view.mouseDrag(event(down, to, true));
             view.mouseUp(event(down, to, true));
         };
+        const auto automationParameters = session.deviceParameters(0, 0);
+        require(!automationParameters.empty(), "Starter device exposes an automatable parameter");
+        require(session.setClipAutomationRamp(id, {0, 0, 0}, 0.0, 0.75,
+                                              automationParameters.front().minimum, automationParameters.front().maximum).wasOk(),
+                "Can add automation before exercising clip gestures");
+        view.sync();
+        view.fit();
+        drag({view.xFor(0.5), view.lane(1).getCentreY()}, {view.xFor(0.75), view.lane(1).getCentreY()});
+        require(close(session.findAudioClip(id)->getPosition().time.getStart().inSeconds(), 0.25),
+                "Automation overlays do not block a clip move gesture");
+        session.undo();
+        session.undo();
+        view.sync();
+        view.fit();
         view.selected = id;
         view.duplicateSelected();
         auto* snapDuplicate = te::getAudioTracks(*session.edit)[1]->getClips().getLast();
