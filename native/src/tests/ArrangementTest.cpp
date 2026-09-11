@@ -508,6 +508,15 @@ int runArrangementTest()
         StepGrid selectionGrid(session);
         selectionGrid.setSize(1000, 250);
         selectionGrid.changeListenerCallback(nullptr);
+        const auto defaultCellWidth = selectionGrid.cell(1, 0).getWidth();
+        session.setEditorStepCount(32);
+        selectionGrid.changeListenerCallback(nullptr);
+        require(selectionGrid.horizontalScroll.isVisible()
+                && close(selectionGrid.visibleStepSpan(), static_cast<double>(Session::defaultSteps))
+                && std::abs(selectionGrid.cell(1, 0).getWidth() - defaultCellWidth) < 0.1f,
+                "Fine editor grids zoom horizontally instead of shrinking cells");
+        session.setEditorStepCount(Session::defaultSteps);
+        selectionGrid.changeListenerCallback(nullptr);
         require(close(selectionGrid.playheadXForTime(0.5), 54.0),
                 "Note editor playhead starts at the selected clip even after bar one");
         require(close(selectionGrid.playheadXForTime(1.5), 527.0),

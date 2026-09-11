@@ -37,6 +37,8 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
             session.setEditorStepCount(resolutionBox.getSelectedId());
     };
     addAndMakeVisible(resolutionBox);
+    horizontalScroll.addListener(this);
+    addAndMakeVisible(horizontalScroll);
     session.addChangeListener(this);
     changeListenerCallback(nullptr);
 }
@@ -44,14 +46,25 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
 StepGrid::~StepGrid()
 {
     if (gesture != Gesture::none) session.endNoteGesture();
+    horizontalScroll.removeListener(this);
     session.removeChangeListener(this);
 }
 
 juce::Rectangle<float> StepGrid::cell(int step, int row) const
 {
-    const auto width = gridWidth() / session.editorStepCount();
-    const auto height = (getHeight() - headerHeight) / Session::pitches;
-    return {labelWidth + step * width, headerHeight + row * height, width, height};
+    const auto width = cellWidth();
+    const auto height = rowAreaHeight() / Session::pitches;
+    return {labelWidth + static_cast<float>(step - stepScroll) * width, headerHeight + row * height, width, height};
+}
+
+float StepGrid::rowAreaHeight() const
+{
+    return std::max(1.0f, getHeight() - headerHeight - (horizontalScroll.isVisible() ? scrollHeight : 0.0f));
+}
+
+float StepGrid::cellWidth() const
+{
+    return gridWidth() / static_cast<float>(visibleStepSpan());
 }
 
 float StepGrid::gridRight() const
@@ -65,15 +78,25 @@ float StepGrid::gridWidth() const
     return std::max(1.0f, gridRight() - labelWidth);
 }
 
+double StepGrid::visibleStepSpan() const
+{
+    return std::clamp(static_cast<double>(session.editorStepCount()) / stepZoom,
+                      1.0, static_cast<double>(session.editorStepCount()));
+}
+
 void StepGrid::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xff1d2228));
     g.setFont(juce::FontOptions(12.0f));
     const auto dirty = g.getClipBounds().toFloat();
     const auto steps = session.editorStepCount();
+    const auto firstVisibleStep = std::max(0, static_cast<int>(std::floor(stepScroll)));
+    const auto lastVisibleStep = std::min(steps - 1, static_cast<int>(std::ceil(stepScroll + visibleStepSpan())));
     for (int step = 0; step < steps; ++step)
     {
         const auto headerCell = cell(step, 0).withY(0).withHeight(headerHeight);
+        if (headerCell.getRight() < labelWidth || headerCell.getX() > gridRight())
+            continue;
         g.setColour(juce::Colour(step % 4 == 0 ? 0xffd4dacd : 0xff78818a));
         g.drawText(juce::String(step + 1), headerCell, juce::Justification::centred);
     }
@@ -88,7 +111,7 @@ void StepGrid::paint(juce::Graphics& g)
         g.setColour(juce::Colour(namedDrum ? 0xffffc16a : 0xffbac2ca));
         g.drawText(session.isPatternDrums() ? drumLaneName(pitch) : juce::MidiMessage::getMidiNoteName(pitch, true, true, 4),
                    key, juce::Justification::centred);
-        for (int step = 0; step < steps; ++step)
+        for (int step = firstVisibleStep; step <= lastVisibleStep; ++step)
         {
             const auto bounds = cell(step, row).reduced(2.0f, 2.0f);
             if (!dirty.intersects(bounds)) continue;
@@ -106,30 +129,32 @@ void StepGrid::paint(juce::Graphics& g)
     if (!session.isPatternDrums())
     {
         const auto maxLowest = 127 - Session::pitches + 1;
-        const auto thumbHeight = std::max(18.0f, (getHeight() - headerHeight) * (static_cast<float>(Session::pitches) / 128.0f));
-        const auto thumbTravel = std::max(1.0f, getHeight() - headerHeight - thumbHeight);
+        const auto thumbHeight = std::max(18.0f, rowAreaHeight() * (static_cast<float>(Session::pitches) / 128.0f));
+        const auto thumbTravel = std::max(1.0f, rowAreaHeight() - thumbHeight);
         const auto thumbY = headerHeight + (maxLowest - lowestVisiblePitch) / static_cast<float>(maxLowest) * thumbTravel;
         const auto right = gridRight();
         const juce::Rectangle<float> thumb(right - 5.0f, thumbY, 3.0f, thumbHeight);
         g.setColour(juce::Colour(0x55313b44));
-        g.fillRect(juce::Rectangle<float>(right - 6.0f, headerHeight + 2.0f, 4.0f, getHeight() - headerHeight - 4.0f));
+        g.fillRect(juce::Rectangle<float>(right - 6.0f, headerHeight + 2.0f, 4.0f, rowAreaHeight() - 4.0f));
         g.setColour(juce::Colour(0xaa8cc5d2));
         g.fillRoundedRectangle(thumb, 1.5f);
     }
     if (playhead >= 0)
     {
         g.setColour(playheadColour);
-        g.fillRect(playhead, headerHeight, 2.0f, getHeight() - headerHeight);
+        g.fillRect(playhead, headerHeight, 2.0f, rowAreaHeight());
     }
 }
 
 int StepGrid::hit(juce::Point<float> point) const
 {
-    if (point.x < labelWidth || point.y < headerHeight || point.x >= gridRight() || point.y >= getHeight())
+    if (point.x < labelWidth || point.y < headerHeight || point.x >= gridRight() || point.y >= headerHeight + rowAreaHeight())
         return -1;
     const auto steps = session.editorStepCount();
-    const auto step = static_cast<int>((point.x - labelWidth) / gridWidth() * steps);
-    const auto row = static_cast<int>((point.y - headerHeight) / (getHeight() - headerHeight) * Session::pitches);
+    const auto step = static_cast<int>(stepScroll + (point.x - labelWidth) / cellWidth());
+    if (step < 0 || step >= steps)
+        return -1;
+    const auto row = static_cast<int>((point.y - headerHeight) / rowAreaHeight() * Session::pitches);
     return row * Session::steps + step;
 }
 
@@ -387,6 +412,7 @@ int StepGrid::automaticLowestPitch() const
 void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 {
     syncResolutionBox();
+    syncHorizontalScroll();
     const auto previousLowestPitch = lowestVisiblePitch;
     if (session.isPatternDrums())
         manualPitchScroll = false;
@@ -413,6 +439,7 @@ void StepGrid::rebuildVisibleNotes()
     const auto changed = next ^ notes;
     const auto stepCountChanged = steps != visibleStepCount;
     visibleStepCount = steps;
+    syncHorizontalScroll();
     notes = next;
     selectedNotes &= notes;
     if (stepCountChanged || showingDrumLabels != nextDrumLabels)
@@ -441,7 +468,8 @@ void StepGrid::updatePlayhead()
     if (isShowing() && transport.isPlaying())
         next = playheadXForTime(playheadTime(transport));
     movePlayhead(*this, playhead, next,
-                 getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight)));
+                 getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight))
+                                 .withTrimmedBottom(horizontalScroll.isVisible() ? static_cast<int>(scrollHeight) : 0));
 }
 
 float StepGrid::playheadXForTime(double seconds) const
@@ -458,7 +486,10 @@ float StepGrid::playheadXForTime(double seconds) const
     auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, 4.0);
     if (localBeat < 0.0)
         localBeat += 4.0;
-    return static_cast<float>(labelWidth + localBeat / 4.0 * gridWidth());
+    const auto step = localBeat / 4.0 * session.editorStepCount();
+    if (step < stepScroll || step > stepScroll + visibleStepSpan())
+        return -1.0f;
+    return static_cast<float>(labelWidth + (step - stepScroll) * cellWidth());
 }
 
 void StepGrid::syncResolutionBox()
@@ -467,9 +498,34 @@ void StepGrid::syncResolutionBox()
     resolutionBox.setSelectedId(session.editorStepCount(), juce::dontSendNotification);
 }
 
+void StepGrid::syncHorizontalScroll()
+{
+    const auto steps = session.editorStepCount();
+    stepZoom = std::clamp(static_cast<double>(steps) / static_cast<double>(Session::defaultSteps), 1.0, 4.0);
+    const auto visible = visibleStepSpan();
+    const auto maximumStart = std::max(0.0, static_cast<double>(steps) - visible);
+    stepScroll = std::clamp(stepScroll, 0.0, maximumStart);
+    horizontalScroll.setVisible(maximumStart > 0.001);
+    horizontalScroll.setRangeLimits(0.0, static_cast<double>(steps), juce::dontSendNotification);
+    horizontalScroll.setCurrentRange(stepScroll, visible, juce::dontSendNotification);
+}
+
+void StepGrid::scrollBarMoved(juce::ScrollBar* bar, double start)
+{
+    if (bar != &horizontalScroll)
+        return;
+    const auto maximumStart = std::max(0.0, static_cast<double>(session.editorStepCount()) - visibleStepSpan());
+    stepScroll = std::clamp(start, 0.0, maximumStart);
+    updatePlayhead();
+    repaint();
+}
+
 void StepGrid::resized()
 {
     resolutionBox.setBounds(std::max(0, getWidth() - 86), 3, 78, 20);
+    syncHorizontalScroll();
+    horizontalScroll.setBounds(static_cast<int>(labelWidth), getHeight() - static_cast<int>(scrollHeight),
+                               std::max(1, static_cast<int>(gridRight() - labelWidth)), static_cast<int>(scrollHeight));
     updatePlayhead();
     repaint();
 }
