@@ -94,6 +94,8 @@ public:
     void setEditorStepCount(int newSteps);
     bool hasNote(int step, int pitch) const;
     void setNote(int step, int pitch, bool enabled);
+    int noteLengthSteps(int step, int pitch) const;
+    juce::Result resizeNote(int step, int pitch, int lengthSteps);
     void beginNoteGesture(juce::String actionName = "Draw notes");
     void endNoteGesture();
     void clearPattern();

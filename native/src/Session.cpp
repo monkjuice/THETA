@@ -723,6 +723,43 @@ void Session::setNote(int step, int pitch, bool enabled)
     sendSynchronousChangeMessage();
 }
 
+int Session::noteLengthSteps(int step, int pitch) const
+{
+    const auto gridSteps = editorStepCount();
+    if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
+        return 0;
+    const auto beat = step * stepDurationBeats(gridSteps);
+    for (auto* note : pattern().getSequence().getNotes())
+        if (note->getNoteNumber() == pitch
+            && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
+            return std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats() / stepDurationBeats(gridSteps))));
+    return 0;
+}
+
+juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    const auto gridSteps = editorStepCount();
+    if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
+        return juce::Result::fail("Resize notes inside the visible grid.");
+    lengthSteps = juce::jlimit(1, gridSteps - step, lengthSteps);
+    const auto beat = step * stepDurationBeats(gridSteps);
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    for (auto* note : sequence.getNotes())
+        if (note->getNoteNumber() == pitch
+            && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
+        {
+            const auto start = tracktion::core::BeatPosition::fromBeats(beat);
+            const auto length = tracktion::core::BeatDuration::fromBeats(lengthSteps * stepDurationBeats(gridSteps) * 0.9);
+            note->setStartAndLength(start, length, undoManager);
+            markModified();
+            sendSynchronousChangeMessage();
+            return juce::Result::ok();
+        }
+    return juce::Result::fail("Select a note to resize.");
+}
+
 juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());

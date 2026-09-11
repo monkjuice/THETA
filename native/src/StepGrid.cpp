@@ -113,13 +113,28 @@ void StepGrid::paint(juce::Graphics& g)
                    key, juce::Justification::centred);
         for (int step = firstVisibleStep; step <= lastVisibleStep; ++step)
         {
-            const auto bounds = cell(step, row).reduced(2.0f, 2.0f);
+            auto bounds = cell(step, row).reduced(2.0f, 2.0f);
             if (!dirty.intersects(bounds)) continue;
-            const bool active = notes.test(static_cast<size_t>(row * Session::steps + step));
-            const bool selected = selectedNotes.test(static_cast<size_t>(row * Session::steps + step));
-            g.setColour(juce::Colour(active ? 0xffc6d58c : (step / 4 % 2 == 0 ? 0xff2a3139 : 0xff252c33)));
+            g.setColour(juce::Colour(step / 4 % 2 == 0 ? 0xff2a3139 : 0xff252c33));
             g.fillRect(bounds);
-            if (selected)
+        }
+
+        for (int step = 0; step <= lastVisibleStep; ++step)
+        {
+            const auto index = row * Session::steps + step;
+            if (!notes.test(static_cast<size_t>(index)))
+                continue;
+
+            const auto length = std::max(1, noteLengths[static_cast<size_t>(index)]);
+            auto bounds = cell(step, row).reduced(2.0f, 2.0f);
+            bounds.setWidth(std::max(bounds.getWidth(), cellWidth() * length - 4.0f));
+            bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
+            if (bounds.getRight() < labelWidth || !dirty.intersects(bounds))
+                continue;
+
+            g.setColour(juce::Colour(0xffc6d58c));
+            g.fillRect(bounds);
+            if (selectedNotes.test(static_cast<size_t>(index)))
             {
                 g.setColour(juce::Colour(0xfff4f0b0));
                 g.drawRect(bounds.reduced(1.0f), 2.0f);
@@ -158,8 +173,47 @@ int StepGrid::hit(juce::Point<float> point) const
     return row * Session::steps + step;
 }
 
+int StepGrid::resizeHit(juce::Point<float> point) const
+{
+    if (point.y < headerHeight || point.y >= headerHeight + rowAreaHeight())
+        return -1;
+    const auto row = static_cast<int>((point.y - headerHeight) / rowAreaHeight() * Session::pitches);
+    if (row < 0 || row >= Session::pitches)
+        return -1;
+    const auto steps = session.editorStepCount();
+    const auto firstVisibleStep = std::max(0, static_cast<int>(std::floor(stepScroll)));
+    const auto lastVisibleStep = std::min(steps - 1, static_cast<int>(std::ceil(stepScroll + visibleStepSpan())));
+    for (int step = firstVisibleStep; step <= lastVisibleStep; ++step)
+    {
+        const auto index = row * Session::steps + step;
+        if (!notes.test(static_cast<size_t>(index)))
+            continue;
+        const auto length = std::max(1, noteLengths[static_cast<size_t>(index)]);
+        auto bounds = cell(step, row).reduced(2.0f, 2.0f);
+        bounds.setWidth(std::max(bounds.getWidth(), cellWidth() * length - 4.0f));
+        bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
+        const auto handle = bounds.withX(bounds.getRight() - std::min(8.0f, bounds.getWidth()));
+        if (handle.contains(point))
+            return index;
+    }
+    return -1;
+}
+
 void StepGrid::mouseDown(const juce::MouseEvent& event)
 {
+    if (!event.mods.isRightButtonDown())
+    {
+        const auto resizeIndex = resizeHit(event.position);
+        if (resizeIndex >= 0)
+        {
+            grabKeyboardFocus();
+            gesture = Gesture::resize;
+            resizingNoteIndex = resizeIndex;
+            noteMoved = false;
+            session.beginNoteGesture("Resize note");
+            return;
+        }
+    }
     const auto index = hit(event.position);
     if (index < 0) return;
     grabKeyboardFocus();
@@ -328,6 +382,21 @@ juce::Result StepGrid::moveCurrentNoteTo(int index)
     return result;
 }
 
+juce::Result StepGrid::resizeCurrentNoteTo(int index)
+{
+    if (resizingNoteIndex < 0)
+        return juce::Result::ok();
+    if (index < 0)
+        return juce::Result::ok();
+    const auto sourceStep = resizingNoteIndex % Session::steps;
+    const auto targetStep = index % Session::steps;
+    const auto length = std::max(1, targetStep - sourceStep + 1);
+    const auto result = session.resizeNote(sourceStep, pitchForIndex(resizingNoteIndex), length);
+    if (result.wasOk())
+        noteMoved = true;
+    return result;
+}
+
 void StepGrid::mouseDrag(const juce::MouseEvent& event)
 {
     if (gesture == Gesture::none) return;
@@ -335,6 +404,11 @@ void StepGrid::mouseDrag(const juce::MouseEvent& event)
     if (gesture == Gesture::move)
     {
         moveCurrentNoteTo(index);
+        return;
+    }
+    if (gesture == Gesture::resize)
+    {
+        resizeCurrentNoteTo(index);
         return;
     }
 
@@ -354,6 +428,7 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
     gesture = Gesture::none;
     lastHit = -1;
     movingNoteIndex = -1;
+    resizingNoteIndex = -1;
     noteMoved = false;
 }
 
@@ -426,6 +501,7 @@ void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 void StepGrid::rebuildVisibleNotes()
 {
     std::bitset<Session::steps * Session::pitches> next;
+    std::array<int, Session::steps * Session::pitches> nextLengths {};
     const auto nextDrumLabels = session.isPatternDrums();
     const auto steps = session.editorStepCount();
     const auto beatsPerStep = 4.0 / static_cast<double>(steps);
@@ -434,15 +510,21 @@ void StepGrid::rebuildVisibleNotes()
         const auto row = lowestVisiblePitch + Session::pitches - 1 - note->getNoteNumber();
         const auto step = juce::roundToInt(note->getStartBeat().inBeats() / beatsPerStep);
         if (row >= 0 && row < Session::pitches && step >= 0 && step < steps)
+        {
             next.set(static_cast<size_t>(row * Session::steps + step));
+            nextLengths[static_cast<size_t>(row * Session::steps + step)] =
+                std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats() / beatsPerStep)));
+        }
     }
     const auto changed = next ^ notes;
+    const auto lengthsChanged = nextLengths != noteLengths;
     const auto stepCountChanged = steps != visibleStepCount;
     visibleStepCount = steps;
     syncHorizontalScroll();
     notes = next;
+    noteLengths = nextLengths;
     selectedNotes &= notes;
-    if (stepCountChanged || showingDrumLabels != nextDrumLabels)
+    if (stepCountChanged || lengthsChanged || showingDrumLabels != nextDrumLabels)
     {
         showingDrumLabels = nextDrumLabels;
         repaint();

@@ -1,5 +1,6 @@
 #pragma once
 #include "Session.h"
+#include <array>
 #include <bitset>
 #include <vector>
 
@@ -19,7 +20,7 @@ public:
     void resized() override;
 private:
     friend int runArrangementTest();
-    enum class Gesture { none, draw, move };
+    enum class Gesture { none, draw, move, resize };
     struct CopiedNote { int step = 0, pitch = 0; };
     juce::Rectangle<float> cell(int step, int row) const;
     float rowAreaHeight() const;
@@ -29,6 +30,7 @@ private:
     double visibleStepSpan() const;
     void syncHorizontalScroll();
     int hit(juce::Point<float>) const;
+    int resizeHit(juce::Point<float>) const;
     void apply(int index);
     void toggleSelection(int index);
     void clearSelection();
@@ -36,6 +38,7 @@ private:
     bool pasteSelection();
     bool deleteSelection();
     juce::Result moveCurrentNoteTo(int index);
+    juce::Result resizeCurrentNoteTo(int index);
     int pitchForIndex(int index) const;
     int indexForCell(int step, int pitch) const;
     int automaticLowestPitch() const;
@@ -47,10 +50,11 @@ private:
     void updatePlayhead();
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited, selectedNotes;
+    std::array<int, Session::steps * Session::pitches> noteLengths {};
     std::vector<CopiedNote> noteClipboard;
     Gesture gesture = Gesture::none;
     bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, updatingResolutionBox = false;
-    int lastHit = -1, movingNoteIndex = -1, pasteAnchorIndex = -1;
+    int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1;
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;

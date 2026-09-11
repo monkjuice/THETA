@@ -546,6 +546,18 @@ int runArrangementTest()
         {
             return selectionGrid.lowestVisiblePitch + Session::pitches - 1 - pitch;
         };
+        const auto resizeCell = selectionGrid.cell(1, rowForPitch(48));
+        const juce::Point<float> resizeHandle(resizeCell.getRight() - 3.0f, resizeCell.getCentreY());
+        const auto resizeTarget = selectionGrid.cell(4, rowForPitch(48)).getCentre();
+        selectionGrid.mouseDown(gridEvent(resizeHandle, resizeHandle, false));
+        selectionGrid.mouseDrag(gridEvent(resizeHandle, resizeTarget, true));
+        selectionGrid.mouseUp(gridEvent(resizeHandle, resizeTarget, true));
+        selectionGrid.changeListenerCallback(nullptr);
+        require(session.noteLengthSteps(1, 48) == 4
+                && selectionGrid.noteLengths[static_cast<size_t>(selectionGrid.indexForCell(1, 48))] == 4,
+                "Dragging a note edge resizes its musical length in the editor");
+        session.undo();
+        selectionGrid.changeListenerCallback(nullptr);
         const auto commandLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::commandModifier);
         selectionGrid.mouseDown(gridEvent(selectionGrid.cell(4, rowForPitch(55)).getCentre(),
                                           selectionGrid.cell(4, rowForPitch(55)).getCentre(), false, commandLeft));

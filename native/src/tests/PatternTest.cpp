@@ -189,6 +189,9 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),
                 "Reese bass preset loads sustained electronic bass notes");
+        require(session.noteLengthSteps(0, 36) == 8 && session.resizeNote(8, 39, 2).wasOk()
+                && session.noteLengthSteps(8, 39) == 2,
+                "Pattern notes expose and edit musical step lengths");
         require(session.synth->chorusMix->getCurrentValue() > 0.1f && session.synth->oscParams[0]->detune->getCurrentValue() > 0.05f
                 && static_cast<int>(session.synth->state.getProperty("voices")) == 1,
                 "Reese bass preset shapes the 4OSC patch for detuned bass movement");
