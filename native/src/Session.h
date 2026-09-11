@@ -86,7 +86,7 @@ public:
     juce::Result importAudioAt(const juce::File&, int track, double startSeconds);
     void togglePlayback();
     void stop();
-    void panicReset();
+    void panicReset(bool restartAudioDevice = true);
     void releaseAudioDevice();
     static constexpr int steps = 64, defaultSteps = 16, pitches = 16, lowestNote = 48;
     te::MidiClip& pattern() const { return *patternClip; }

@@ -49,9 +49,20 @@ StepGrid::~StepGrid()
 
 juce::Rectangle<float> StepGrid::cell(int step, int row) const
 {
-    const auto width = (getWidth() - labelWidth) / session.editorStepCount();
+    const auto width = gridWidth() / session.editorStepCount();
     const auto height = (getHeight() - headerHeight) / Session::pitches;
     return {labelWidth + step * width, headerHeight + row * height, width, height};
+}
+
+float StepGrid::gridRight() const
+{
+    const auto boxX = resolutionBox.getBounds().getX();
+    return static_cast<float>(boxX > 0 ? boxX - 8 : getWidth());
+}
+
+float StepGrid::gridWidth() const
+{
+    return std::max(1.0f, gridRight() - labelWidth);
 }
 
 void StepGrid::paint(juce::Graphics& g)
@@ -60,12 +71,9 @@ void StepGrid::paint(juce::Graphics& g)
     g.setFont(juce::FontOptions(12.0f));
     const auto dirty = g.getClipBounds().toFloat();
     const auto steps = session.editorStepCount();
-    const auto headerLimit = resolutionBox.getBounds().getX() - 4.0f;
     for (int step = 0; step < steps; ++step)
     {
         const auto headerCell = cell(step, 0).withY(0).withHeight(headerHeight);
-        if (headerCell.getRight() > headerLimit)
-            continue;
         g.setColour(juce::Colour(step % 4 == 0 ? 0xffd4dacd : 0xff78818a));
         g.drawText(juce::String(step + 1), headerCell, juce::Justification::centred);
     }
@@ -101,9 +109,10 @@ void StepGrid::paint(juce::Graphics& g)
         const auto thumbHeight = std::max(18.0f, (getHeight() - headerHeight) * (static_cast<float>(Session::pitches) / 128.0f));
         const auto thumbTravel = std::max(1.0f, getHeight() - headerHeight - thumbHeight);
         const auto thumbY = headerHeight + (maxLowest - lowestVisiblePitch) / static_cast<float>(maxLowest) * thumbTravel;
-        const juce::Rectangle<float> thumb(getWidth() - 5.0f, thumbY, 3.0f, thumbHeight);
+        const auto right = gridRight();
+        const juce::Rectangle<float> thumb(right - 5.0f, thumbY, 3.0f, thumbHeight);
         g.setColour(juce::Colour(0x55313b44));
-        g.fillRect(juce::Rectangle<float>(getWidth() - 6.0f, headerHeight + 2.0f, 4.0f, getHeight() - headerHeight - 4.0f));
+        g.fillRect(juce::Rectangle<float>(right - 6.0f, headerHeight + 2.0f, 4.0f, getHeight() - headerHeight - 4.0f));
         g.setColour(juce::Colour(0xaa8cc5d2));
         g.fillRoundedRectangle(thumb, 1.5f);
     }
@@ -116,10 +125,10 @@ void StepGrid::paint(juce::Graphics& g)
 
 int StepGrid::hit(juce::Point<float> point) const
 {
-    if (point.x < labelWidth || point.y < headerHeight || point.x >= getWidth() || point.y >= getHeight())
+    if (point.x < labelWidth || point.y < headerHeight || point.x >= gridRight() || point.y >= getHeight())
         return -1;
     const auto steps = session.editorStepCount();
-    const auto step = static_cast<int>((point.x - labelWidth) / (getWidth() - labelWidth) * steps);
+    const auto step = static_cast<int>((point.x - labelWidth) / gridWidth() * steps);
     const auto row = static_cast<int>((point.y - headerHeight) / (getHeight() - headerHeight) * Session::pitches);
     return row * Session::steps + step;
 }
@@ -402,9 +411,11 @@ void StepGrid::rebuildVisibleNotes()
             next.set(static_cast<size_t>(row * Session::steps + step));
     }
     const auto changed = next ^ notes;
+    const auto stepCountChanged = steps != visibleStepCount;
+    visibleStepCount = steps;
     notes = next;
     selectedNotes &= notes;
-    if (showingDrumLabels != nextDrumLabels)
+    if (stepCountChanged || showingDrumLabels != nextDrumLabels)
     {
         showingDrumLabels = nextDrumLabels;
         repaint();
@@ -447,7 +458,7 @@ float StepGrid::playheadXForTime(double seconds) const
     auto localBeat = std::fmod(editBeat - clipStartBeat + offsetBeat, 4.0);
     if (localBeat < 0.0)
         localBeat += 4.0;
-    return static_cast<float>(labelWidth + localBeat / 4.0 * (getWidth() - labelWidth));
+    return static_cast<float>(labelWidth + localBeat / 4.0 * gridWidth());
 }
 
 void StepGrid::syncResolutionBox()
@@ -458,7 +469,7 @@ void StepGrid::syncResolutionBox()
 
 void StepGrid::resized()
 {
-    resolutionBox.setBounds(getWidth() - 86, 3, 78, 20);
+    resolutionBox.setBounds(std::max(0, getWidth() - 86), 3, 78, 20);
     updatePlayhead();
     repaint();
 }

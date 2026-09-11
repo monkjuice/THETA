@@ -123,7 +123,7 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::HouseKit);
         require(sequence.getNumNotes() == 10, "Drum kit preset loads notes");
         require(!session.synth->isEnabled() && session.drums->isEnabled(), "Drum kit preset enables drum instrument");
-        session.panicReset();
+        session.panicReset(false);
         require(!session.edit->getTransport().isPlaying(), "Panic reset stops playback");
         session.undo();
         require(sequence.getNumNotes() == 2, "Undo restores notes before preset load");
@@ -318,7 +318,7 @@ int runPatternTest()
                 }
             require(arpPeak > 0.0001f && arpPeak < 1.0f, "Theta Arp render must be audible and below clipping");
             arpSession.stop();
-            arpSession.panicReset();
+            arpSession.panicReset(false);
         }
 
         {
@@ -365,7 +365,7 @@ int runPatternTest()
                 }
             require(fxPeak > 0.0001f && fxPeak <= 1.0f, "Theta Space size automation remains bounded and audible");
             fxSession.stop();
-            fxSession.panicReset();
+            fxSession.panicReset(false);
         }
 
         require(session.importAudio(output.getFile()).wasOk(), "Import rendered audio");

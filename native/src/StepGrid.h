@@ -22,6 +22,8 @@ private:
     enum class Gesture { none, draw, move };
     struct CopiedNote { int step = 0, pitch = 0; };
     juce::Rectangle<float> cell(int step, int row) const;
+    float gridRight() const;
+    float gridWidth() const;
     int hit(juce::Point<float>) const;
     void apply(int index);
     void toggleSelection(int index);
@@ -44,6 +46,7 @@ private:
     Gesture gesture = Gesture::none;
     bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, updatingResolutionBox = false;
     int lastHit = -1, movingNoteIndex = -1, pasteAnchorIndex = -1;
+    int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     float playhead = -1.0f;
     juce::ComboBox resolutionBox;

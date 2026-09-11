@@ -633,7 +633,7 @@ Session::Session()
     edit->resetChangedStatus();
 }
 
-void Session::panicReset()
+void Session::panicReset(bool restartAudioDevice)
 {
     te::TransportControl::stopAllTransports(engine, false, true);
     auto& transport = edit->getTransport();
@@ -649,8 +649,11 @@ void Session::panicReset()
 
     transport.freePlaybackContext();
     engine.getDeviceManager().deviceManager.closeAudioDevice();
-    engine.getDeviceManager().deviceManager.restartLastAudioDevice();
-    transport.ensureContextAllocated(true);
+    if (restartAudioDevice)
+    {
+        engine.getDeviceManager().deviceManager.restartLastAudioDevice();
+        transport.ensureContextAllocated(true);
+    }
     sendSynchronousChangeMessage();
 }
 
