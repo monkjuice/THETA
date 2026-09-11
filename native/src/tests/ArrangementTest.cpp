@@ -1,7 +1,7 @@
-#include "Arrangement.h"
-#include "Theme.h"
-#include "StepGrid.h"
-#include "Playhead.h"
+#include "../Arrangement.h"
+#include "../Theme.h"
+#include "../StepGrid.h"
+#include "../Playhead.h"
 #include <stdexcept>
 
 #if JUCE_WINDOWS

@@ -1,4 +1,4 @@
-#include "Session.h"
+#include "../Session.h"
 #include <stdexcept>
 
 namespace theta
