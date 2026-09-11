@@ -132,6 +132,28 @@ int runPatternTest()
         session.applyPatternPreset(Session::PatternPreset::ClapKit);
         require(session.isPatternDrums() && session.hasNote(4, 56) && session.hasNote(12, 56),
                 "Clap kit preset loads clap notes into the drum editor");
+        require(session.addAudioTrack().wasOk(), "Can add a target track for moved MIDI");
+        const auto drumClipID = session.pattern().itemID;
+        require(session.duplicateClip(drumClipID).wasOk(), "Can duplicate a drum MIDI clip");
+        auto* drumDuplicate = te::getAudioTracks(*session.edit)[0]->getClips().getLast();
+        const auto drumDuplicateID = drumDuplicate->itemID;
+        const auto duplicateLength = drumDuplicate->getPosition().time.getLength().inSeconds();
+        require(session.editClip(drumDuplicateID, {2.0, 2.0 + duplicateLength, drumDuplicate->getPosition().offset.inSeconds()},
+                                 ClipGesture::move, 2).wasOk(),
+                "Can move a duplicated drum MIDI clip to another track");
+        const auto movedDrumSlots = session.deviceSlots(2);
+        auto movedDrumsEnabled = false, movedSynthDisabled = true, movedWaveDisabled = true;
+        for (const auto& slot : movedDrumSlots)
+        {
+            if (slot.type == DrumDevice::xmlTypeName) movedDrumsEnabled = slot.enabled;
+            if (slot.type == te::FourOscPlugin::xmlTypeName) movedSynthDisabled = !slot.enabled;
+            if (slot.type == ThetaWaveDevice::xmlTypeName) movedWaveDisabled = !slot.enabled;
+        }
+        require(movedDrumsEnabled && movedSynthDisabled && movedWaveDisabled,
+                "Moving duplicated drum MIDI to another track enables the drum instrument there");
+        session.undo();
+        session.undo();
+        session.undo();
         session.applyPatternPreset(Session::PatternPreset::ArpRun);
         require(!session.isPatternDrums() && session.hasNote(0, 48) && session.hasNote(0, 60),
                 "Arp run preset loads a held synth chord");
@@ -370,6 +392,7 @@ int runPatternTest()
         session.deleteClip(session.pattern().itemID);
         require(patternTrack->getClips().size() >= 1, "Deleting the last edited pattern keeps an editable clip alive");
         require(session.pattern().getSequence().getNumNotes() == 0, "Replacement pattern clip is empty and readable");
+        session.releaseAudioDevice();
         return 0;
     }
     catch (const std::exception& error)

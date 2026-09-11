@@ -97,6 +97,7 @@ int runSelfTest()
         bloom->restorePluginStateFromValueTree(bloomState);
         require(std::abs(bloom->getAutomatableParameterByID("chorus")->getCurrentValue() - 0.25f) < 1.0e-5f);
         bloom->deinitialise();
+        session.releaseAudioDevice();
         return 0;
     }
     catch (const std::exception& error)

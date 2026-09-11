@@ -716,6 +716,7 @@ int runArrangementTest()
         const auto late = output.getRMSLevel(0, 14400, 4800);
         require(early > 0.01f && late > early * 4.0f, "Rendered source window must match the visible trim");
         view.setLookAndFeel(nullptr);
+        session.releaseAudioDevice();
         return 0;
     }
     catch (const std::exception& error)

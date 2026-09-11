@@ -421,6 +421,17 @@ DrumDevice* findDrumDevice(te::AudioTrack& track)
     return nullptr;
 }
 
+Session::Instrument activeTrackInstrument(te::AudioTrack& track)
+{
+    if (auto* drums = findDrumDevice(track))
+        if (drums->isEnabled())
+            return Session::Instrument::Drums;
+    if (auto* wave = findThetaWave(track))
+        if (wave->isEnabled())
+            return Session::Instrument::ThetaWave;
+    return Session::Instrument::FourOsc;
+}
+
 te::AutomatableParameter* activeParameterAt(te::Plugin& plugin, int index)
 {
     int active = 0;
@@ -697,6 +708,18 @@ void Session::panicReset()
     engine.getDeviceManager().deviceManager.restartLastAudioDevice();
     transport.ensureContextAllocated(true);
     sendSynchronousChangeMessage();
+}
+
+void Session::releaseAudioDevice()
+{
+    te::TransportControl::stopAllTransports(engine, false, true);
+    if (edit != nullptr)
+    {
+        auto& transport = edit->getTransport();
+        transport.stop(false, true);
+        transport.freePlaybackContext();
+    }
+    engine.getDeviceManager().deviceManager.closeAudioDevice();
 }
 
 bool Session::hasNote(int step, int pitch) const
@@ -1567,6 +1590,9 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
     const auto tracks = te::getAudioTracks(*edit);
     auto* oldTrack = clip->getClipTrack();
     const auto oldTrackIndex = tracks.indexOf(dynamic_cast<te::AudioTrack*>(oldTrack));
+    const auto movingMidi = dynamic_cast<te::MidiClip*>(clip) != nullptr;
+    const auto sourceInstrument = movingMidi && oldTrackIndex >= 0 ? activeTrackInstrument(*tracks[oldTrackIndex])
+                                                                   : Instrument::Utility;
     if (targetTrack < 0 || gesture != ClipGesture::move)
         targetTrack = oldTrackIndex;
     if (targetTrack < 0 || targetTrack > tracks.size())
@@ -1595,6 +1621,18 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
     if (targetTrack != oldTrackIndex)
     {
         auto* target = refreshedTracks[targetTrack];
+        if (movingMidi)
+        {
+            bool instrumentChanged = false;
+            const auto result = switchTrackInstrument(*edit, *target, sourceInstrument, instrumentChanged);
+            if (result.failed())
+                return result;
+            if (targetTrack == 0)
+                edit->state.setProperty("thetaPatternInstrument",
+                                        sourceInstrument == Instrument::Drums ? "drums"
+                                            : sourceInstrument == Instrument::ThetaWave ? "wave" : "synth",
+                                        &edit->getUndoManager());
+        }
         if (!clip->moveTo(*target))
             return juce::Result::fail("The clip could not be moved to that track.");
     }

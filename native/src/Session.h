@@ -87,6 +87,7 @@ public:
     void togglePlayback();
     void stop();
     void panicReset();
+    void releaseAudioDevice();
     static constexpr int steps = 64, defaultSteps = 16, pitches = 16, lowestNote = 48;
     te::MidiClip& pattern() const { return *patternClip; }
     int editorStepCount() const { return editorSteps; }
