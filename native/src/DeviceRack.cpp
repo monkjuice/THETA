@@ -157,7 +157,14 @@ public:
                         session.setDeviceParameter(track, slot, index, static_cast<float>(slider->getValue()));
                         const auto next = session.deviceParameters(track, slot);
                         if (juce::isPositiveAndBelow(index, next.size()))
-                            values[index]->setText(next[static_cast<size_t>(index)].valueText, juce::dontSendNotification);
+                        {
+                            parameters[static_cast<size_t>(index)] = next[static_cast<size_t>(index)];
+                            values[index]->setText(parameters[static_cast<size_t>(index)].valueText, juce::dontSendNotification);
+                            slider->setTooltip(parameters[static_cast<size_t>(index)].name + ": "
+                                               + parameters[static_cast<size_t>(index)].valueText);
+                            if (isThetaWave)
+                                repaint(oscillatorArea.getUnion(envelopeArea).expanded(2));
+                        }
                     }
                 };
                 slider->onDragEnd = [this, index]
