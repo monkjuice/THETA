@@ -116,6 +116,45 @@ int runSelfTest()
                 wavePeak = std::max(wavePeak, std::abs(sample));
             }
         require(wavePeak < 1.0f);
+        wave->reset();
+        auto wavePosition = wave->getAutomatableParameterByID("position");
+        auto waveShape = wave->getAutomatableParameterByID("shape");
+        auto waveMotion = wave->getAutomatableParameterByID("motion");
+        auto waveOsc2 = wave->getAutomatableParameterByID("osc2Level");
+        auto waveTune2 = wave->getAutomatableParameterByID("osc2Tune");
+        auto waveCutoff = wave->getAutomatableParameterByID("cutoff");
+        require(wavePosition != nullptr && waveShape != nullptr && waveMotion != nullptr
+                && waveOsc2 != nullptr && waveTune2 != nullptr && waveCutoff != nullptr);
+        juce::AudioBuffer<float> sweepBuffer(2, 512);
+        te::MidiMessageArray sweepMidi;
+        float sweepPeak = 0.0f, maxJump = 0.0f, previousSample = 0.0f;
+        for (int block = 0; block < 32; ++block)
+        {
+            sweepBuffer.clear();
+            sweepMidi.clear();
+            if (block == 0)
+                sweepMidi.addMidiMessage(juce::MidiMessage::noteOn(1, 61, 0.8f), 0.0, {});
+            if (block == 16)
+                sweepMidi.addMidiMessage(juce::MidiMessage::noteOn(1, 73, 0.55f), 0.0, {});
+            const auto phase = static_cast<float>(block) / 31.0f;
+            wavePosition->setParameter(phase, juce::dontSendNotification);
+            waveShape->setParameter(1.0f - phase * 0.7f, juce::dontSendNotification);
+            waveMotion->setParameter(0.1f + phase * 0.75f, juce::dontSendNotification);
+            waveOsc2->setParameter(phase, juce::dontSendNotification);
+            waveTune2->setParameter(block % 2 == 0 ? 12.0f : -12.0f, juce::dontSendNotification);
+            waveCutoff->setParameter(350.0f + phase * 12000.0f, juce::dontSendNotification);
+            te::PluginRenderContext sweepContext(&sweepBuffer, 0, sweepBuffer.getNumSamples(), &sweepMidi, 0.0, {}, true, false, true, false);
+            wave->applyToBuffer(sweepContext);
+            for (int i = 0; i < sweepBuffer.getNumSamples(); ++i)
+            {
+                const auto sample = sweepBuffer.getSample(0, i);
+                require(std::isfinite(sample));
+                sweepPeak = std::max(sweepPeak, std::abs(sample));
+                maxJump = std::max(maxJump, std::abs(sample - previousSample));
+                previousSample = sample;
+            }
+        }
+        require(sweepPeak > 0.0001f && sweepPeak < 1.0f && maxJump < 0.9f);
         wave->deinitialise();
         session.releaseAudioDevice();
         return 0;

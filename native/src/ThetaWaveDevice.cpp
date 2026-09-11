@@ -96,6 +96,7 @@ void ThetaWaveDevice::reset()
     for (auto& voice : voices)
         voice.active = false;
     filterL = filterR = 0.0f;
+    syncSmoothedParameters(true);
 }
 
 void ThetaWaveDevice::midiPanic()
@@ -126,13 +127,13 @@ void ThetaWaveDevice::release(int note)
 float ThetaWaveDevice::wave(float phase, float motionOffset) const
 {
     phase -= std::floor(phase);
-    const auto positionValue = std::clamp(positionParam->getCurrentValue() + motionOffset, 0.0f, 1.0f);
+    const auto positionValue = std::clamp(currentPosition + motionOffset, 0.0f, 1.0f);
     const auto sine = std::sin(phase * juce::MathConstants<float>::twoPi);
     const auto tri = 1.0f - 4.0f * std::abs(phase - 0.5f);
     const auto saw = phase * 2.0f - 1.0f;
     const auto square = phase < 0.5f ? 1.0f : -1.0f;
     const auto folded = std::sin((phase + positionValue * 0.35f) * juce::MathConstants<float>::twoPi)
-        * 0.58f + std::sin(phase * juce::MathConstants<float>::twoPi * (2.0f + shapeParam->getCurrentValue() * 6.0f)) * 0.42f;
+        * 0.58f + std::sin(phase * juce::MathConstants<float>::twoPi * (2.0f + currentShape * 6.0f)) * 0.42f;
     const auto morph = positionValue * 4.0f;
     const auto index = std::min(3, static_cast<int>(morph));
     const auto mix = morph - static_cast<float>(index);
@@ -171,25 +172,25 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
 
     const auto frequency = std::max(16.35f, static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(voice.note)));
     const auto unisonCount = juce::jlimit(1, 4, juce::roundToInt(unisonParam->getCurrentValue()));
-    voice.motionPhase += dt * (0.08f + motionParam->getCurrentValue() * 3.2f);
+    voice.motionPhase += dt * (0.08f + currentMotion * 3.2f);
     if (voice.motionPhase >= 1.0f)
         voice.motionPhase -= std::floor(voice.motionPhase);
     const auto motionOffset = std::sin(voice.motionPhase * juce::MathConstants<float>::twoPi)
-        * motionParam->getCurrentValue() * 0.18f;
+        * currentMotion * 0.18f;
     auto sample = 0.0f;
-    const auto osc2Mix = std::clamp(osc2LevelParam->getCurrentValue(), 0.0f, 1.0f);
-    const auto osc2Ratio = std::pow(2.0f, osc2TuneParam->getCurrentValue() / 12.0f);
+    const auto osc2Mix = std::clamp(currentOsc2Level, 0.0f, 1.0f);
+    const auto osc2Ratio = std::pow(2.0f, currentOsc2Tune / 12.0f);
     const auto basePhase = voice.phase;
     const auto baseOsc2Phase = voice.osc2Phase;
     for (int i = 0; i < unisonCount; ++i)
     {
         const auto spread = unisonCount == 1 ? 0.0f : (static_cast<float>(i) / static_cast<float>(unisonCount - 1) - 0.5f);
-        const auto cents = spread * detuneParam->getCurrentValue() * 48.0f;
+        const auto cents = spread * currentDetune * 48.0f;
         const auto detunedPhase = basePhase * std::pow(2.0f, cents / 1200.0f);
-        const auto osc1 = wave(detunedPhase + spread * widthParam->getCurrentValue() * 0.12f,
-                               motionOffset + spread * motionParam->getCurrentValue() * 0.04f);
-        const auto osc2 = wave(baseOsc2Phase + spread * widthParam->getCurrentValue() * 0.16f + 0.25f,
-                               motionOffset + 0.18f + spread * motionParam->getCurrentValue() * 0.05f);
+        const auto osc1 = wave(detunedPhase + spread * currentWidth * 0.12f,
+                               motionOffset + spread * currentMotion * 0.04f);
+        const auto osc2 = wave(baseOsc2Phase + spread * currentWidth * 0.16f + 0.25f,
+                               motionOffset + 0.18f + spread * currentMotion * 0.05f);
         sample += osc1 * (1.0f - osc2Mix) + osc2 * osc2Mix;
     }
     voice.phase += frequency * dt;
@@ -204,8 +205,41 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
     if (voice.subPhase >= 1.0f)
         voice.subPhase -= std::floor(voice.subPhase);
     const auto subOsc = std::sin(voice.subPhase * juce::MathConstants<float>::twoPi);
-    sample = sample * (1.0f - subParam->getCurrentValue() * 0.45f) + subOsc * subParam->getCurrentValue() * 0.45f;
+    sample = sample * (1.0f - currentSub * 0.45f) + subOsc * currentSub * 0.45f;
     return sample * voice.envelope * voice.velocity;
+}
+
+void ThetaWaveDevice::syncSmoothedParameters(bool immediate)
+{
+    const auto update = [immediate, this] (float& current, float target)
+    {
+        if (immediate)
+        {
+            current = target;
+            return;
+        }
+        const auto smoothing = 1.0f - std::exp(-1.0f / static_cast<float>(sampleRate * 0.018));
+        current += (target - current) * smoothing;
+    };
+
+    update(currentPosition, std::clamp(positionParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentShape, std::clamp(shapeParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentMotion, std::clamp(motionParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentCutoff, std::clamp(cutoffParam->getCurrentValue(), 80.0f, static_cast<float>(sampleRate * 0.45)));
+    update(currentFilterEnv, std::clamp(filterEnvParam->getCurrentValue(), -1.0f, 1.0f));
+    update(currentDrive, juce::Decibels::decibelsToGain(std::clamp(driveParam->getCurrentValue(), 0.0f, 24.0f)));
+    update(currentSub, std::clamp(subParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentResonance, std::clamp(resonanceParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentDetune, std::clamp(detuneParam->getCurrentValue(), 0.0f, 0.35f));
+    update(currentWidth, std::clamp(widthParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentOutput, juce::Decibels::decibelsToGain(std::clamp(outputParam->getCurrentValue(), -36.0f, 6.0f)));
+    update(currentOsc2Level, std::clamp(osc2LevelParam->getCurrentValue(), 0.0f, 1.0f));
+    update(currentOsc2Tune, std::clamp(osc2TuneParam->getCurrentValue(), -24.0f, 24.0f));
+}
+
+void ThetaWaveDevice::smoothParameters()
+{
+    syncSmoothedParameters(false);
 }
 
 void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
@@ -227,13 +261,9 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
                 midiPanic();
         }
 
-    const auto output = juce::Decibels::decibelsToGain(outputParam->getCurrentValue());
-    const auto baseCutoffHz = std::clamp(cutoffParam->getCurrentValue(), 80.0f, static_cast<float>(sampleRate * 0.45));
-    const auto drive = juce::Decibels::decibelsToGain(driveParam->getCurrentValue());
-    const auto resonancePush = 1.0f + resonanceParam->getCurrentValue() * 1.8f;
-
     for (int frame = context.bufferStartSample; frame < context.bufferStartSample + context.bufferNumSamples; ++frame)
     {
+        smoothParameters();
         auto mono = 0.0f;
         for (auto& voice : voices)
             mono += renderVoice(voice);
@@ -241,15 +271,15 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
         for (const auto& voice : voices)
             if (voice.active)
                 envelopePeak = std::max(envelopePeak, voice.envelope);
-        const auto cutoffHz = std::clamp(baseCutoffHz * std::pow(2.0f, filterEnvParam->getCurrentValue() * envelopePeak * 4.0f),
+        const auto cutoffHz = std::clamp(currentCutoff * std::pow(2.0f, currentFilterEnv * envelopePeak * 4.0f),
                                          40.0f, static_cast<float>(sampleRate * 0.45));
         const auto filterAmount = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * cutoffHz / static_cast<float>(sampleRate));
-        mono = std::tanh(mono * drive * resonancePush) * output;
+        mono = std::tanh(mono * currentDrive * (1.0f + currentResonance * 1.8f)) * currentOutput;
         filterL += (mono - filterL) * filterAmount;
         filterR += (mono - filterR) * filterAmount;
         const auto side = mono - filterL;
-        const auto left = std::clamp(filterL - side * widthParam->getCurrentValue() * 0.18f, -0.98f, 0.98f);
-        const auto right = std::clamp(filterR + side * widthParam->getCurrentValue() * 0.18f, -0.98f, 0.98f);
+        const auto left = std::clamp(filterL - side * currentWidth * 0.18f, -0.98f, 0.98f);
+        const auto right = std::clamp(filterR + side * currentWidth * 0.18f, -0.98f, 0.98f);
         if (buffer.getNumChannels() > 0)
             buffer.setSample(0, frame, std::clamp(buffer.getSample(0, frame) + left, -0.98f, 0.98f));
         if (buffer.getNumChannels() > 1)
@@ -263,5 +293,6 @@ void ThetaWaveDevice::restorePluginStateFromValueTree(const juce::ValueTree& sou
                                      unison, detune, width, outputDb, osc2Level, osc2Tune);
     for (auto* parameter : getAutomatableParameters())
         parameter->updateFromAttachedValue();
+    syncSmoothedParameters(true);
 }
 }

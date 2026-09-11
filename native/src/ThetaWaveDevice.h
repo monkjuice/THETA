@@ -40,6 +40,8 @@ private:
     void release(int note);
     float renderVoice(Voice&);
     float wave(float phase, float motionOffset) const;
+    void syncSmoothedParameters(bool immediate);
+    void smoothParameters();
 
     juce::CachedValue<float> position, shape, motion, cutoff, filterEnv, driveDb, sub, resonance, attack, decay, sustain, releaseTime;
     juce::CachedValue<float> unison, detune, width, outputDb;
@@ -52,5 +54,8 @@ private:
     double sampleRate = 48000.0;
     size_t nextVoice = 0;
     float filterL = 0.0f, filterR = 0.0f;
+    float currentPosition = 0.0f, currentShape = 0.0f, currentMotion = 0.0f, currentCutoff = 0.0f, currentFilterEnv = 0.0f;
+    float currentDrive = 1.0f, currentSub = 0.0f, currentResonance = 0.0f, currentDetune = 0.0f, currentWidth = 0.0f;
+    float currentOutput = 1.0f, currentOsc2Level = 0.0f, currentOsc2Tune = 0.0f;
 };
 }
