@@ -49,7 +49,7 @@ public:
         {
             setOpaque(true);
             refresh();
-            setSize(isThetaWave ? 860 : 680, isThetaWave ? 540 : 430);
+            setSize(isThetaWave ? 920 : 680, isThetaWave ? 620 : 430);
             startTimerHz(30);
         }
 
@@ -228,7 +228,7 @@ public:
 
         void paintWaveScope(juce::Graphics& g, juce::Rectangle<int> area) const
         {
-            const auto scope = area.toFloat().reduced(18.0f, 38.0f).withTrimmedBottom(12.0f);
+            const auto scope = area.toFloat().reduced(18.0f, 38.0f).withTrimmedBottom(96.0f);
             g.setColour(juce::Colour(0xff101419));
             g.fillRect(scope);
             g.setColour(juce::Colour(0xff2c3740));
@@ -262,7 +262,7 @@ public:
 
         void paintEnvelope(juce::Graphics& g, juce::Rectangle<int> area) const
         {
-            const auto graph = area.toFloat().reduced(18.0f, 42.0f).withTrimmedBottom(54.0f);
+            const auto graph = area.toFloat().reduced(18.0f, 42.0f).withTrimmedBottom(108.0f);
             g.setColour(juce::Colour(0xff101419));
             g.fillRect(graph);
             g.setColour(juce::Colour(0xff2c3740));
@@ -327,9 +327,13 @@ public:
         void layoutThetaWave()
         {
             const auto bounds = getLocalBounds().reduced(28);
-            oscillatorArea = {bounds.getX(), bounds.getY() + 60, 510, 206};
+            const auto top = bounds.getY() + 60;
+            const auto gap = 14;
+            const auto topHeight = 252;
+            const auto bottomHeight = bounds.getBottom() - top - topHeight - gap;
+            oscillatorArea = {bounds.getX(), top, 548, topHeight};
             filterArea = {oscillatorArea.getRight() + 14, oscillatorArea.getY(), bounds.getRight() - oscillatorArea.getRight() - 14, oscillatorArea.getHeight()};
-            envelopeArea = {bounds.getX(), oscillatorArea.getBottom() + 14, 392, bounds.getBottom() - oscillatorArea.getBottom() - 14};
+            envelopeArea = {bounds.getX(), oscillatorArea.getBottom() + gap, 432, bottomHeight};
             voiceArea = {envelopeArea.getRight() + 14, envelopeArea.getY(), bounds.getRight() - envelopeArea.getRight() - 14, envelopeArea.getHeight()};
 
             for (int i = 0; i < labels.size(); ++i)
@@ -340,11 +344,11 @@ public:
                 sliders[i]->setVisible(visible);
             }
 
-            const auto oscControls = oscillatorArea.reduced(18).removeFromBottom(86);
-            placeControl(0, oscControls, 0, 0, 4, 1);
-            placeControl(1, oscControls, 1, 0, 4, 1);
-            placeControl(3, oscControls, 2, 0, 4, 1);
-            placeControl(4, oscControls, 3, 0, 4, 1);
+            const auto oscControls = oscillatorArea.reduced(18).removeFromBottom(96);
+            placeControl(0, oscControls, 0, 0, 4, 1, 60);
+            placeControl(1, oscControls, 1, 0, 4, 1, 60);
+            placeControl(3, oscControls, 2, 0, 4, 1, 60);
+            placeControl(4, oscControls, 3, 0, 4, 1, 60);
 
             const auto filterControls = filterArea.reduced(18, 42);
             placeControl(5, filterControls, 0, 0, 2, 2);
@@ -352,7 +356,7 @@ public:
             placeControl(6, filterControls, 0, 1, 2, 2);
             placeControl(7, filterControls, 1, 1, 2, 2);
 
-            const auto envControls = envelopeArea.reduced(18).removeFromBottom(86);
+            const auto envControls = envelopeArea.reduced(18).removeFromBottom(96);
             placeControl(10, envControls, 0, 0, 4, 1, 60);
             placeControl(11, envControls, 1, 0, 4, 1, 60);
             placeControl(12, envControls, 2, 0, 4, 1, 60);
