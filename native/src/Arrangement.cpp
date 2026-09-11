@@ -657,6 +657,9 @@ void Arrangement::scrollBarMoved(juce::ScrollBar* bar, double start)
 void Arrangement::mouseDown(const juce::MouseEvent& event)
 {
     grabKeyboardFocus();
+    pendingAutomationClip = {};
+    pendingAutomationTarget = {};
+    pendingAutomationName.clear();
     if (event.mods.isRightButtonDown() && loopGestureAt(event.position) != LoopGesture::none)
     {
         session.clearManualLoopRange();
@@ -702,12 +705,12 @@ void Arrangement::mouseDown(const juce::MouseEvent& event)
     const auto clickedAutomationLane = automationLaneAt(clip, event.position);
     if (!automationButton.getToggleState() && clickedAutomationLane >= 0)
     {
-        activeAutomationClip = clip.id;
-        activeAutomationTarget = clip.automations[static_cast<size_t>(clickedAutomationLane)].target;
-        if (status)
-            status("Automation lane: " + clip.automations[static_cast<size_t>(clickedAutomationLane)].parameterName);
-        repaint();
-        return;
+        // A short click selects this lane. A drag still moves/trims the clip,
+        // including from its automation area.
+        const auto& automation = clip.automations[static_cast<size_t>(clickedAutomationLane)];
+        pendingAutomationClip = clip.id;
+        pendingAutomationTarget = automation.target;
+        pendingAutomationName = automation.parameterName;
     }
     repaint();
     if (automationButton.getToggleState())
@@ -853,6 +856,16 @@ void Arrangement::mouseUp(const juce::MouseEvent& event)
         return;
     }
     if (!dragging) return;
+    if (pendingAutomationClip == selected && pendingAutomationTarget.isValid()
+        && event.getDistanceFromDragStart() < 3)
+    {
+        activeAutomationClip = pendingAutomationClip;
+        activeAutomationTarget = pendingAutomationTarget;
+        if (status) status("Automation lane: " + pendingAutomationName);
+        cancelDrag();
+        repaint();
+        return;
+    }
     if (event.getDistanceFromDragStart() >= 3)
     {
         mouseDrag(event);
@@ -882,7 +895,7 @@ void Arrangement::mouseMove(const juce::MouseEvent& event)
         if (automationButton.getToggleState())
             pointerStyle = juce::MouseCursor::CrosshairCursor;
         else if (automationLaneAt(clips[static_cast<size_t>(index)], event.position) >= 0)
-            pointerStyle = juce::MouseCursor::PointingHandCursor;
+            pointerStyle = juce::MouseCursor::DraggingHandCursor;
         else
         {
             const auto box = bounds(clips[static_cast<size_t>(index)]);
@@ -1066,6 +1079,9 @@ void Arrangement::cancelDrag()
 {
     dragging = false;
     loopGesture = LoopGesture::none;
+    pendingAutomationClip = {};
+    pendingAutomationTarget = {};
+    pendingAutomationName.clear();
 }
 
 void Arrangement::selectTrack(int track)
