@@ -79,13 +79,21 @@ double Arrangement::snappedClipMoveStart(double desiredStart, double length, int
     return std::max(0.0, bestPixels < std::numeric_limits<float>::max() ? bestStart : snapped(desiredStart, false));
 }
 
+juce::Rectangle<float> Arrangement::automationBounds(const ClipView& clip) const
+{
+    // Automation lanes describe time within the clip, so each lane retains the
+    // whole clip width. Keep only vertical breathing room around the editor.
+    const auto clipBounds = bounds(clip);
+    return clipBounds.reduced(0.0f, 8.0f).withTop(clipBounds.getY() + 22.0f);
+}
+
 float Arrangement::automationValueForY(const ClipView& clip, float y, Session::DeviceTarget target) const
 {
     const auto parameters = session.deviceParameters(target.track, target.slot);
     if (!juce::isPositiveAndBelow(target.parameter, parameters.size()))
         return 0.0f;
     const auto& parameter = parameters[static_cast<size_t>(target.parameter)];
-    const auto stack = bounds(clip).reduced(7.0f, 8.0f).withTop(bounds(clip).getY() + 22.0f);
+    const auto stack = automationBounds(clip);
     auto area = stack;
     const auto active = activeAutomationIndex(clip);
     if (active >= 0)
@@ -131,7 +139,7 @@ int Arrangement::automationLaneAt(const ClipView& clip, juce::Point<float> point
 {
     if (clip.automations.empty())
         return -1;
-    const auto stack = bounds(clip).reduced(7.0f, 8.0f).withTop(bounds(clip).getY() + 22.0f);
+    const auto stack = automationBounds(clip);
     if (!stack.contains(point))
         return -1;
     const auto active = activeAutomationIndex(clip);

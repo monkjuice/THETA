@@ -70,6 +70,7 @@ private:
     double timeAt(float x) const;
     double snapped(double seconds, bool bypass) const;
     double snappedClipMoveStart(double desiredStart, double length, int targetTrack, bool bypass) const;
+    juce::Rectangle<float> automationBounds(const ClipView&) const;
     float automationValueForY(const ClipView&, float y, Session::DeviceTarget) const;
     int activeAutomationIndex(const ClipView&) const;
     int automationLaneAt(const ClipView&, juce::Point<float>) const;
