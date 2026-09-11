@@ -810,6 +810,9 @@ void Arrangement::mouseUp(const juce::MouseEvent& event)
         {
             activeAutomationClip = selected;
             activeAutomationTarget = automationTarget;
+            // Draw mode is one-shot so the next drag returns to the normal
+            // clip move/trim gesture without requiring an extra toggle.
+            automationButton.setToggleState(false, juce::dontSendNotification);
         }
         repaint();
         return;

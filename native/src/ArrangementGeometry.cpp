@@ -81,10 +81,10 @@ double Arrangement::snappedClipMoveStart(double desiredStart, double length, int
 
 juce::Rectangle<float> Arrangement::automationBounds(const ClipView& clip) const
 {
-    // Automation lanes describe time within the clip, so each lane retains the
-    // whole clip width. Keep only vertical breathing room around the editor.
+    // Automation is an overlay on the clip. Give every curve the complete
+    // usable clip height, including while its first drag is still a preview.
     const auto clipBounds = bounds(clip);
-    return clipBounds.reduced(0.0f, 8.0f).withTop(clipBounds.getY() + 22.0f);
+    return clipBounds.reduced(0.0f, 4.0f);
 }
 
 float Arrangement::automationValueForY(const ClipView& clip, float y, Session::DeviceTarget target) const
