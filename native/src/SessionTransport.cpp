@@ -2,6 +2,18 @@
 
 namespace theta
 {
+namespace
+{
+void releasePluginList(te::PluginList* list)
+{
+    if (list == nullptr)
+        return;
+    for (auto* plugin : *list)
+        if (plugin != nullptr)
+            plugin->midiPanic();
+}
+}
+
 juce::Result Session::importAudio(const juce::File& file)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
@@ -48,7 +60,11 @@ juce::Result Session::importAudioAt(const juce::File& file, int trackIndex, doub
 void Session::togglePlayback()
 {
     auto& transport = edit->getTransport();
-    if (transport.isPlaying()) transport.stop(false, false);
+    if (transport.isPlaying())
+    {
+        transport.stop(false, false);
+        releasePlayingNotes();
+    }
     else transport.play(false);
 }
 
@@ -56,6 +72,7 @@ void Session::stop()
 {
     edit->getTransport().stop(false, false);
     edit->getTransport().setPosition({});
+    releasePlayingNotes();
     for (auto* track : te::getAudioTracks(*edit))
         for (auto* plugin : track->pluginList)
             if (plugin != nullptr)
@@ -63,6 +80,16 @@ void Session::stop()
                 plugin->midiPanic();
                 plugin->reset();
             }
+}
+
+void Session::releasePlayingNotes()
+{
+    for (auto* track : te::getAudioTracks(*edit))
+    {
+        releasePluginList(&track->pluginList);
+        for (auto* clip : track->getClips())
+            releasePluginList(clip->getPluginList());
+    }
 }
 
 void Session::releaseAudioDevice()
