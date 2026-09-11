@@ -174,16 +174,19 @@ bool hasClipAutomationTarget(const te::Edit& edit, Session::DeviceTarget target)
     for (auto* track : te::getAudioTracks(edit))
         for (auto* clip : track->getClips())
         {
-            const auto state = clip->state.getChildWithName(clipAutomationID);
-            if (!state.isValid())
-                continue;
-            const Session::DeviceTarget clipTarget {
-                static_cast<int>(state.getProperty(automationTrackID, -1)),
-                static_cast<int>(state.getProperty(automationSlotID, -1)),
-                static_cast<int>(state.getProperty(automationParameterID, -1))
-            };
-            if (sameDeviceTarget(clipTarget, target))
-                return true;
+            for (int i = 0; i < clip->state.getNumChildren(); ++i)
+            {
+                const auto state = clip->state.getChild(i);
+                if (!state.hasType(clipAutomationID))
+                    continue;
+                const Session::DeviceTarget clipTarget {
+                    static_cast<int>(state.getProperty(automationTrackID, -1)),
+                    static_cast<int>(state.getProperty(automationSlotID, -1)),
+                    static_cast<int>(state.getProperty(automationParameterID, -1))
+                };
+                if (sameDeviceTarget(clipTarget, target))
+                    return true;
+            }
         }
     return false;
 }

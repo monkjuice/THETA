@@ -201,19 +201,23 @@ int runPatternTest()
         const auto decayMaximum = std::min(synthMacros[1].maximum, decayMinimum + 1.0f);
         require(session.setClipAutomationRamp(automatedClip, {0, 0, 1}, 0.25, 1.25, decayMinimum, decayMaximum).wasOk(),
                 "A clip can store automation for a second parameter");
+        const auto sustainMinimum = synthMacros[2].minimum;
+        const auto sustainMaximum = synthMacros[2].maximum;
+        require(session.setClipAutomationRamp(automatedClip, {0, 0, 2}, 0.5, 1.5, sustainMinimum, sustainMaximum).wasOk(),
+                "A clip can store automation for a third parameter");
         const auto storedAutomations = session.clipAutomations(automatedClip);
-        require(storedAutomations.size() == 2,
+        require(storedAutomations.size() == 3,
                 "Clip automation stores multiple parameter lanes");
         session.beginNoteGesture("Draw note after automation");
         session.setNote(15, 80, true);
         session.endNoteGesture();
         require(session.hasNote(15, 80), "Notes can be drawn after clip automation");
         session.undo();
-        require(!session.hasNote(15, 80) && session.clipAutomations(automatedClip).size() == 2,
+        require(!session.hasNote(15, 80) && session.clipAutomations(automatedClip).size() == 3,
                 "Undo after automation removes the new note without deleting automation");
         synthMacros = session.deviceParameters(0, 0);
-        require(synthMacros[0].automated && synthMacros[1].automated
-                && !synthMacros[0].automationOverridden && !synthMacros[1].automationOverridden,
+        require(synthMacros[0].automated && synthMacros[1].automated && synthMacros[2].automated
+                && !synthMacros[0].automationOverridden && !synthMacros[1].automationOverridden && !synthMacros[2].automationOverridden,
                 "Automated parameters report following state to device panels");
         session.applyClipAutomationAt(0.5);
         require(std::abs(session.synth->ampAttack->getCurrentValue() - (attackMinimum + attackMaximum) * 0.5f) < 0.02f,
@@ -242,7 +246,8 @@ int runPatternTest()
                 "Re-enabled automation drives the parameter again");
         require(session.deleteClipAutomation(automatedClip, {0, 0, 1}).wasOk(),
                 "A single automation lane can be deleted");
-        require(session.clipAutomations(automatedClip).size() == 1 && session.deviceParameters(0, 0)[0].automated,
+        require(session.clipAutomations(automatedClip).size() == 2
+                && session.deviceParameters(0, 0)[0].automated && session.deviceParameters(0, 0)[2].automated,
                 "Deleting one automation lane preserves other automation lanes");
         session.applyPatternPreset(Session::PatternPreset::ReeseBass);
         require(!session.isPatternDrums() && session.hasNote(0, 36) && session.hasNote(8, 39) && session.hasNote(12, 41),

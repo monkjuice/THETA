@@ -266,19 +266,19 @@ void Arrangement::paint(juce::Graphics& g)
         const auto position = dragging && clip.id == selected ? preview : clip.position;
         const auto automationStack = box.reduced(7.0f, 8.0f).withTop(box.getY() + 22.0f);
         const auto activeLane = activeAutomationIndex(clip);
-        const auto overviewStripHeight = activeLane >= 0
-            ? std::min(14.0f, std::max(9.0f, automationStack.getHeight() / static_cast<float>(clip.automations.size() + 3)))
+        const auto overviewHeight = activeLane >= 0 ? automationStack.getHeight() * 0.2f : 0.0f;
+        const auto overviewStripHeight = activeLane >= 0 && !clip.automations.empty()
+            ? overviewHeight / static_cast<float>(clip.automations.size())
             : 0.0f;
-        const auto overviewHeight = overviewStripHeight * static_cast<float>(clip.automations.size());
         const auto automationAreaFor = [&] (int laneIndex, int laneCount)
         {
             if (activeLane >= 0)
             {
                 if (laneIndex == activeLane)
-                    return automationStack.withTrimmedBottom(overviewHeight + 3.0f).reduced(0.0f, 2.0f);
+                    return automationStack.withTrimmedBottom(overviewHeight + 2.0f).reduced(0.0f, 1.0f);
                 const auto stripTop = automationStack.getBottom() - overviewHeight;
                 return juce::Rectangle<float>(automationStack.getX(), stripTop + overviewStripHeight * laneIndex,
-                                              automationStack.getWidth(), overviewStripHeight).reduced(0.0f, 1.0f);
+                                              automationStack.getWidth(), overviewStripHeight).reduced(0.0f, 0.75f);
             }
             const auto count = std::max(1, laneCount);
             const auto laneHeight = automationStack.getHeight() / static_cast<float>(count);
@@ -303,23 +303,36 @@ void Arrangement::paint(juce::Graphics& g)
             const auto y1 = yFor(startValue);
             const auto y2 = yFor(endValue);
             const auto laneActive = activeLane < 0 || laneIndex == activeLane || previewLine;
+            const auto laneColour = previewLine ? juce::Colour(0xffffbf7a)
+                : laneActive ? juce::Colour(0xffff8eea)
+                : juce::Colour(0xffd9a5ff);
+            const auto startColour = previewLine ? juce::Colour(0xffffd08a) : juce::Colour(0xff75d3e6);
+            const auto endColour = previewLine ? juce::Colour(0xffffa45d) : juce::Colour(0xffffbf7a);
             if (laneActive && activeLane >= 0 && !previewLine)
             {
-                g.setColour(juce::Colour(0x332f151f));
+                g.setColour(juce::Colour(0x552f151f));
                 g.fillRect(autoArea);
                 g.setColour(juce::Colour(0xffffbf7a).withAlpha(0.9f));
                 g.drawRect(autoArea.reduced(0.5f), 2.0f);
             }
-            g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(laneActive ? 0.25f : 0.14f));
+            g.setColour(laneColour.withAlpha(laneActive ? 0.34f : 0.2f));
             g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
             g.setColour(juce::Colour(0x5511191f));
             g.drawRect(autoArea.reduced(0.5f), 1.0f);
-            g.setColour((previewLine ? juce::Colour(0xffffbf7a) : juce::Colour(0xffd9a5ff)).withAlpha(laneActive ? 1.0f : 0.75f));
-            g.drawLine(x1, y1, x2, y2, laneActive ? 2.0f : 1.2f);
+            g.setColour(laneColour.withAlpha(laneActive ? 1.0f : 0.86f));
+            g.drawLine(x1, y1, x2, y2, laneActive ? 2.6f : 1.5f);
             if (laneActive)
             {
-                g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x1, y1}));
-                g.fillRect(juce::Rectangle<float>(8.0f, 8.0f).withCentre({x2, y2}));
+                const auto startHandle = juce::Rectangle<float>(9.0f, 9.0f).withCentre({x1, y1});
+                const auto endHandle = juce::Rectangle<float>(9.0f, 9.0f).withCentre({x2, y2});
+                g.setColour(startColour);
+                g.fillRect(startHandle);
+                g.setColour(juce::Colour(0xff11161b));
+                g.drawRect(startHandle.reduced(0.5f), 1.0f);
+                g.setColour(endColour);
+                g.fillRect(endHandle);
+                g.setColour(juce::Colour(0xff11161b));
+                g.drawRect(endHandle.reduced(0.5f), 1.0f);
             }
             if (!automation.parameterName.isEmpty())
             {
