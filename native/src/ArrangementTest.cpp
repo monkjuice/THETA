@@ -424,6 +424,23 @@ int runArrangementTest()
             return output.getRMSLevel(0, 0, output.getNumSamples());
         };
         view.selected = id;
+        view.duplicateSelected();
+        auto* movedDuplicate = te::getAudioTracks(*session.edit)[1]->getClips().getLast();
+        const auto movedDuplicateID = movedDuplicate->itemID;
+        view.sync();
+        view.selected = movedDuplicateID;
+        drag({view.xFor(movedDuplicate->getPosition().time.getStart().inSeconds() + 0.1), view.lane(1).getCentreY()},
+             {view.xFor(0.5), view.lane(2).getCentreY()});
+        require(te::getAudioTracks(*session.edit)[2]->findClipForID(movedDuplicateID) != nullptr,
+                "Dragging a duplicated audio clip to a newly-created track preserves clip identity");
+        require(renderClipRms(*session.findAudioClip(movedDuplicateID)) > 0.01f,
+                "Duplicated audio moved to a newly-created track still renders audible audio");
+        session.undo();
+        session.undo();
+        require(te::getAudioTracks(*session.edit)[1]->findClipForID(id) != nullptr,
+                "Undo restores the original audio clip after duplicate move regression");
+        view.sync();
+        view.selected = id;
         drag({view.xFor(0.2), view.lane(1).getCentreY()}, {view.xFor(0.5), view.lane(2).getCentreY()});
         require(te::getAudioTracks(*session.edit)[1]->getClips().isEmpty(), "Dragging an audio clip to another lane removes it from the source track");
         require(te::getAudioTracks(*session.edit)[2]->findClipForID(id) != nullptr, "Dragging an audio clip to another lane preserves clip identity on the target track");
@@ -539,6 +556,17 @@ int runArrangementTest()
         require(session.hasNote(5, 55) && session.hasNote(9, 60), "Undo restores notes removed by multi-selection delete");
         selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
         require(selectionGrid.selectedNotes.none(), "Escape clears note selection");
+        const auto ctrlLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::ctrlModifier);
+        selectionGrid.mouseDown(gridEvent(selectionGrid.cell(4, rowForPitch(55)).getCentre(),
+                                          selectionGrid.cell(4, rowForPitch(55)).getCentre(), false, ctrlLeft));
+        selectionGrid.mouseDown(gridEvent(selectionGrid.cell(8, rowForPitch(60)).getCentre(),
+                                          selectionGrid.cell(8, rowForPitch(60)).getCentre(), false, ctrlLeft));
+        require(selectionGrid.selectedNotes.count() == 2, "Ctrl-click selects multiple note cells on Windows");
+        require(selectionGrid.keyPressed(juce::KeyPress('C', juce::ModifierKeys::ctrlModifier, 'c')),
+                "Ctrl-C copies selected notes");
+        require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys::ctrlModifier, 'v')),
+                "Ctrl-V pastes selected notes");
+        selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
         const auto sourceCell = selectionGrid.cell(1, rowForPitch(48)).getCentre();
         const auto targetCell = selectionGrid.cell(1, rowForPitch(50)).getCentre();
         const auto shiftLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier);

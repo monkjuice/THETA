@@ -5,6 +5,7 @@ namespace theta
 namespace
 {
 const juce::Identifier starterPlaceholderID {"thetaStarterPlaceholder"};
+const juce::Identifier editorStepsID {"thetaEditorSteps"};
 
 struct PresetNote { int step, pitch, length; };
 
@@ -147,6 +148,11 @@ void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoMan
                          tracktion::core::BeatDuration::fromBeats(std::max(1, preset.notes[i].length) * 0.225), 100, 0,
                          &undoManager);
     clip.setName(preset.name);
+}
+
+double stepDurationBeats(int steps)
+{
+    return 4.0 / static_cast<double>(juce::jlimit(Session::defaultSteps, Session::steps, steps));
 }
 
 te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type)
@@ -575,6 +581,7 @@ Session::Session()
     engine.getPluginManager().createBuiltInType<ThetaWaveDevice>();
     edit = te::createEmptyEdit(engine, {});
     edit->state.setProperty("thetaFormatVersion", 1, nullptr);
+    edit->state.setProperty(editorStepsID, editorSteps, nullptr);
     edit->tempoSequence.getTempo(0)->setBpm(120.0);
     edit->ensureNumberOfAudioTracks(2);
     auto* track = te::getAudioTracks(*edit)[0];
@@ -694,9 +701,12 @@ void Session::panicReset()
 
 bool Session::hasNote(int step, int pitch) const
 {
+    if (step < 0 || step >= editorSteps || pitch < 0 || pitch > 127)
+        return false;
+    const auto beat = step * stepDurationBeats(editorSteps);
     for (auto* note : pattern().getSequence().getNotes())
         if (note->getNoteNumber() == pitch
-            && std::abs(note->getStartBeat().inBeats() - step * 0.25) < 0.0001)
+            && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
             return true;
     return false;
 }
@@ -704,16 +714,28 @@ bool Session::hasNote(int step, int pitch) const
 void Session::beginNoteGesture(juce::String actionName) { edit->getUndoManager().beginNewTransaction(actionName); }
 void Session::endNoteGesture() { edit->getUndoManager().beginNewTransaction(); }
 
+void Session::setEditorStepCount(int newSteps)
+{
+    const auto clamped = juce::jlimit(defaultSteps, steps, newSteps);
+    if (editorSteps == clamped)
+        return;
+    editorSteps = clamped;
+    edit->state.setProperty(editorStepsID, editorSteps, &edit->getUndoManager());
+    markModified();
+    sendSynchronousChangeMessage();
+}
+
 void Session::setNote(int step, int pitch, bool enabled)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    if (step < 0 || step >= steps || pitch < 0 || pitch > 127)
+    if (step < 0 || step >= editorSteps || pitch < 0 || pitch > 127)
         return;
+    const auto beat = step * stepDurationBeats(editorSteps);
     auto& sequence = pattern().getSequence();
     auto* undoManager = &edit->getUndoManager();
     for (auto* note : sequence.getNotes())
         if (note->getNoteNumber() == pitch
-            && std::abs(note->getStartBeat().inBeats() - step * 0.25) < 0.0001)
+            && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
         {
             if (!enabled)
             {
@@ -726,8 +748,9 @@ void Session::setNote(int step, int pitch, bool enabled)
     if (enabled)
     {
         pattern().state.removeProperty(starterPlaceholderID, undoManager);
-        sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(step * 0.25),
-                         tracktion::core::BeatDuration::fromBeats(0.225), 100, 0, undoManager);
+        const auto duration = std::max(0.02, stepDurationBeats(editorSteps) * 0.9);
+        sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(beat),
+                         tracktion::core::BeatDuration::fromBeats(duration), 100, 0, undoManager);
         markModified();
     }
     sendSynchronousChangeMessage();
@@ -736,7 +759,7 @@ void Session::setNote(int step, int pitch, bool enabled)
 juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-    if (sourceStep < 0 || sourceStep >= steps || targetStep < 0 || targetStep >= steps
+    if (sourceStep < 0 || sourceStep >= editorSteps || targetStep < 0 || targetStep >= editorSteps
         || sourcePitch < 0 || sourcePitch > 127
         || targetPitch < 0 || targetPitch > 127)
         return juce::Result::fail("Move notes inside the visible pitch grid.");
@@ -746,18 +769,20 @@ juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, 
     auto& sequence = pattern().getSequence();
     auto* undoManager = &edit->getUndoManager();
     auto* moving = static_cast<te::MidiNote*>(nullptr);
+    const auto sourceBeat = sourceStep * stepDurationBeats(editorSteps);
+    const auto targetBeat = targetStep * stepDurationBeats(editorSteps);
     for (auto* note : sequence.getNotes())
     {
-        const auto step = juce::roundToInt(note->getStartBeat().inBeats() * 4.0);
-        if (step == targetStep && note->getNoteNumber() == targetPitch)
+        const auto noteBeat = note->getStartBeat().inBeats();
+        if (std::abs(noteBeat - targetBeat) < 0.0001 && note->getNoteNumber() == targetPitch)
             return juce::Result::fail("That note cell is already occupied.");
-        if (step == sourceStep && note->getNoteNumber() == sourcePitch)
+        if (std::abs(noteBeat - sourceBeat) < 0.0001 && note->getNoteNumber() == sourcePitch)
             moving = note;
     }
     if (moving == nullptr)
         return juce::Result::fail("Select a note to move.");
 
-    const auto targetStart = tracktion::core::BeatPosition::fromBeats(targetStep * 0.25);
+    const auto targetStart = tracktion::core::BeatPosition::fromBeats(targetBeat);
     const auto maximumLength = tracktion::core::BeatDuration::fromBeats(4.0 - targetStart.inBeats());
     if (maximumLength <= tracktion::core::BeatDuration())
         return juce::Result::fail("Move notes inside the clip.");
@@ -1361,6 +1386,7 @@ void Session::redo()
 void Session::refreshAfterUndoRedo(bool changed)
 {
     if (changed) markModified();
+    editorSteps = juce::jlimit(defaultSteps, steps, static_cast<int>(edit->state.getProperty(editorStepsID, defaultSteps)));
     ensureEditablePatternClip();
     edit->tempoSequence.updateTempoData();
     refreshLoop();
@@ -1468,6 +1494,7 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
     listeners.call(&Listener::editWillChange);
     stop();
     edit = std::move(candidate);
+    editorSteps = juce::jlimit(defaultSteps, steps, static_cast<int>(edit->state.getProperty(editorStepsID, defaultSteps)));
     patternClip = nextPattern;
     patternClipID = patternClip->itemID;
     utility = nextUtility;

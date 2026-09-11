@@ -97,6 +97,19 @@ int runPatternTest()
         require(sequence.getNumNotes() == 0, "One gesture must undo together");
         session.redo();
         require(sequence.getNumNotes() == 2, "Redo restores the gesture");
+        session.setEditorStepCount(32);
+        session.beginNoteGesture("Draw 32-step note");
+        session.setNote(1, 50, true);
+        session.setNote(32, 50, true);
+        session.endNoteGesture();
+        require(session.editorStepCount() == 32 && session.hasNote(1, 50), "Editor can draw notes on a 32-step grid");
+        auto* thirtySecondNote = static_cast<te::MidiNote*>(nullptr);
+        for (auto* note : sequence.getNotes())
+            if (note->getNoteNumber() == 50)
+                thirtySecondNote = note;
+        require(thirtySecondNote != nullptr && std::abs(thirtySecondNote->getStartBeat().inBeats() - 0.125) < 0.0001,
+                "32-step grid places notes halfway between 16th steps");
+        session.setEditorStepCount(Session::defaultSteps);
         session.applyPatternPreset(Session::PatternPreset::HouseKit);
         require(sequence.getNumNotes() == 10, "Drum kit preset loads notes");
         require(!session.synth->isEnabled() && session.drums->isEnabled(), "Drum kit preset enables drum instrument");

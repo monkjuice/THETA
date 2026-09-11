@@ -14,6 +14,11 @@ juce::String drumLaneName(int pitch)
     if (pitch == 58) return "Hat";
     return juce::MidiMessage::getMidiNoteName(pitch, true, true, 4);
 }
+
+bool isShortcutDown(const juce::ModifierKeys& mods)
+{
+    return mods.isCommandDown() || mods.isCtrlDown();
+}
 }
 
 StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhead(); })
@@ -21,7 +26,17 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
     setOpaque(true);
     setWantsKeyboardFocus(true);
     setTitle("Pattern notes");
-    setDescription("One bar, sixteen steps. Drag to draw or erase notes.");
+    setDescription("One bar step editor. Drag to draw or erase notes.");
+    resolutionBox.addItem("1/16", 16);
+    resolutionBox.addItem("1/32", 32);
+    resolutionBox.addItem("1/64", 64);
+    resolutionBox.setJustificationType(juce::Justification::centred);
+    resolutionBox.onChange = [this]
+    {
+        if (!updatingResolutionBox && resolutionBox.getSelectedId() > 0)
+            session.setEditorStepCount(resolutionBox.getSelectedId());
+    };
+    addAndMakeVisible(resolutionBox);
     session.addChangeListener(this);
     changeListenerCallback(nullptr);
 }
@@ -34,7 +49,7 @@ StepGrid::~StepGrid()
 
 juce::Rectangle<float> StepGrid::cell(int step, int row) const
 {
-    const auto width = (getWidth() - labelWidth) / Session::steps;
+    const auto width = (getWidth() - labelWidth) / session.editorStepCount();
     const auto height = (getHeight() - headerHeight) / Session::pitches;
     return {labelWidth + step * width, headerHeight + row * height, width, height};
 }
@@ -44,10 +59,15 @@ void StepGrid::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1d2228));
     g.setFont(juce::FontOptions(12.0f));
     const auto dirty = g.getClipBounds().toFloat();
-    for (int step = 0; step < Session::steps; ++step)
+    const auto steps = session.editorStepCount();
+    const auto headerLimit = resolutionBox.getBounds().getX() - 4.0f;
+    for (int step = 0; step < steps; ++step)
     {
+        const auto headerCell = cell(step, 0).withY(0).withHeight(headerHeight);
+        if (headerCell.getRight() > headerLimit)
+            continue;
         g.setColour(juce::Colour(step % 4 == 0 ? 0xffd4dacd : 0xff78818a));
-        g.drawText(juce::String(step + 1), cell(step, 0).withY(0).withHeight(headerHeight), juce::Justification::centred);
+        g.drawText(juce::String(step + 1), headerCell, juce::Justification::centred);
     }
     for (int row = 0; row < Session::pitches; ++row)
     {
@@ -60,7 +80,7 @@ void StepGrid::paint(juce::Graphics& g)
         g.setColour(juce::Colour(namedDrum ? 0xffffc16a : 0xffbac2ca));
         g.drawText(session.isPatternDrums() ? drumLaneName(pitch) : juce::MidiMessage::getMidiNoteName(pitch, true, true, 4),
                    key, juce::Justification::centred);
-        for (int step = 0; step < Session::steps; ++step)
+        for (int step = 0; step < steps; ++step)
         {
             const auto bounds = cell(step, row).reduced(2.0f, 2.0f);
             if (!dirty.intersects(bounds)) continue;
@@ -98,7 +118,8 @@ int StepGrid::hit(juce::Point<float> point) const
 {
     if (point.x < labelWidth || point.y < headerHeight || point.x >= getWidth() || point.y >= getHeight())
         return -1;
-    const auto step = static_cast<int>((point.x - labelWidth) / (getWidth() - labelWidth) * Session::steps);
+    const auto steps = session.editorStepCount();
+    const auto step = static_cast<int>((point.x - labelWidth) / (getWidth() - labelWidth) * steps);
     const auto row = static_cast<int>((point.y - headerHeight) / (getHeight() - headerHeight) * Session::pitches);
     return row * Session::steps + step;
 }
@@ -110,7 +131,7 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
     grabKeyboardFocus();
     lastHit = index;
     pasteAnchorIndex = index;
-    if (event.mods.isCommandDown())
+    if (isShortcutDown(event.mods))
     {
         toggleSelection(index);
         return;
@@ -166,19 +187,28 @@ bool StepGrid::copySelection()
 
     auto minStep = Session::steps;
     auto minPitch = 128;
-    for (int index = 0; index < Session::steps * Session::pitches; ++index)
+    const auto steps = session.editorStepCount();
+    for (int row = 0; row < Session::pitches; ++row)
+    for (int step = 0; step < steps; ++step)
+    {
+        const auto index = row * Session::steps + step;
         if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
         {
             minStep = std::min(minStep, index % Session::steps);
             minPitch = std::min(minPitch, pitchForIndex(index));
         }
-    if (minStep >= Session::steps || minPitch > 127)
+    }
+    if (minStep >= steps || minPitch > 127)
         return false;
 
-    for (int index = 0; index < Session::steps * Session::pitches; ++index)
+    for (int row = 0; row < Session::pitches; ++row)
+    for (int step = 0; step < steps; ++step)
+    {
+        const auto index = row * Session::steps + step;
         if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
             noteClipboard.push_back({index % Session::steps - minStep, pitchForIndex(index) - minPitch});
-    pasteAnchorIndex = indexForCell(std::min(Session::steps - 1, minStep + 1), minPitch);
+    }
+    pasteAnchorIndex = indexForCell(std::min(steps - 1, minStep + 1), minPitch);
     return !noteClipboard.empty();
 }
 
@@ -198,7 +228,8 @@ bool StepGrid::pasteSelection()
     }
 
     const auto anchor = pasteAnchorIndex >= 0 ? pasteAnchorIndex : 0;
-    const auto anchorStep = juce::jlimit(0, std::max(0, Session::steps - 1 - maxStepOffset), anchor % Session::steps);
+    const auto steps = session.editorStepCount();
+    const auto anchorStep = juce::jlimit(0, std::max(0, steps - 1 - maxStepOffset), anchor % Session::steps);
     const auto anchorPitch = juce::jlimit(-minPitchOffset, 127 - maxPitchOffset, pitchForIndex(anchor));
 
     session.beginNoteGesture("Paste notes");
@@ -212,7 +243,7 @@ bool StepGrid::pasteSelection()
             selectedNotes.set(static_cast<size_t>(index));
     }
     session.endNoteGesture();
-    pasteAnchorIndex = indexForCell(std::min(Session::steps - 1, anchorStep + maxStepOffset + 1), anchorPitch);
+    pasteAnchorIndex = indexForCell(std::min(steps - 1, anchorStep + maxStepOffset + 1), anchorPitch);
     repaint();
     return true;
 }
@@ -223,9 +254,14 @@ bool StepGrid::deleteSelection()
         return false;
 
     session.beginNoteGesture("Delete notes");
-    for (int index = 0; index < Session::steps * Session::pitches; ++index)
+    const auto steps = session.editorStepCount();
+    for (int row = 0; row < Session::pitches; ++row)
+    for (int step = 0; step < steps; ++step)
+    {
+        const auto index = row * Session::steps + step;
         if (selectedNotes.test(static_cast<size_t>(index)))
             session.setNote(index % Session::steps, pitchForIndex(index), false);
+    }
     session.endNoteGesture();
     clearSelection();
     return true;
@@ -239,7 +275,7 @@ int StepGrid::pitchForIndex(int index) const
 int StepGrid::indexForCell(int step, int pitch) const
 {
     const auto row = lowestVisiblePitch + Session::pitches - 1 - pitch;
-    if (step < 0 || step >= Session::steps || row < 0 || row >= Session::pitches)
+    if (step < 0 || step >= session.editorStepCount() || row < 0 || row >= Session::pitches)
         return -1;
     return row * Session::steps + step;
 }
@@ -289,7 +325,7 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
 
 bool StepGrid::keyPressed(const juce::KeyPress& key)
 {
-    const auto command = key.getModifiers().isCommandDown();
+    const auto command = isShortcutDown(key.getModifiers());
     if (command && key.getKeyCode() == 'C')
         return copySelection();
     if (command && key.getKeyCode() == 'V')
@@ -341,6 +377,7 @@ int StepGrid::automaticLowestPitch() const
 
 void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 {
+    syncResolutionBox();
     const auto previousLowestPitch = lowestVisiblePitch;
     if (session.isPatternDrums())
         manualPitchScroll = false;
@@ -355,11 +392,13 @@ void StepGrid::rebuildVisibleNotes()
 {
     std::bitset<Session::steps * Session::pitches> next;
     const auto nextDrumLabels = session.isPatternDrums();
+    const auto steps = session.editorStepCount();
+    const auto beatsPerStep = 4.0 / static_cast<double>(steps);
     for (auto* note : session.pattern().getSequence().getNotes())
     {
         const auto row = lowestVisiblePitch + Session::pitches - 1 - note->getNoteNumber();
-        const auto step = juce::roundToInt(note->getStartBeat().inBeats() * 4.0);
-        if (row >= 0 && row < Session::pitches && step >= 0 && step < Session::steps)
+        const auto step = juce::roundToInt(note->getStartBeat().inBeats() / beatsPerStep);
+        if (row >= 0 && row < Session::pitches && step >= 0 && step < steps)
             next.set(static_cast<size_t>(row * Session::steps + step));
     }
     const auto changed = next ^ notes;
@@ -376,8 +415,12 @@ void StepGrid::rebuildVisibleNotes()
         repaint();
         return;
     }
-    for (int i = 0; i < Session::steps * Session::pitches; ++i)
-        if (changed.test(static_cast<size_t>(i))) repaint(cell(i % Session::steps, i / Session::steps).getSmallestIntegerContainer());
+    for (int row = 0; row < Session::pitches; ++row)
+    for (int step = 0; step < steps; ++step)
+    {
+        const auto index = row * Session::steps + step;
+        if (changed.test(static_cast<size_t>(index))) repaint(cell(step, row).getSmallestIntegerContainer());
+    }
 }
 
 void StepGrid::updatePlayhead()
@@ -407,5 +450,16 @@ float StepGrid::playheadXForTime(double seconds) const
     return static_cast<float>(labelWidth + localBeat / 4.0 * (getWidth() - labelWidth));
 }
 
-void StepGrid::resized() { updatePlayhead(); repaint(); }
+void StepGrid::syncResolutionBox()
+{
+    const juce::ScopedValueSetter<bool> scope(updatingResolutionBox, true);
+    resolutionBox.setSelectedId(session.editorStepCount(), juce::dontSendNotification);
+}
+
+void StepGrid::resized()
+{
+    resolutionBox.setBounds(getWidth() - 86, 3, 78, 20);
+    updatePlayhead();
+    repaint();
+}
 }
