@@ -265,7 +265,7 @@ void Arrangement::paint(juce::Graphics& g)
         }
         const auto position = dragging && clip.id == selected ? preview : clip.position;
         const auto automationStack = automationBounds(clip);
-        const auto activeLane = activeAutomationIndex(clip);
+        const auto activeLane = displayedAutomationIndex(clip);
         const auto overviewHeight = activeLane >= 0 ? automationStack.getHeight() * 0.2f : 0.0f;
         const auto overviewStripHeight = activeLane >= 0 && !clip.automations.empty()
             ? overviewHeight / static_cast<float>(clip.automations.size())

@@ -95,7 +95,7 @@ float Arrangement::automationValueForY(const ClipView& clip, float y, Session::D
     const auto& parameter = parameters[static_cast<size_t>(target.parameter)];
     const auto stack = automationBounds(clip);
     auto area = stack;
-    const auto active = activeAutomationIndex(clip);
+    const auto active = displayedAutomationIndex(clip);
     if (active >= 0)
     {
         area = stack.withTrimmedBottom(stack.getHeight() * 0.2f + 2.0f).reduced(0.0f, 1.0f);
@@ -133,6 +133,25 @@ int Arrangement::activeAutomationIndex(const ClipView& clip) const
             return i;
     }
     return -1;
+}
+
+int Arrangement::displayedAutomationIndex(const ClipView& clip) const
+{
+    // A new parameter has no persisted lane yet. Promote its live preview to
+    // the full editor instead of squeezing it into the overview strip.
+    if (automationDragging && clip.id == selected && automationTarget.isValid())
+    {
+        for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
+        {
+            const auto& automation = clip.automations[static_cast<size_t>(i)];
+            if (automation.target.track == automationTarget.track && automation.target.slot == automationTarget.slot
+                && automation.target.parameter == automationTarget.parameter)
+                return i;
+        }
+        return static_cast<int>(clip.automations.size());
+    }
+
+    return activeAutomationIndex(clip);
 }
 
 int Arrangement::automationLaneAt(const ClipView& clip, juce::Point<float> point) const

@@ -73,6 +73,7 @@ private:
     juce::Rectangle<float> automationBounds(const ClipView&) const;
     float automationValueForY(const ClipView&, float y, Session::DeviceTarget) const;
     int activeAutomationIndex(const ClipView&) const;
+    int displayedAutomationIndex(const ClipView&) const;
     int automationLaneAt(const ClipView&, juce::Point<float>) const;
     LoopGesture loopGestureAt(juce::Point<float>) const;
     juce::Rectangle<float> lane(int track) const;
