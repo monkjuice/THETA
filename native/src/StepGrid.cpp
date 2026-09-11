@@ -134,6 +134,10 @@ void StepGrid::paint(juce::Graphics& g)
 
             g.setColour(juce::Colour(0xffc6d58c));
             g.fillRect(bounds);
+            g.setColour(juce::Colour(0x55363f46));
+            g.fillRect(bounds.withWidth(2.0f));
+            g.setColour(juce::Colour(0xffe8f2aa));
+            g.fillRect(bounds.withX(bounds.getRight() - 3.0f).withWidth(3.0f));
             if (selectedNotes.test(static_cast<size_t>(index)))
             {
                 g.setColour(juce::Colour(0xfff4f0b0));
@@ -181,9 +185,8 @@ int StepGrid::resizeHit(juce::Point<float> point) const
     if (row < 0 || row >= Session::pitches)
         return -1;
     const auto steps = session.editorStepCount();
-    const auto firstVisibleStep = std::max(0, static_cast<int>(std::floor(stepScroll)));
     const auto lastVisibleStep = std::min(steps - 1, static_cast<int>(std::ceil(stepScroll + visibleStepSpan())));
-    for (int step = firstVisibleStep; step <= lastVisibleStep; ++step)
+    for (int step = 0; step <= lastVisibleStep; ++step)
     {
         const auto index = row * Session::steps + step;
         if (!notes.test(static_cast<size_t>(index)))
@@ -192,7 +195,10 @@ int StepGrid::resizeHit(juce::Point<float> point) const
         auto bounds = cell(step, row).reduced(2.0f, 2.0f);
         bounds.setWidth(std::max(bounds.getWidth(), cellWidth() * length - 4.0f));
         bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
-        const auto handle = bounds.withX(bounds.getRight() - std::min(8.0f, bounds.getWidth()));
+        if (bounds.getRight() < labelWidth || bounds.getX() > gridRight())
+            continue;
+        const auto handleWidth = std::min(5.0f, std::max(3.0f, bounds.getWidth() * 0.25f));
+        const auto handle = bounds.withX(bounds.getRight() - handleWidth).withWidth(handleWidth);
         if (handle.contains(point))
             return index;
     }
@@ -224,7 +230,7 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
         toggleSelection(index);
         return;
     }
-    if (event.mods.isShiftDown() && !event.mods.isRightButtonDown() && notes.test(static_cast<size_t>(index)))
+    if (!event.mods.isRightButtonDown() && notes.test(static_cast<size_t>(index)))
     {
         gesture = Gesture::move;
         movingNoteIndex = index;

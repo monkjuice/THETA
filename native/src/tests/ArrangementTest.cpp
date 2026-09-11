@@ -556,6 +556,23 @@ int runArrangementTest()
         require(session.noteLengthSteps(1, 48) == 4
                 && selectionGrid.noteLengths[static_cast<size_t>(selectionGrid.indexForCell(1, 48))] == 4,
                 "Dragging a note edge resizes its musical length in the editor");
+        const auto splitPoint = selectionGrid.cell(3, rowForPitch(48)).getCentre();
+        selectionGrid.mouseDown(gridEvent(splitPoint, splitPoint, false));
+        selectionGrid.mouseUp(gridEvent(splitPoint, splitPoint, false));
+        selectionGrid.changeListenerCallback(nullptr);
+        require(session.noteLengthSteps(1, 48) == 2 && session.hasNote(3, 48),
+                "Clicking inside a sustained note creates an independent note and shortens the sustain");
+        session.undo();
+        session.undo();
+        selectionGrid.changeListenerCallback(nullptr);
+        const auto moveFrom = selectionGrid.cell(1, rowForPitch(48)).getCentre();
+        const auto moveTo = selectionGrid.cell(2, rowForPitch(48)).getCentre();
+        selectionGrid.mouseDown(gridEvent(moveFrom, moveFrom, false));
+        selectionGrid.mouseDrag(gridEvent(moveFrom, moveTo, true));
+        selectionGrid.mouseUp(gridEvent(moveFrom, moveTo, true));
+        selectionGrid.changeListenerCallback(nullptr);
+        require(!session.hasNote(1, 48) && session.hasNote(2, 48),
+                "Dragging a note body moves it without requiring a modifier");
         session.undo();
         selectionGrid.changeListenerCallback(nullptr);
         const auto commandLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::commandModifier);

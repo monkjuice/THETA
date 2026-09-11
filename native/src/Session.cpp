@@ -714,6 +714,24 @@ void Session::setNote(int step, int pitch, bool enabled)
         }
     if (enabled)
     {
+        for (auto* note : sequence.getNotes())
+        {
+            if (note->getNoteNumber() != pitch)
+                continue;
+
+            const auto noteStartStep = juce::roundToInt(note->getStartBeat().inBeats() / stepDurationBeats(gridSteps));
+            const auto noteLengthSteps = std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats()
+                                                                                / stepDurationBeats(gridSteps))));
+            if (noteStartStep < step && step < noteStartStep + noteLengthSteps)
+            {
+                const auto start = tracktion::core::BeatPosition::fromBeats(noteStartStep * stepDurationBeats(gridSteps));
+                const auto length = tracktion::core::BeatDuration::fromBeats((step - noteStartStep) * stepDurationBeats(gridSteps) * 0.9);
+                note->setStartAndLength(start, length, undoManager);
+                markModified();
+                break;
+            }
+        }
+
         pattern().state.removeProperty(starterPlaceholderID, undoManager);
         const auto duration = std::max(0.02, stepDurationBeats(gridSteps) * 0.9);
         sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(beat),
@@ -746,6 +764,12 @@ juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
     const auto beat = step * stepDurationBeats(gridSteps);
     auto& sequence = pattern().getSequence();
     auto* undoManager = &edit->getUndoManager();
+    auto nextNoteStep = gridSteps;
+    for (auto* note : sequence.getNotes())
+        if (note->getNoteNumber() == pitch && note->getStartBeat().inBeats() > beat + 0.0001)
+            nextNoteStep = std::min(nextNoteStep, juce::roundToInt(note->getStartBeat().inBeats() / stepDurationBeats(gridSteps)));
+    lengthSteps = std::min(lengthSteps, std::max(1, nextNoteStep - step));
+
     for (auto* note : sequence.getNotes())
         if (note->getNoteNumber() == pitch
             && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
