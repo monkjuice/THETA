@@ -109,9 +109,6 @@ private:
     Session::DeviceTarget automationTarget;
     te::EditItemID activeAutomationClip;
     Session::DeviceTarget activeAutomationTarget;
-    te::EditItemID pendingAutomationClip;
-    Session::DeviceTarget pendingAutomationTarget;
-    juce::String pendingAutomationName;
     double automationStartTime = 0.0, automationEndTime = 0.0;
     float automationStartValue = 0.0f, automationEndValue = 0.0f;
     float playhead = -1.0f;

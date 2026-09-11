@@ -94,29 +94,9 @@ float Arrangement::automationValueForY(const ClipView& clip, float y, Session::D
         return 0.0f;
     const auto& parameter = parameters[static_cast<size_t>(target.parameter)];
     const auto stack = automationBounds(clip);
-    auto area = stack;
-    const auto active = displayedAutomationIndex(clip);
-    if (active >= 0)
-    {
-        area = stack.reduced(0.0f, 1.0f);
-    }
-    else
-    {
-        auto laneIndex = static_cast<int>(clip.automations.size());
-        for (int i = 0; i < static_cast<int>(clip.automations.size()); ++i)
-        {
-            const auto& automation = clip.automations[static_cast<size_t>(i)];
-            if (automation.target.track == target.track && automation.target.slot == target.slot && automation.target.parameter == target.parameter)
-            {
-                laneIndex = i;
-                break;
-            }
-        }
-        const auto laneCount = std::max(static_cast<int>(clip.automations.size()), laneIndex + 1);
-        const auto laneHeight = stack.getHeight() / static_cast<float>(std::max(1, laneCount));
-        area = juce::Rectangle<float>(stack.getX(), stack.getY() + laneHeight * laneIndex,
-                                      stack.getWidth(), std::max(8.0f, laneHeight)).reduced(0.0f, 2.0f);
-    }
+    // Curves share one editor. Adding a parameter must never reduce the
+    // physical throw used to reach its minimum and maximum.
+    const auto area = stack.reduced(0.0f, 1.0f);
     const auto amount = 1.0f - std::clamp((y - area.getY()) / std::max(1.0f, area.getHeight()), 0.0f, 1.0f);
     return parameter.minimum + (parameter.maximum - parameter.minimum) * amount;
 }
@@ -156,21 +136,9 @@ int Arrangement::displayedAutomationIndex(const ClipView& clip) const
 
 int Arrangement::automationLaneAt(const ClipView& clip, juce::Point<float> point) const
 {
-    if (clip.automations.empty())
+    if (clip.automations.empty() || !automationBounds(clip).contains(point))
         return -1;
-    const auto stack = automationBounds(clip);
-    if (!stack.contains(point))
-        return -1;
-    const auto active = activeAutomationIndex(clip);
-    if (active >= 0)
-    {
-        // Background lanes deliberately don't reserve vertical space. The
-        // foreground lane owns the full editor while it is being written.
-        return active;
-    }
-    const auto laneHeight = stack.getHeight() / static_cast<float>(clip.automations.size());
-    const auto index = static_cast<int>((point.y - stack.getY()) / std::max(1.0f, laneHeight));
-    return juce::isPositiveAndBelow(index, clip.automations.size()) ? index : -1;
+    return std::max(0, activeAutomationIndex(clip));
 }
 
 int Arrangement::hit(juce::Point<float> point) const
