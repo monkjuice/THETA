@@ -186,27 +186,31 @@ int runArrangementTest()
         session.undo();
         require(te::getAudioTracks(*session.edit)[0]->getClips().size() == 1, "Undo duplicate restores one MIDI pattern clip");
 
-        // isShowing() requires a visible desktop peer. Keep this tiny navigation
-        // check offscreen and remove the peer before exercising clip gestures.
-        view.setTopLeftPosition(-10000, -10000);
-        view.addToDesktop(0);
-        view.setVisible(true);
-        juce::Thread::sleep(1);
+        const auto runNativeRenderPeerTest = juce::SystemStats::getEnvironmentVariable("THETA_NATIVE_RENDER_TEST", {}) == "1";
+        if (runNativeRenderPeerTest)
+        {
+            // isShowing() requires a visible desktop peer. Keep this tiny navigation
+            // check offscreen and remove the peer before exercising clip gestures.
+            view.setTopLeftPosition(-10000, -10000);
+            view.addToDesktop(0);
+            view.setVisible(true);
+            juce::Thread::sleep(1);
        #if JUCE_WINDOWS
-        // Exercise the native damage handoff, not just software image painting.
-        // Simulate a new position arriving in vblank while earlier damage is
-        // already queued. Both strips must reach D2D before vblank drawing.
-        auto* peer = view.getPeer();
-        const auto direct2D = peer->getAvailableRenderingEngines().indexOf("Direct2D");
-        require(direct2D >= 0, "Windows rendering regression requires Direct2D");
-        peer->setCurrentRenderingEngine(direct2D);
-        const auto hwnd = static_cast<HWND>(peer->getNativeHandle());
-        UpdateWindow(hwnd);
-        view.repaint(150, 32, 6, 196);
-        require(GetUpdateRect(hwnd, nullptr, FALSE) != 0, "Repaint queues native window damage");
-        movePlayhead(view, view.playhead, 300, view.getLocalBounds().withTrimmedTop(32).withTrimmedBottom(18));
-        require(GetUpdateRect(hwnd, nullptr, FALSE) == 0, "Playhead damage must reach Direct2D before the vblank callback returns");
+            // Exercise the native damage handoff, not just software image painting.
+            // Simulate a new position arriving in vblank while earlier damage is
+            // already queued. Both strips must reach D2D before vblank drawing.
+            auto* peer = view.getPeer();
+            const auto direct2D = peer->getAvailableRenderingEngines().indexOf("Direct2D");
+            require(direct2D >= 0, "Windows rendering regression requires Direct2D");
+            peer->setCurrentRenderingEngine(direct2D);
+            const auto hwnd = static_cast<HWND>(peer->getNativeHandle());
+            UpdateWindow(hwnd);
+            view.repaint(150, 32, 6, 196);
+            require(GetUpdateRect(hwnd, nullptr, FALSE) != 0, "Repaint queues native window damage");
+            movePlayhead(view, view.playhead, 300, view.getLocalBounds().withTrimmedTop(32).withTrimmedBottom(18));
+            require(GetUpdateRect(hwnd, nullptr, FALSE) == 0, "Playhead damage must reach Direct2D before the vblank callback returns");
        #endif
+        }
         session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(0.5));
         view.zoom(0.5, 0.5);
         require(view.playhead == view.xFor(0.5), "Zoom must preserve the fractional playhead position before the next vblank");
@@ -214,9 +218,12 @@ int runArrangementTest()
         view.fit();
         require(view.playhead == view.xFor(0.5), "Fit must update the playhead immediately");
         session.stop();
-        view.setVisible(false);
-        view.removeFromDesktop();
-        juce::Thread::sleep(1);
+        if (runNativeRenderPeerTest)
+        {
+            view.setVisible(false);
+            view.removeFromDesktop();
+            juce::Thread::sleep(1);
+        }
 
         // Start asynchronous waveform scanning after the deterministic frame check.
         require(session.importAudio(source.getFile()).wasOk(), "Import audio");

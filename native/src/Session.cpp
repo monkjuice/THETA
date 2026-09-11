@@ -6,6 +6,7 @@ namespace
 {
 const juce::Identifier starterPlaceholderID {"thetaStarterPlaceholder"};
 const juce::Identifier editorStepsID {"thetaEditorSteps"};
+bool commandLineTestMode = false;
 
 struct PresetNote { int step, pitch, length; };
 
@@ -582,7 +583,12 @@ juce::Result switchTrackInstrument(te::Edit& edit, te::AudioTrack& track, Sessio
 }
 }
 
-Session::Session()
+void Session::setCommandLineTestMode(bool enabled)
+{
+    commandLineTestMode = enabled;
+}
+
+Session::Session() : engine(commandLineTestMode ? "Theta Native Tests" : "Theda Native")
 {
     engine.getPluginManager().createBuiltInType<UtilityDevice>();
     engine.getPluginManager().createBuiltInType<DrumDevice>();

@@ -37,6 +37,15 @@ void avoidLegacyDirectSound(te::Engine& engine)
    #endif
 }
 
+void prepareCommandLineAudio()
+{
+   #if JUCE_WINDOWS
+    te::Engine testEngine {"Theta Native Tests"};
+    avoidLegacyDirectSound(testEngine);
+    testEngine.getDeviceManager().deviceManager.closeAudioDevice();
+   #endif
+}
+
 class ControlWindow final : public juce::Component,
                             public juce::DragAndDropContainer,
                             private Session::Listener,
@@ -498,6 +507,8 @@ public:
         juce::Logger::writeToLog("Theta: log started at " + logFile.getFullPathName());
         if (args == "--self-test" || args == "--pattern-test" || args == "--arrangement-test")
         {
+            Session::setCommandLineTestMode(true);
+            prepareCommandLineAudio();
             setApplicationReturnValue(args == "--self-test" ? runSelfTest()
                 : args == "--pattern-test" ? runPatternTest() : runArrangementTest());
             quit();

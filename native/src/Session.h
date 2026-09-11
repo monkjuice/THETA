@@ -75,6 +75,7 @@ public:
         virtual void editDidChange() = 0;
     };
     Session();
+    static void setCommandLineTestMode(bool enabled);
     juce::ValueTree projectSnapshot();
     juce::Result restoreProject(const juce::ValueTree&, const juce::File&);
     void projectSaved(const juce::ValueTree&, const juce::File&);
@@ -139,8 +140,7 @@ public:
     int clipPluginCount(te::EditItemID) const;
     void toggleTrackMute(int track);
     void toggleTrackSolo(int track);
-    // Keep the established settings location so existing audio-device choices survive.
-    te::Engine engine {"Theda Native"};
+    te::Engine engine;
     std::unique_ptr<te::Edit> edit;
     UtilityDevice* utility = nullptr; // owned by edit's plugin list
     UtilityDevice* audioUtility = nullptr; // owned by edit's plugin list
