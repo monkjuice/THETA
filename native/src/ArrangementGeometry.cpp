@@ -98,7 +98,7 @@ float Arrangement::automationValueForY(const ClipView& clip, float y, Session::D
     const auto active = displayedAutomationIndex(clip);
     if (active >= 0)
     {
-        area = stack.withTrimmedBottom(stack.getHeight() * 0.2f + 2.0f).reduced(0.0f, 1.0f);
+        area = stack.reduced(0.0f, 1.0f);
     }
     else
     {
@@ -164,14 +164,8 @@ int Arrangement::automationLaneAt(const ClipView& clip, juce::Point<float> point
     const auto active = activeAutomationIndex(clip);
     if (active >= 0)
     {
-        const auto overviewHeight = stack.getHeight() * 0.2f;
-        const auto stripHeight = overviewHeight / static_cast<float>(clip.automations.size());
-        const auto stripTop = stack.getBottom() - overviewHeight;
-        if (point.y >= stripTop)
-        {
-            const auto index = static_cast<int>((point.y - stripTop) / stripHeight);
-            return juce::isPositiveAndBelow(index, clip.automations.size()) ? index : -1;
-        }
+        // Background lanes deliberately don't reserve vertical space. The
+        // foreground lane owns the full editor while it is being written.
         return active;
     }
     const auto laneHeight = stack.getHeight() / static_cast<float>(clip.automations.size());

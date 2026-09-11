@@ -266,20 +266,10 @@ void Arrangement::paint(juce::Graphics& g)
         const auto position = dragging && clip.id == selected ? preview : clip.position;
         const auto automationStack = automationBounds(clip);
         const auto activeLane = displayedAutomationIndex(clip);
-        const auto overviewHeight = activeLane >= 0 ? automationStack.getHeight() * 0.2f : 0.0f;
-        const auto overviewStripHeight = activeLane >= 0 && !clip.automations.empty()
-            ? overviewHeight / static_cast<float>(clip.automations.size())
-            : 0.0f;
         const auto automationAreaFor = [&] (int laneIndex, int laneCount)
         {
             if (activeLane >= 0)
-            {
-                if (laneIndex == activeLane)
-                    return automationStack.withTrimmedBottom(overviewHeight + 2.0f).reduced(0.0f, 1.0f);
-                const auto stripTop = automationStack.getBottom() - overviewHeight;
-                return juce::Rectangle<float>(automationStack.getX(), stripTop + overviewStripHeight * laneIndex,
-                                              automationStack.getWidth(), overviewStripHeight).reduced(0.0f, 0.75f);
-            }
+                return automationStack.reduced(0.0f, 1.0f);
             const auto count = std::max(1, laneCount);
             const auto laneHeight = automationStack.getHeight() / static_cast<float>(count);
             return juce::Rectangle<float>(automationStack.getX(), automationStack.getY() + laneHeight * laneIndex,
@@ -315,11 +305,14 @@ void Arrangement::paint(juce::Graphics& g)
                 g.setColour(juce::Colour(0xffffbf7a).withAlpha(0.9f));
                 g.drawRect(autoArea.reduced(0.5f), 2.0f);
             }
-            g.setColour(laneColour.withAlpha(laneActive ? 0.34f : 0.2f));
-            g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
+            if (laneActive)
+            {
+                g.setColour(laneColour.withAlpha(0.34f));
+                g.fillRect(juce::Rectangle<float>(std::min(x1, x2), autoArea.getY(), std::abs(x2 - x1), autoArea.getHeight()));
+            }
             g.setColour(juce::Colour(0x5511191f));
             g.drawRect(autoArea.reduced(0.5f), 1.0f);
-            g.setColour(laneColour.withAlpha(laneActive ? 1.0f : 0.86f));
+            g.setColour(laneColour.withAlpha(laneActive ? 1.0f : 0.38f));
             g.drawLine(x1, y1, x2, y2, laneActive ? 2.6f : 1.5f);
             if (laneActive)
             {
@@ -339,7 +332,9 @@ void Arrangement::paint(juce::Graphics& g)
                 g.setFont(juce::FontOptions(11.0f));
                 const auto labelArea = laneActive && activeLane >= 0 && !previewLine
                     ? autoArea.withHeight(18.0f).reduced(5.0f, 1.0f)
-                    : autoArea.withHeight(std::min(16.0f, autoArea.getHeight())).reduced(4.0f, 0.0f);
+                    : !laneActive && activeLane >= 0
+                        ? autoArea.withY(autoArea.getY() + laneIndex * 13.0f).withHeight(12.0f).reduced(4.0f, 0.0f)
+                        : autoArea.withHeight(std::min(16.0f, autoArea.getHeight())).reduced(4.0f, 0.0f);
                 if (laneActive && activeLane >= 0 && !previewLine)
                 {
                     const auto textWidth = static_cast<float>(automation.parameterName.length()) * 6.5f;
@@ -930,6 +925,17 @@ void Arrangement::mouseWheelMove(const juce::MouseEvent& event, const juce::Mous
 
 bool Arrangement::keyPressed(const juce::KeyPress& key)
 {
+    if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z')
+    {
+        if (key.getModifiers().isShiftDown()) session.redo();
+        else session.undo();
+        return true;
+    }
+    if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Y')
+    {
+        session.redo();
+        return true;
+    }
     if (key.getKeyCode() == juce::KeyPress::leftKey || key.getKeyCode() == juce::KeyPress::rightKey)
     {
         nudgeSelected(key.getKeyCode() == juce::KeyPress::rightKey ? 1 : -1, key.getModifiers().isShiftDown());
