@@ -57,6 +57,15 @@ public:
         rackToggle.onClick = [this] { rackOpen = !rackOpen; resized(); repaint(); };
         browserToggle.setTooltip("Hide browser");
         rackToggle.setTooltip("Hide device rack");
+        editorResolution.addItem("1/16", 16);
+        editorResolution.addItem("1/32", 32);
+        editorResolution.addItem("1/64", 64);
+        editorResolution.setJustificationType(juce::Justification::centred);
+        editorResolution.onChange = [this]
+        {
+            if (!updatingEditorResolution && editorResolution.getSelectedId() > 0)
+                session.setEditorStepCount(editorResolution.getSelectedId());
+        };
         for (auto* toggle : {&browserToggle, &rackToggle})
         {
             toggle->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff252b31));
@@ -167,7 +176,7 @@ public:
         for (auto* component : std::initializer_list<juce::Component*>{
                  &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &panic, &import, &settings,
                  &browser, &browserToggle, &rackToggle, &grid, &arrangement, &rack, &tempo, &undo, &redo, &clear, &hint, &open, &save,
-                 &documentName, &patternLabel})
+                 &documentName, &patternLabel, &editorResolution})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
         session.addChangeListener(this);
@@ -195,13 +204,23 @@ public:
     void paint(juce::Graphics& g) override
     {
         g.fillAll(juce::Colour(0xff171a1e));
-        const auto bottomX = (browserOpen ? browserWidth : 0) + 18;
+        const auto bottomX = (browserOpen ? browserWidth : collapsedRailWidth) + 18;
         g.setColour(juce::Colour(0xff24282d));
-        g.fillRect(bottomX, getHeight() - 64, getWidth() - bottomX - 24, 44);
+        g.fillRect(bottomX, getHeight() - 64, getWidth() - bottomX - 24 - (rackOpen ? 0 : collapsedRailWidth), 44);
+        if (!browserOpen)
+        {
+            g.setColour(juce::Colour(0xff11161b));
+            g.fillRect(0, browserTop, collapsedRailWidth, getHeight() - browserTop);
+        }
         if (browserOpen)
         {
             g.setColour(juce::Colour(0xff3a434b));
             g.fillRect(browserWidth, browserTop, 4, getHeight() - browserTop);
+        }
+        if (!rackOpen)
+        {
+            g.setColour(juce::Colour(0xff11161b));
+            g.fillRect(getWidth() - collapsedRailWidth, browserTop, collapsedRailWidth, getHeight() - browserTop);
         }
         if (rackOpen)
         {
@@ -215,9 +234,10 @@ public:
     void resized() override
     {
         constexpr int gap = 18;
-        const auto leftWidth = browserOpen ? browserWidth : 0;
+        const auto leftWidth = browserOpen ? browserWidth : collapsedRailWidth;
+        const auto rightRail = rackOpen ? 0 : collapsedRailWidth;
         const auto editorX = leftWidth + gap;
-        const auto editorW = getWidth() - editorX - 24;
+        const auto editorW = getWidth() - editorX - 24 - rightRail;
         const auto arrangementTop = 132;
         arrangementHeight = juce::jlimit(150, std::max(150, getHeight() - 350), arrangementHeight);
         const auto arrangementBottom = arrangementTop + arrangementHeight;
@@ -244,9 +264,10 @@ public:
         browser.setBounds(0, browserTop, browserWidth, getHeight() - browserTop);
         browserToggle.setButtonText(browserOpen ? "<" : "B");
         browserToggle.setTooltip(browserOpen ? "Hide browser" : "Show browser");
-        browserToggle.setBounds(browserOpen ? leftWidth - 28 : 6, browserTop + 6, browserOpen ? 22 : 28, browserOpen ? 22 : 46);
+        browserToggle.setBounds(browserOpen ? leftWidth - 28 : 8, browserTop + 14, browserOpen ? 22 : 28, browserOpen ? 22 : 82);
         arrangement.setBounds(editorX, arrangementTop, editorW, arrangementHeight);
-        patternLabel.setBounds(editorX, arrangementBottom + 10, lowerW, 24);
+        patternLabel.setBounds(editorX, arrangementBottom + 10, std::max(80, lowerW - 92), 24);
+        editorResolution.setBounds(editorX + std::max(90, lowerW - 78), arrangementBottom + 12, 70, 20);
         grid.setBounds(editorX, lowerTop, lowerW, lowerH);
         rack.setVisible(rackOpen);
         if (rackOpen)
@@ -255,8 +276,9 @@ public:
             rack.setBounds(getWidth(), lowerTop, 0, lowerH);
         rackToggle.setButtonText(rackOpen ? ">" : "R");
         rackToggle.setTooltip(rackOpen ? "Hide device rack" : "Show device rack");
-        rackToggle.setBounds(rackOpen ? rack.getRight() - 28 : getWidth() - 34, rackOpen ? rack.getY() + 5 : lowerTop + 6,
-                             rackOpen ? 22 : 28, rackOpen ? 22 : 46);
+        rackToggle.setBounds(rackOpen ? rack.getRight() - 28 : getWidth() - collapsedRailWidth + 8,
+                             rackOpen ? rack.getY() + 5 : lowerTop + 14,
+                             rackOpen ? 22 : 28, rackOpen ? 22 : 82);
         browserToggle.toFront(false);
         rackToggle.toFront(false);
         hint.setBounds(0, 0, 0, 0);
@@ -402,6 +424,10 @@ private:
         redo.setEnabled(session.edit->getUndoManager().canRedo());
         patternLabel.setText(session.isPatternDrums() ? "PATTERN 1  /  DRUM EDITOR" : "PATTERN 1  /  NOTE EDITOR",
                              juce::dontSendNotification);
+        {
+            const juce::ScopedValueSetter<bool> scope(updatingEditorResolution, true);
+            editorResolution.setSelectedId(session.editorStepCount(), juce::dontSendNotification);
+        }
         const auto name = session.projectFile == juce::File{} ? juce::String("Untitled") : session.projectFile.getFileNameWithoutExtension();
         documentName.setText(name + (session.hasUnsavedChanges() ? " *" : ""), juce::dontSendNotification);
     }
@@ -446,14 +472,16 @@ private:
     juce::TextButton undo {"Undo"}, redo {"Redo"}, clear {"Clear"};
     juce::TextButton play {"Play"}, stop {"Stop"}, panic {"Panic"}, import {"Add audio"}, settings {"Audio settings"};
     juce::TextButton browserToggle {"<"}, rackToggle {">"};
+    juce::ComboBox editorResolution;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> audioSettings;
     juce::TextButton open {"Open"}, save {"Save"};
     ProjectFiles files;
     int browserWidth = 244, rackWidth = 312, arrangementHeight = 246;
     int resizeStartX = 0, resizeStartY = 0, resizeStartBrowserWidth = 244, resizeStartRackWidth = 312, resizeStartArrangementHeight = 246;
-    static constexpr int browserTop = 74;
+    static constexpr int browserTop = 74, collapsedRailWidth = 44;
     bool browserOpen = true, rackOpen = true, resizingBrowser = false, resizingRack = false, resizingArrangement = false;
+    bool updatingEditorResolution = false;
 };
 
 class Application final : public juce::JUCEApplication, private juce::Timer

@@ -27,16 +27,6 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
     setWantsKeyboardFocus(true);
     setTitle("Pattern notes");
     setDescription("One bar step editor. Drag to draw or erase notes.");
-    resolutionBox.addItem("1/16", 16);
-    resolutionBox.addItem("1/32", 32);
-    resolutionBox.addItem("1/64", 64);
-    resolutionBox.setJustificationType(juce::Justification::centred);
-    resolutionBox.onChange = [this]
-    {
-        if (!updatingResolutionBox && resolutionBox.getSelectedId() > 0)
-            session.setEditorStepCount(resolutionBox.getSelectedId());
-    };
-    addAndMakeVisible(resolutionBox);
     horizontalScroll.addListener(this);
     addAndMakeVisible(horizontalScroll);
     session.addChangeListener(this);
@@ -491,7 +481,6 @@ int StepGrid::automaticLowestPitch() const
 
 void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 {
-    syncResolutionBox();
     syncHorizontalScroll();
     const auto previousLowestPitch = lowestVisiblePitch;
     if (session.isPatternDrums())
@@ -579,12 +568,6 @@ float StepGrid::playheadXForTime(double seconds) const
     return static_cast<float>(labelWidth + (step - stepScroll) * cellWidth());
 }
 
-void StepGrid::syncResolutionBox()
-{
-    const juce::ScopedValueSetter<bool> scope(updatingResolutionBox, true);
-    resolutionBox.setSelectedId(session.editorStepCount(), juce::dontSendNotification);
-}
-
 void StepGrid::syncHorizontalScroll()
 {
     const auto steps = session.editorStepCount();
@@ -609,7 +592,6 @@ void StepGrid::scrollBarMoved(juce::ScrollBar* bar, double start)
 
 void StepGrid::resized()
 {
-    resolutionBox.setBounds(std::max(0, getWidth() - 74), 3, 66, 20);
     syncHorizontalScroll();
     horizontalScroll.setBounds(static_cast<int>(labelWidth), getHeight() - static_cast<int>(scrollHeight),
                                std::max(1, static_cast<int>(gridRight() - labelWidth)), static_cast<int>(scrollHeight));

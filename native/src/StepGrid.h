@@ -44,7 +44,6 @@ private:
     int automaticLowestPitch() const;
     void rebuildVisibleNotes();
     float playheadXForTime(double seconds) const;
-    void syncResolutionBox();
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void scrollBarMoved(juce::ScrollBar*, double) override;
     void updatePlayhead();
@@ -53,13 +52,12 @@ private:
     std::array<int, Session::steps * Session::pitches> noteLengths {};
     std::vector<CopiedNote> noteClipboard;
     Gesture gesture = Gesture::none;
-    bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, updatingResolutionBox = false;
+    bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false;
     int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1;
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;
     float playhead = -1.0f;
-    juce::ComboBox resolutionBox;
     juce::ScrollBar horizontalScroll {false};
     juce::VBlankAttachment vblank;
     static constexpr float labelWidth = 54.0f, headerHeight = 26.0f, scrollHeight = 14.0f;
