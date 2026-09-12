@@ -26,7 +26,7 @@ public:
     void resized() override;
 private:
     friend int runArrangementTest();
-    enum class Gesture { none, draw, move, resize };
+    enum class Gesture { none, draw, move, resize, select };
     struct CopiedNote { int step = 0, pitch = 0; double length = 1.0; };
     struct MovingNote { int step = 0, pitch = 0; };
     juce::Rectangle<float> cell(int step, int row) const;
@@ -57,6 +57,7 @@ private:
     juce::Result resizeCurrentNoteTo(int index);
     juce::Result resizeCurrentNoteTo(juce::Point<float>, bool freeLength);
     void updatePointer(juce::Point<float>, const juce::ModifierKeys&);
+    void updateMarqueeSelection();
     int pitchForIndex(int index) const;
     int indexForCell(int step, int pitch) const;
     int automaticLowestPitch() const;
@@ -83,6 +84,8 @@ private:
     int visualSubdivisions = 1;
     float verticalAutoScroll = 0.0f;
     juce::Point<float> dragPosition {-1.0f, -1.0f};
+    juce::Point<float> selectionAnchor {-1.0f, -1.0f};
+    juce::Rectangle<float> selectionBox;
     float playhead = -1.0f;
     juce::ScrollBar horizontalScroll {false};
     juce::VBlankAttachment vblank;

@@ -264,6 +264,17 @@ void StepGrid::paint(juce::Graphics& g)
         g.setColour(juce::Colour(0xff55c7eb));
         g.drawRect(getLocalBounds().toFloat().reduced(1.0f), 2.0f);
     }
+    if (gesture == Gesture::select && !selectionBox.isEmpty())
+    {
+        g.setColour(juce::Colour(0x3355c7eb));
+        g.fillRect(selectionBox);
+        g.setColour(juce::Colour(0xff55c7eb));
+        static constexpr float dash[] {4.0f, 3.0f};
+        g.drawDashedLine(juce::Line<float>(selectionBox.getTopLeft(), selectionBox.getTopRight()), dash, 2, 1.0f);
+        g.drawDashedLine(juce::Line<float>(selectionBox.getTopRight(), selectionBox.getBottomRight()), dash, 2, 1.0f);
+        g.drawDashedLine(juce::Line<float>(selectionBox.getBottomRight(), selectionBox.getBottomLeft()), dash, 2, 1.0f);
+        g.drawDashedLine(juce::Line<float>(selectionBox.getBottomLeft(), selectionBox.getTopLeft()), dash, 2, 1.0f);
+    }
 }
 
 int StepGrid::cellHit(juce::Point<float> point) const
@@ -349,6 +360,17 @@ void StepGrid::mouseMove(const juce::MouseEvent& event)
 
 void StepGrid::mouseDown(const juce::MouseEvent& event)
 {
+    if (!event.mods.isRightButtonDown() && juce::KeyPress::isKeyCurrentlyDown('S')
+        && event.position.x >= labelWidth && event.position.y >= headerHeight)
+    {
+        grabKeyboardFocus();
+        gesture = Gesture::select;
+        selectionAnchor = event.position;
+        selectionBox = {};
+        selectedNotes.reset();
+        repaint();
+        return;
+    }
     if (!event.mods.isRightButtonDown()
         && event.position.y >= 0.0f && event.position.y < headerHeight
         && event.position.x >= labelWidth && event.position.x < gridRight())
@@ -830,6 +852,14 @@ void StepGrid::mouseDrag(const juce::MouseEvent& event)
 {
     if (gesture == Gesture::none) return;
     dragPosition = event.position;
+    if (gesture == Gesture::select)
+    {
+        selectionBox = juce::Rectangle<float>(selectionAnchor, event.position).getIntersection(
+            {labelWidth, headerHeight, gridWidth(), rowAreaHeight()});
+        updateMarqueeSelection();
+        repaint();
+        return;
+    }
     const auto index = hit(event.position);
     if (gesture == Gesture::move)
     {
@@ -857,6 +887,8 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
         session.setNote(movingNoteIndex % Session::steps, pitchForIndex(movingNoteIndex), false);
     if (gesture != Gesture::none) session.endNoteGesture();
     gesture = Gesture::none;
+    selectionAnchor = {-1.0f, -1.0f};
+    selectionBox = {};
     lastHit = -1;
     movingNoteIndex = -1;
     movingNotes.clear();
@@ -868,6 +900,23 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
     resizingNoteIndex = -1;
     resizingFromLeft = false;
     noteMoved = false;
+}
+
+void StepGrid::updateMarqueeSelection()
+{
+    selectedNotes.reset();
+    if (selectionBox.isEmpty()) return;
+    const auto last = std::min(session.editorStepCount() - 1, static_cast<int>(std::ceil(stepScroll + visibleStepSpan())));
+    for (int row = 0; row < Session::pitches; ++row)
+        for (int step = 0; step <= last; ++step)
+        {
+            const auto index = row * Session::steps + step;
+            if (!notes.test(static_cast<size_t>(index))) continue;
+            auto bounds = cell(step, row);
+            bounds.translate(noteStartOffsets[static_cast<size_t>(index)] * cellWidth(), 0.0f);
+            bounds.setWidth(std::max(3.0f, cellWidth() * noteLengths[static_cast<size_t>(index)]));
+            if (bounds.intersects(selectionBox)) selectedNotes.set(static_cast<size_t>(index));
+        }
 }
 
 void StepGrid::timerCallback()
