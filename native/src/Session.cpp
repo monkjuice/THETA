@@ -1084,6 +1084,10 @@ juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources,
     if (moves.size() != sources.size())
         return juce::Result::fail("Select notes to move.");
 
+    const auto wasPlaying = edit->getTransport().isPlaying();
+    // A moved sustained note may already be active in the current playback
+    // graph. Its old note-off can otherwise disappear when the MIDI sequence
+    // changes, leaving the instrument sounding indefinitely.
     auto* undoManager = &edit->getUndoManager();
     for (const auto& move : moves)
         move.note->setStartAndLength(tracktion::core::BeatPosition::fromBeats(move.targetStep * stepBeats),
@@ -1091,6 +1095,8 @@ juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources,
     for (const auto& move : moves)
         move.note->setNoteNumber(move.targetPitch, undoManager);
     markModified();
+    if (wasPlaying)
+        edit->restartPlayback();
     sendSynchronousChangeMessage();
     return juce::Result::ok();
 }
