@@ -121,6 +121,7 @@ public:
     void setNote(int step, int pitch, bool enabled);
     int noteLengthSteps(int step, int pitch) const;
     juce::Result resizeNote(int step, int pitch, int lengthSteps);
+    bool ensurePatternLengthSteps(int requiredSteps);
     juce::Result fillNoteToClipEnd(int step, int pitch);
     void beginNoteGesture(juce::String actionName = "Draw notes");
     void endNoteGesture();

@@ -606,13 +606,25 @@ int runArrangementTest()
                 "Command-C copies selected notes");
         require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys::commandModifier, 'v')),
                 "Command-V pastes selected notes");
-        require(session.hasNote(5, 55) && session.hasNote(9, 60), "Pasted notes keep the selected shape one step later");
+        require(session.hasNote(0, 55) && session.hasNote(4, 60),
+                "Paste places the selected shape at the first empty grid position");
+        require(selectionGrid.keyPressed(juce::KeyPress('Z', juce::ModifierKeys::commandModifier, 'z')),
+                "Command-Z undoes a note-editor edit while the grid is focused");
+        require(!session.hasNote(0, 55) && !session.hasNote(4, 60),
+                "Note-editor undo removes the pasted note shape");
+        require(selectionGrid.keyPressed(juce::KeyPress('Y', juce::ModifierKeys::commandModifier, 'y')),
+                "Command-Y redoes a note-editor edit while the grid is focused");
+        require(session.hasNote(0, 55) && session.hasNote(4, 60),
+                "Note-editor redo restores the pasted note shape");
+        selectionGrid.selectedNotes.reset();
+        selectionGrid.selectedNotes.set(static_cast<size_t>(selectionGrid.indexForCell(0, 55)));
+        selectionGrid.selectedNotes.set(static_cast<size_t>(selectionGrid.indexForCell(4, 60)));
         require(selectionGrid.selectedNotes.count() == 2, "Pasted notes become the active selection");
         require(selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey)),
                 "Delete removes selected notes");
-        require(!session.hasNote(5, 55) && !session.hasNote(9, 60), "Deleted pasted notes are removed from the clip");
+        require(!session.hasNote(0, 55) && !session.hasNote(4, 60), "Deleted pasted notes are removed from the clip");
         session.undo();
-        require(session.hasNote(5, 55) && session.hasNote(9, 60), "Undo restores notes removed by multi-selection delete");
+        require(session.hasNote(0, 55) && session.hasNote(4, 60), "Undo restores notes removed by multi-selection delete");
         selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
         require(selectionGrid.selectedNotes.none(), "Escape clears note selection");
         const auto ctrlLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::ctrlModifier);

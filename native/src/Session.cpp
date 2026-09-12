@@ -920,6 +920,25 @@ juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
     return juce::Result::fail("Select a note to resize.");
 }
 
+bool Session::ensurePatternLengthSteps(int requiredSteps)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    if (requiredSteps <= editorStepCount())
+        return true;
+    if (requiredSteps > steps || patternClip == nullptr)
+        return false;
+
+    const auto position = pattern().getPosition();
+    const auto startBeat = edit->tempoSequence.toBeats(position.time.getStart());
+    const auto end = edit->tempoSequence.toTime(startBeat + tracktion::core::BeatDuration::fromBeats(
+        requiredSteps * stepDurationBeats(editorStepResolution())));
+    pattern().setLength(end - position.time.getStart(), true);
+    markModified();
+    refreshLoop();
+    sendSynchronousChangeMessage();
+    return true;
+}
+
 juce::Result Session::fillNoteToClipEnd(int step, int pitch)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());

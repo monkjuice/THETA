@@ -311,16 +311,37 @@ bool StepGrid::copySelection()
     }
     if (minStep >= steps || minPitch > 127)
         return false;
+    clipboardBasePitch = minPitch;
 
     for (int row = 0; row < Session::pitches; ++row)
     for (int step = 0; step < steps; ++step)
     {
         const auto index = row * Session::steps + step;
         if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
-            noteClipboard.push_back({index % Session::steps - minStep, pitchForIndex(index) - minPitch});
+            noteClipboard.push_back({index % Session::steps - minStep, pitchForIndex(index) - minPitch,
+                                     std::max(1, noteLengths[static_cast<size_t>(index)])});
     }
-    pasteAnchorIndex = indexForCell(std::min(steps - 1, minStep + 1), minPitch);
     return !noteClipboard.empty();
+}
+
+bool StepGrid::canPasteAt(int step) const
+{
+    for (const auto& copied : noteClipboard)
+    {
+        const auto targetStep = step + copied.step;
+        const auto targetPitch = clipboardBasePitch + copied.pitch;
+        for (int row = 0; row < Session::pitches; ++row)
+            for (int existingStep = 0; existingStep < session.editorStepCount(); ++existingStep)
+            {
+                const auto index = row * Session::steps + existingStep;
+                if (!notes.test(static_cast<size_t>(index)) || pitchForIndex(index) != targetPitch)
+                    continue;
+                const auto existingEnd = existingStep + std::max(1, noteLengths[static_cast<size_t>(index)]);
+                if (targetStep < existingEnd && existingStep < targetStep + copied.length)
+                    return false;
+            }
+    }
+    return true;
 }
 
 bool StepGrid::pasteSelection()
@@ -328,33 +349,47 @@ bool StepGrid::pasteSelection()
     if (noteClipboard.empty())
         return false;
 
-    auto maxStepOffset = 0;
+    auto requiredSteps = 0;
     auto minPitchOffset = 0;
     auto maxPitchOffset = 0;
     for (const auto& note : noteClipboard)
     {
-        maxStepOffset = std::max(maxStepOffset, note.step);
+        requiredSteps = std::max(requiredSteps, note.step + note.length);
         minPitchOffset = std::min(minPitchOffset, note.pitch);
         maxPitchOffset = std::max(maxPitchOffset, note.pitch);
     }
 
-    const auto anchor = pasteAnchorIndex >= 0 ? pasteAnchorIndex : 0;
     const auto steps = session.editorStepCount();
-    const auto anchorStep = juce::jlimit(0, std::max(0, steps - 1 - maxStepOffset), anchor % Session::steps);
-    const auto anchorPitch = juce::jlimit(-minPitchOffset, 127 - maxPitchOffset, pitchForIndex(anchor));
+    if (requiredSteps > Session::steps || minPitchOffset < -127 || maxPitchOffset > 127)
+        return false;
+
+    auto anchorStep = steps;
+    for (int candidate = 0; candidate + requiredSteps <= steps; ++candidate)
+        if (canPasteAt(candidate))
+        {
+            anchorStep = candidate;
+            break;
+        }
+    const auto anchorPitch = juce::jlimit(-minPitchOffset, 127 - maxPitchOffset, clipboardBasePitch);
 
     session.beginNoteGesture("Paste notes");
+    if (!session.ensurePatternLengthSteps(anchorStep + requiredSteps))
+    {
+        session.endNoteGesture();
+        return false;
+    }
     selectedNotes.reset();
     for (const auto& note : noteClipboard)
     {
         const auto step = anchorStep + note.step;
         const auto pitch = anchorPitch + note.pitch;
         session.setNote(step, pitch, true);
+        session.resizeNote(step, pitch, note.length);
         if (const auto index = indexForCell(step, pitch); index >= 0)
             selectedNotes.set(static_cast<size_t>(index));
     }
     session.endNoteGesture();
-    pasteAnchorIndex = indexForCell(std::min(steps - 1, anchorStep + maxStepOffset + 1), anchorPitch);
+    pasteAnchorIndex = indexForCell(std::min(session.editorStepCount() - 1, anchorStep + requiredSteps), anchorPitch);
     repaint();
     return true;
 }
@@ -480,6 +515,17 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
 bool StepGrid::keyPressed(const juce::KeyPress& key)
 {
     const auto command = isShortcutDown(key.getModifiers());
+    if (command && key.getKeyCode() == 'Z')
+    {
+        if (key.getModifiers().isShiftDown()) session.redo();
+        else session.undo();
+        return true;
+    }
+    if (command && key.getKeyCode() == 'Y')
+    {
+        session.redo();
+        return true;
+    }
     if (command && key.getKeyCode() == 'A')
         return selectAllNotes();
     if (command && key.getKeyCode() == 'C')

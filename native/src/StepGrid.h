@@ -23,7 +23,7 @@ public:
 private:
     friend int runArrangementTest();
     enum class Gesture { none, draw, move, resize };
-    struct CopiedNote { int step = 0, pitch = 0; };
+    struct CopiedNote { int step = 0, pitch = 0, length = 1; };
     juce::Rectangle<float> cell(int step, int row) const;
     float rowAreaHeight() const;
     float cellWidth() const;
@@ -36,6 +36,7 @@ private:
     void apply(int index);
     void toggleSelection(int index);
     bool selectAllNotes();
+    bool canPasteAt(int step) const;
     void clearSelection();
     bool copySelection();
     bool pasteSelection();
@@ -57,7 +58,7 @@ private:
     std::vector<CopiedNote> noteClipboard;
     Gesture gesture = Gesture::none;
     bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false;
-    int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1;
+    int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1, clipboardBasePitch = 0;
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;
