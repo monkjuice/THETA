@@ -1,5 +1,6 @@
 #include "StepGrid.h"
 #include "Playhead.h"
+#include <algorithm>
 #include <cmath>
 
 namespace theta
@@ -49,6 +50,31 @@ juce::Rectangle<float> StepGrid::cell(int step, int row) const
     const auto width = cellWidth();
     const auto height = rowAreaHeight() / Session::pitches;
     return {labelWidth + static_cast<float>(step - stepScroll) * width, headerHeight + row * height, width, height};
+}
+
+void StepGrid::zoomIn()
+{
+    stepZoom = std::min(8.0, stepZoom * 1.5);
+    syncHorizontalScroll();
+    updatePlayhead();
+    repaint();
+}
+
+void StepGrid::zoomOut()
+{
+    stepZoom = std::max(1.0, stepZoom / 1.5);
+    syncHorizontalScroll();
+    updatePlayhead();
+    repaint();
+}
+
+void StepGrid::setScaleHighlight(int selection)
+{
+    if (scaleHighlight != selection)
+    {
+        scaleHighlight = selection;
+        repaint();
+    }
 }
 
 float StepGrid::rowAreaHeight() const
@@ -102,6 +128,15 @@ void StepGrid::paint(juce::Graphics& g)
     {
         const auto pitch = lowestVisiblePitch + Session::pitches - 1 - row;
         const bool black = juce::MidiMessage::isMidiNoteBlack(pitch);
+        const auto scaleIndex = scaleHighlight - 2;
+        const bool scaleEnabled = !session.isPatternDrums() && scaleIndex >= 0;
+        const auto root = scaleEnabled ? scaleIndex % 12 : 0;
+        const bool minor = scaleEnabled && scaleIndex >= 12;
+        static constexpr std::array<int, 7> major {0, 2, 4, 5, 7, 9, 11};
+        static constexpr std::array<int, 7> naturalMinor {0, 2, 3, 5, 7, 8, 10};
+        const auto& scale = minor ? naturalMinor : major;
+        const auto pitchClass = (pitch % 12 + 12) % 12;
+        const bool inScale = !scaleEnabled || std::find(scale.begin(), scale.end(), (pitchClass - root + 12) % 12) != scale.end();
         const bool namedDrum = session.isPatternDrums()
                             && (pitch == 48 || pitch == 50 || pitch == 52 || pitch == 53 || pitch == 54
                                 || pitch == 56 || pitch == 58 || pitch == 59);
@@ -115,7 +150,8 @@ void StepGrid::paint(juce::Graphics& g)
         {
             auto bounds = cell(step, row).reduced(2.0f, 2.0f);
             if (!dirty.intersects(bounds)) continue;
-            g.setColour(juce::Colour(step / 4 % 2 == 0 ? 0xff2a3139 : 0xff252c33));
+            const auto barColour = step / 4 % 2 == 0 ? juce::Colour(0xff303941) : juce::Colour(0xff252d35);
+            g.setColour(inScale ? barColour : juce::Colour(0xff1c2228));
             g.fillRect(bounds);
         }
 
@@ -125,9 +161,9 @@ void StepGrid::paint(juce::Graphics& g)
             if (!notes.test(static_cast<size_t>(index)))
                 continue;
 
-            const auto length = std::max(1, noteLengths[static_cast<size_t>(index)]);
+            const auto length = std::max(0.0625f, noteLengths[static_cast<size_t>(index)]);
             auto bounds = cell(step, row).reduced(2.0f, 2.0f);
-            bounds.setWidth(std::max(bounds.getWidth(), cellWidth() * length - 4.0f));
+            bounds.setWidth(std::max(3.0f, cellWidth() * length - 4.0f));
             bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
             if (bounds.getRight() < labelWidth || !dirty.intersects(bounds))
                 continue;
@@ -180,6 +216,16 @@ int StepGrid::hit(juce::Point<float> point) const
     if (step < 0 || step >= steps)
         return -1;
     const auto row = static_cast<int>((point.y - headerHeight) / rowAreaHeight() * Session::pitches);
+    // A sustained note is selected from anywhere in its drawn body, not only
+    // its start cell. This is especially important for Ctrl-click selection.
+    for (int candidate = 0; candidate < steps; ++candidate)
+    {
+        const auto candidateIndex = row * Session::steps + candidate;
+        if (!notes.test(static_cast<size_t>(candidateIndex))) continue;
+        auto bounds = cell(candidate, row).reduced(2.0f, 2.0f);
+        bounds.setWidth(std::max(3.0f, cellWidth() * noteLengths[static_cast<size_t>(candidateIndex)] - 4.0f));
+        if (bounds.contains(point)) return candidateIndex;
+    }
     return row * Session::steps + step;
 }
 
@@ -197,9 +243,9 @@ int StepGrid::resizeHit(juce::Point<float> point) const
         const auto index = row * Session::steps + step;
         if (!notes.test(static_cast<size_t>(index)))
             continue;
-        const auto length = std::max(1, noteLengths[static_cast<size_t>(index)]);
+        const auto length = std::max(0.0625f, noteLengths[static_cast<size_t>(index)]);
         auto bounds = cell(step, row).reduced(2.0f, 2.0f);
-        bounds.setWidth(std::max(bounds.getWidth(), cellWidth() * length - 4.0f));
+        bounds.setWidth(std::max(3.0f, cellWidth() * length - 4.0f));
         bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
         if (bounds.getRight() < labelWidth || bounds.getX() > gridRight())
             continue;
@@ -213,7 +259,7 @@ int StepGrid::resizeHit(juce::Point<float> point) const
 
 void StepGrid::mouseDown(const juce::MouseEvent& event)
 {
-    if (!event.mods.isRightButtonDown())
+    if (!event.mods.isRightButtonDown() && !isShortcutDown(event.mods))
     {
         const auto resizeIndex = resizeHit(event.position);
         if (resizeIndex >= 0)
@@ -342,7 +388,7 @@ bool StepGrid::copySelection()
         const auto index = row * Session::steps + step;
         if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
             noteClipboard.push_back({index % Session::steps - minStep, pitchForIndex(index) - minPitch,
-                                     std::max(1, noteLengths[static_cast<size_t>(index)])});
+                                     std::max(0.0625, static_cast<double>(noteLengths[static_cast<size_t>(index)]))});
     }
     return !noteClipboard.empty();
 }
@@ -359,7 +405,7 @@ bool StepGrid::canPasteAt(int step) const
                 const auto index = row * Session::steps + existingStep;
                 if (!notes.test(static_cast<size_t>(index)) || pitchForIndex(index) != targetPitch)
                     continue;
-                const auto existingEnd = existingStep + std::max(1, noteLengths[static_cast<size_t>(index)]);
+                const auto existingEnd = existingStep + std::max(0.0625, static_cast<double>(noteLengths[static_cast<size_t>(index)]));
                 if (targetStep < existingEnd && existingStep < targetStep + copied.length)
                     return false;
             }
@@ -377,7 +423,7 @@ bool StepGrid::pasteSelection()
     auto maxPitchOffset = 0;
     for (const auto& note : noteClipboard)
     {
-        requiredSteps = std::max(requiredSteps, note.step + note.length);
+        requiredSteps = std::max(requiredSteps, static_cast<int>(std::ceil(note.step + note.length)));
         minPitchOffset = std::min(minPitchOffset, note.pitch);
         maxPitchOffset = std::max(maxPitchOffset, note.pitch);
     }
@@ -561,6 +607,24 @@ juce::Result StepGrid::resizeCurrentNoteTo(int index)
     return result;
 }
 
+juce::Result StepGrid::resizeCurrentNoteTo(juce::Point<float> position, bool freeLength)
+{
+    if (resizingNoteIndex < 0)
+        return juce::Result::ok();
+    const auto sourceStep = resizingNoteIndex % Session::steps;
+    auto length = static_cast<double>((position.x - cell(sourceStep, 0).getX()) / cellWidth());
+    length = std::max(0.0625, length);
+    // The first grid space may be freely adjusted. Once past it, resize snaps
+    // to grid boundaries unless Alt/Option is held.
+    if (!freeLength && length > 1.0)
+        length = std::round(length);
+    else
+        length = std::round(length * 16.0) / 16.0;
+    const auto result = session.resizeNote(sourceStep, pitchForIndex(resizingNoteIndex), length);
+    if (result.wasOk()) noteMoved = true;
+    return result;
+}
+
 void StepGrid::mouseDrag(const juce::MouseEvent& event)
 {
     if (gesture == Gesture::none) return;
@@ -574,7 +638,7 @@ void StepGrid::mouseDrag(const juce::MouseEvent& event)
     }
     if (gesture == Gesture::resize)
     {
-        resizeCurrentNoteTo(index);
+        resizeCurrentNoteTo(event.position, event.mods.isAltDown());
         return;
     }
 
@@ -630,6 +694,24 @@ bool StepGrid::keyPressed(const juce::KeyPress& key)
         return copySelection();
     if (command && key.getKeyCode() == 'V')
         return pasteSelection();
+    if (key.getModifiers().isShiftDown()
+        && (key.getKeyCode() == juce::KeyPress::leftKey || key.getKeyCode() == juce::KeyPress::rightKey))
+    {
+        if (selectedNotes.none()) return false;
+        const auto delta = key.getKeyCode() == juce::KeyPress::rightKey ? 1.0 : -1.0;
+        const auto amount = key.getModifiers().isAltDown() ? delta / 16.0 : delta;
+        session.beginNoteGesture("Resize notes");
+        for (int row = 0; row < Session::pitches; ++row)
+            for (int step = 0; step < session.editorStepCount(); ++step)
+            {
+                const auto index = row * Session::steps + step;
+                if (selectedNotes.test(static_cast<size_t>(index)) && notes.test(static_cast<size_t>(index)))
+                    session.resizeNote(step, pitchForIndex(index),
+                                       std::max(0.0625, static_cast<double>(noteLengths[static_cast<size_t>(index)]) + amount));
+            }
+        session.endNoteGesture();
+        return true;
+    }
     if (key.getKeyCode() == 'F')
         return fillSelectionToClipEnd();
     if (key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
@@ -703,7 +785,7 @@ void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 void StepGrid::rebuildVisibleNotes()
 {
     std::bitset<Session::steps * Session::pitches> next;
-    std::array<int, Session::steps * Session::pitches> nextLengths {};
+    std::array<float, Session::steps * Session::pitches> nextLengths {};
     const auto nextDrumLabels = session.isPatternDrums();
     const auto steps = session.editorStepCount();
     const auto beatsPerStep = 4.0 / static_cast<double>(session.editorStepResolution());
@@ -715,7 +797,7 @@ void StepGrid::rebuildVisibleNotes()
         {
             next.set(static_cast<size_t>(row * Session::steps + step));
             nextLengths[static_cast<size_t>(row * Session::steps + step)] =
-                std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats() / beatsPerStep)));
+                static_cast<float>(std::max(0.0625, note->getLengthBeats().inBeats() / beatsPerStep));
         }
     }
     const auto changed = next ^ notes;

@@ -76,6 +76,21 @@ public:
             if (!updatingEditorResolution && editorResolution.getSelectedId() > 0)
                 session.setEditorStepCount(editorResolution.getSelectedId());
         };
+        editorZoomOut.setButtonText("-");
+        editorZoomIn.setButtonText("+");
+        editorZoomOut.setTooltip("Zoom out of note editor");
+        editorZoomIn.setTooltip("Zoom in to note editor");
+        editorZoomOut.onClick = [this] { grid.zoomOut(); };
+        editorZoomIn.onClick = [this] { grid.zoomIn(); };
+        scaleHighlight.addItem("Scale: off", 1);
+        static constexpr const char* roots[] {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+        for (int root = 0; root < 12; ++root)
+            scaleHighlight.addItem(juce::String(roots[root]) + " Major", root + 2);
+        for (int root = 0; root < 12; ++root)
+            scaleHighlight.addItem(juce::String(roots[root]) + " Minor", root + 14);
+        scaleHighlight.setSelectedId(1, juce::dontSendNotification);
+        scaleHighlight.setTooltip("Highlight notes in a scale");
+        scaleHighlight.onChange = [this] { grid.setScaleHighlight(scaleHighlight.getSelectedId()); };
         for (auto* toggle : {&browserToggle, &rackToggle})
         {
             toggle->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff252b31));
@@ -186,7 +201,7 @@ public:
         for (auto* component : std::initializer_list<juce::Component*>{
                  &title, &status, &position, &gainLabel, &gain, &audioGainLabel, &audioGain, &play, &stop, &panic, &import, &settings,
                  &browser, &browserToggle, &rackToggle, &grid, &arrangement, &rack, &tempo, &undo, &redo, &clear, &hint, &open, &save,
-                 &documentName, &patternLabel, &editorResolution})
+                 &documentName, &patternLabel, &editorResolution, &editorZoomOut, &editorZoomIn, &scaleHighlight})
             addAndMakeVisible(component);
         session.edit->getTransport().addChangeListener(this);
         session.addChangeListener(this);
@@ -276,7 +291,12 @@ public:
         browserToggle.setTooltip(browserOpen ? "Hide browser" : "Show browser");
         browserToggle.setBounds(browserOpen ? leftWidth - 28 : 8, browserTop + 14, browserOpen ? 22 : 28, browserOpen ? 22 : 82);
         arrangement.setBounds(editorX, arrangementTop, editorW, arrangementHeight);
-        patternLabel.setBounds(editorX, arrangementBottom + 10, std::max(80, lowerW - 92), 24);
+        patternLabel.setBounds(editorX, arrangementBottom + 10, std::max(80, lowerW - 340), 24);
+        scaleHighlight.setVisible(!session.isPatternDrums());
+        if (!session.isPatternDrums())
+            scaleHighlight.setBounds(editorX + std::max(90, lowerW - 328), arrangementBottom + 12, 146, 20);
+        editorZoomOut.setBounds(editorX + std::max(90, lowerW - 174), arrangementBottom + 12, 25, 20);
+        editorZoomIn.setBounds(editorX + std::max(90, lowerW - 145), arrangementBottom + 12, 25, 20);
         editorResolution.setBounds(editorX + std::max(90, lowerW - 78), arrangementBottom + 12, 70, 20);
         grid.setBounds(editorX, lowerTop, lowerW, lowerH);
         rack.setVisible(rackOpen);
@@ -434,6 +454,7 @@ private:
         redo.setEnabled(session.edit->getUndoManager().canRedo());
         patternLabel.setText(session.isPatternDrums() ? "PATTERN 1  /  DRUM EDITOR" : "PATTERN 1  /  NOTE EDITOR",
                              juce::dontSendNotification);
+        scaleHighlight.setVisible(!session.isPatternDrums());
         {
             const juce::ScopedValueSetter<bool> scope(updatingEditorResolution, true);
             editorResolution.setSelectedId(session.editorStepResolution(), juce::dontSendNotification);
@@ -485,6 +506,8 @@ private:
     juce::TextButton play {"Play"}, stop {"Stop"}, panic {"Panic"}, import {"Add audio"}, settings {"Audio settings"};
     juce::TextButton browserToggle {"<"}, rackToggle {">"};
     juce::ComboBox editorResolution;
+    juce::TextButton editorZoomOut, editorZoomIn;
+    juce::ComboBox scaleHighlight;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> audioSettings;
     juce::TextButton open {"Open"}, save {"Save"};

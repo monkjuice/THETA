@@ -1,4 +1,5 @@
 #include "Session.h"
+#include <algorithm>
 #include <set>
 
 namespace theta
@@ -892,20 +893,25 @@ int Session::noteLengthSteps(int step, int pitch) const
 
 juce::Result Session::resizeNote(int step, int pitch, int lengthSteps)
 {
+    return resizeNote(step, pitch, static_cast<double>(lengthSteps));
+}
+
+juce::Result Session::resizeNote(int step, int pitch, double lengthSteps)
+{
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
     const auto stepBeats = stepDurationBeats(editorStepResolution());
     if (step < 0 || step >= gridSteps || pitch < 0 || pitch > 127)
         return juce::Result::fail("Resize notes inside the visible grid.");
-    lengthSteps = juce::jlimit(1, gridSteps - step, lengthSteps);
+    lengthSteps = std::clamp(lengthSteps, 0.0625, static_cast<double>(gridSteps - step));
     const auto beat = step * stepBeats;
     auto& sequence = pattern().getSequence();
     auto* undoManager = &edit->getUndoManager();
-    auto nextNoteStep = gridSteps;
+    auto nextNoteStep = static_cast<double>(gridSteps);
     for (auto* note : sequence.getNotes())
         if (note->getNoteNumber() == pitch && note->getStartBeat().inBeats() > beat + 0.0001)
-            nextNoteStep = std::min(nextNoteStep, juce::roundToInt(note->getStartBeat().inBeats() / stepBeats));
-    lengthSteps = std::min(lengthSteps, std::max(1, nextNoteStep - step));
+            nextNoteStep = std::min(nextNoteStep, note->getStartBeat().inBeats() / stepBeats);
+    lengthSteps = std::min(lengthSteps, std::max(0.0625, nextNoteStep - step));
 
     for (auto* note : sequence.getNotes())
         if (note->getNoteNumber() == pitch

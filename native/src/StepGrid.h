@@ -17,13 +17,16 @@ public:
     void mouseUp(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed(const juce::KeyPress&) override;
+    void zoomIn();
+    void zoomOut();
+    void setScaleHighlight(int selection);
     void focusGained(juce::Component::FocusChangeType) override;
     void focusLost(juce::Component::FocusChangeType) override;
     void resized() override;
 private:
     friend int runArrangementTest();
     enum class Gesture { none, draw, move, resize };
-    struct CopiedNote { int step = 0, pitch = 0, length = 1; };
+    struct CopiedNote { int step = 0, pitch = 0; double length = 1.0; };
     struct MovingNote { int step = 0, pitch = 0; };
     juce::Rectangle<float> cell(int step, int row) const;
     float rowAreaHeight() const;
@@ -47,6 +50,7 @@ private:
     bool fillSelectionToClipEnd();
     juce::Result moveCurrentNotesBy(int stepDelta, int pitchDelta);
     juce::Result resizeCurrentNoteTo(int index);
+    juce::Result resizeCurrentNoteTo(juce::Point<float>, bool freeLength);
     int pitchForIndex(int index) const;
     int indexForCell(int step, int pitch) const;
     int automaticLowestPitch() const;
@@ -58,7 +62,7 @@ private:
     void updatePlayhead();
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited, selectedNotes;
-    std::array<int, Session::steps * Session::pitches> noteLengths {};
+    std::array<float, Session::steps * Session::pitches> noteLengths {};
     std::vector<CopiedNote> noteClipboard;
     std::vector<MovingNote> movingNotes;
     Gesture gesture = Gesture::none;
@@ -68,6 +72,7 @@ private:
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;
+    int scaleHighlight = 1;
     float verticalAutoScroll = 0.0f;
     juce::Point<float> dragPosition {-1.0f, -1.0f};
     float playhead = -1.0f;

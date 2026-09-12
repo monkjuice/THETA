@@ -255,6 +255,13 @@ int runPatternTest()
         require(session.noteLengthSteps(0, 36) == 8 && session.resizeNote(8, 39, 2).wasOk()
                 && session.noteLengthSteps(8, 39) == 2,
                 "Pattern notes expose and edit musical step lengths");
+        require(session.resizeNote(8, 39, 0.5).wasOk(), "Half-grid note resize succeeds");
+        auto halfGridLengthIsStored = false;
+        for (auto* note : session.pattern().getSequence().getNotes())
+            halfGridLengthIsStored = halfGridLengthIsStored || (note->getNoteNumber() == 39
+                && std::abs(note->getStartBeat().inBeats() - 2.0) < 0.0001
+                && std::abs(note->getLengthBeats().inBeats() - 0.125) < 0.0001);
+        require(halfGridLengthIsStored, "Pattern notes support half-grid lengths");
         const auto longClipStart = session.pattern().getPosition().time.getStart().inSeconds();
         require(session.editClip(session.pattern().itemID, {longClipStart, longClipStart + 4.0, 0.0}, ClipGesture::trimRight).wasOk(),
                 "MIDI clips can be extended to multi-bar parts");
