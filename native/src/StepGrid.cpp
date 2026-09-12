@@ -195,11 +195,42 @@ void StepGrid::paint(juce::Graphics& g)
         const auto y = headerHeight + row * rowAreaHeight() / Session::pitches;
         g.fillRect(juce::Rectangle<float>(labelWidth, std::floor(y), gridWidth(), 1.0f));
     }
-    for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
+    for (int row = 0; row < Session::pitches; ++row)
     {
-        const auto x = cell(step, 0).getX();
-        g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
-        g.drawVerticalLine(juce::roundToInt(x), headerHeight, headerHeight + rowAreaHeight());
+        std::array<int, Session::steps + 2> sustainedBoundaryDeltas {};
+        for (int noteStep = 0; noteStep < steps; ++noteStep)
+        {
+            const auto index = row * Session::steps + noteStep;
+            if (!notes.test(static_cast<size_t>(index)))
+                continue;
+
+            const auto noteStart = noteStep + noteStartOffsets[static_cast<size_t>(index)];
+            const auto noteEnd = noteStart + std::max(0.0625f, noteLengths[static_cast<size_t>(index)]);
+            constexpr float boundaryTolerance = 0.0001f;
+            const auto firstCovered = std::clamp(static_cast<int>(std::floor(noteStart + boundaryTolerance)) + 1,
+                                                 0, steps + 1);
+            const auto afterLastCovered = std::clamp(static_cast<int>(std::ceil(noteEnd - boundaryTolerance)),
+                                                     0, steps + 1);
+            if (firstCovered < afterLastCovered)
+            {
+                ++sustainedBoundaryDeltas[static_cast<size_t>(firstCovered)];
+                --sustainedBoundaryDeltas[static_cast<size_t>(afterLastCovered)];
+            }
+        }
+
+        int sustainedNotes = 0;
+        const auto rowTop = headerHeight + row * rowAreaHeight() / Session::pitches;
+        const auto rowBottom = headerHeight + (row + 1) * rowAreaHeight() / Session::pitches;
+        for (int step = 0; step <= lastVisibleStep + 1; ++step)
+        {
+            sustainedNotes += sustainedBoundaryDeltas[static_cast<size_t>(step)];
+            if (step >= firstVisibleStep && sustainedNotes == 0)
+            {
+                const auto x = cell(step, 0).getX();
+                g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
+                g.drawVerticalLine(juce::roundToInt(x), rowTop, rowBottom);
+            }
+        }
     }
     if (!session.isPatternDrums())
     {
