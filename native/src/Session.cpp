@@ -798,6 +798,72 @@ bool Session::hasNote(int step, int pitch) const
     return false;
 }
 
+std::vector<Session::EditorNote> Session::editorNotes() const
+{
+    std::vector<EditorNote> result;
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    result.reserve(static_cast<size_t>(pattern().getSequence().getNumNotes()));
+    for (auto* note : pattern().getSequence().getNotes())
+        result.push_back({note->state,
+                          note->getStartBeat().inBeats() / stepBeats,
+                          note->getLengthBeats().inBeats() / stepBeats,
+                          note->getNoteNumber(), note->getVelocity(), note->getColour()});
+    return result;
+}
+
+juce::Result Session::addNote(double startSteps, int pitch, double lengthSteps, juce::ValueTree* addedState)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    const auto gridSteps = editorStepCount();
+    if (startSteps < 0.0 || startSteps >= gridSteps || pitch < 0 || pitch > 127)
+        return juce::Result::fail("Add notes inside the visible grid.");
+    lengthSteps = std::clamp(lengthSteps, 0.001, static_cast<double>(gridSteps) - startSteps);
+    constexpr double tolerance = 0.0001;
+    for (const auto& existing : editorNotes())
+        if (existing.pitch == pitch
+            && startSteps < existing.startSteps + existing.lengthSteps - tolerance
+            && existing.startSteps < startSteps + lengthSteps - tolerance)
+            return juce::Result::fail("Notes on the same lane cannot overlap.");
+
+    auto& sequence = pattern().getSequence();
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    auto* added = sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(startSteps * stepBeats),
+                                   tracktion::core::BeatDuration::fromBeats(lengthSteps * stepBeats),
+                                   100, 0, &edit->getUndoManager());
+    if (added == nullptr)
+        return juce::Result::fail("The note could not be added.");
+    if (addedState != nullptr)
+        *addedState = added->state;
+    pattern().state.removeProperty(starterPlaceholderID, &edit->getUndoManager());
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+bool Session::removeNotes(const std::vector<juce::ValueTree>& states)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    auto& sequence = pattern().getSequence();
+    auto changed = false;
+    for (const auto& state : states)
+        if (auto* note = sequence.getNoteFor(state))
+        {
+            sequence.removeNote(*note, &edit->getUndoManager());
+            changed = true;
+        }
+    if (changed)
+    {
+        markModified();
+        if (edit->getTransport().isPlaying())
+        {
+            panicMidiOnTrack(pattern().getClipTrack());
+            edit->restartPlayback();
+        }
+        sendSynchronousChangeMessage();
+    }
+    return changed;
+}
+
 void Session::beginNoteGesture(juce::String actionName) { edit->getUndoManager().beginNewTransaction(actionName); }
 void Session::endNoteGesture() { edit->getUndoManager().beginNewTransaction(); }
 
@@ -946,6 +1012,30 @@ juce::Result Session::resizeNote(int step, int pitch, double lengthSteps)
     return juce::Result::fail("Select a note to resize.");
 }
 
+juce::Result Session::resizeNote(const juce::ValueTree& state, double lengthSteps)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    auto& sequence = pattern().getSequence();
+    auto* note = sequence.getNoteFor(state);
+    if (note == nullptr)
+        return juce::Result::fail("Select a note to resize.");
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    const auto startStep = note->getStartBeat().inBeats() / stepBeats;
+    lengthSteps = std::clamp(lengthSteps, 0.001, static_cast<double>(editorStepCount()) - startStep);
+    auto nextStart = static_cast<double>(editorStepCount());
+    for (auto* other : sequence.getNotes())
+        if (other != note && other->getNoteNumber() == note->getNoteNumber()
+            && other->getStartBeat() > note->getStartBeat())
+            nextStart = std::min(nextStart, other->getStartBeat().inBeats() / stepBeats);
+    lengthSteps = std::min(lengthSteps, std::max(0.001, nextStart - startStep));
+    note->setStartAndLength(note->getStartBeat(),
+                            tracktion::core::BeatDuration::fromBeats(lengthSteps * stepBeats),
+                            &edit->getUndoManager());
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
 juce::Result Session::resizeNoteFromLeft(double startStep, int pitch, double newStartStep)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
@@ -969,6 +1059,29 @@ juce::Result Session::resizeNoteFromLeft(double startStep, int pitch, double new
             return juce::Result::ok();
         }
     return juce::Result::fail("Select a note to resize.");
+}
+
+juce::Result Session::resizeNoteFromLeft(const juce::ValueTree& state, double newStartStep)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    auto& sequence = pattern().getSequence();
+    auto* note = sequence.getNoteFor(state);
+    if (note == nullptr)
+        return juce::Result::fail("Select a note to resize.");
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    const auto endStep = note->getEndBeat().inBeats() / stepBeats;
+    auto previousEnd = 0.0;
+    for (auto* other : sequence.getNotes())
+        if (other != note && other->getNoteNumber() == note->getNoteNumber()
+            && other->getStartBeat() < note->getStartBeat())
+            previousEnd = std::max(previousEnd, other->getEndBeat().inBeats() / stepBeats);
+    newStartStep = std::clamp(newStartStep, previousEnd, endStep - 0.001);
+    note->setStartAndLength(tracktion::core::BeatPosition::fromBeats(newStartStep * stepBeats),
+                            tracktion::core::BeatDuration::fromBeats((endStep - newStartStep) * stepBeats),
+                            &edit->getUndoManager());
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
 bool Session::ensurePatternLengthSteps(int requiredSteps)
@@ -1022,6 +1135,17 @@ juce::Result Session::fillNoteToClipEnd(int step, int pitch)
             return juce::Result::ok();
         }
     return juce::Result::fail("Select a note to fill.");
+}
+
+juce::Result Session::fillNoteToClipEnd(const juce::ValueTree& state)
+{
+    auto& sequence = pattern().getSequence();
+    auto* note = sequence.getNoteFor(state);
+    if (note == nullptr)
+        return juce::Result::fail("Select a note to fill.");
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    const auto startStep = note->getStartBeat().inBeats() / stepBeats;
+    return resizeNote(state, patternLengthBeats() / stepBeats - startStep);
 }
 
 juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch)
@@ -1122,70 +1246,137 @@ juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources,
     return juce::Result::ok();
 }
 
-bool Session::splitNotesAtGrid(const std::vector<std::pair<int, int>>& sources)
+juce::Result Session::moveNotes(const std::vector<juce::ValueTree>& states, double stepDelta, int pitchDelta)
 {
-    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    if (states.empty() || (std::abs(stepDelta) < 0.0001 && pitchDelta == 0))
+        return juce::Result::ok();
+
     auto& sequence = pattern().getSequence();
-    auto* undoManager = &edit->getUndoManager();
-    bool changed = false;
-    for (const auto& [step, pitch] : sources)
-        for (auto* note : sequence.getNotes())
-            if (note->getNoteNumber() == pitch && std::abs(note->getStartBeat().inBeats() - step * stepBeats) < 0.0001)
-            {
-                const auto start = note->getStartBeat().inBeats();
-                const auto end = note->getEndBeat().inBeats();
-                std::vector<std::pair<double, double>> parts;
-                for (auto partStart = start; partStart < end - 0.0001;)
-                {
-                    const auto partEnd = std::min(end, (std::floor(partStart / stepBeats + 0.0001) + 1.0) * stepBeats);
-                    parts.emplace_back(partStart, partEnd);
-                    partStart = partEnd;
-                }
-                if (parts.size() < 2) break;
-                for (const auto& [partStart, partEnd] : parts)
-                    sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(partStart),
-                                     tracktion::core::BeatDuration::fromBeats(partEnd - partStart), note->getVelocity(), note->getColour(), undoManager);
-                sequence.removeNote(*note, undoManager);
-                changed = true;
-                break;
-            }
-    if (changed)
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    struct Move { te::MidiNote* note; double start, length; int pitch; };
+    std::vector<Move> moves;
+    moves.reserve(states.size());
+    for (const auto& state : states)
     {
-        markModified();
-        if (edit->getTransport().isPlaying()) { panicMidiOnTrack(pattern().getClipTrack()); edit->restartPlayback(); }
-        sendSynchronousChangeMessage();
+        auto* note = sequence.getNoteFor(state);
+        if (note == nullptr)
+            return juce::Result::fail("Select notes to move.");
+        moves.push_back({note, note->getStartBeat().inBeats() / stepBeats,
+                         note->getLengthBeats().inBeats() / stepBeats,
+                         note->getNoteNumber()});
     }
-    return changed;
+
+    const auto isMoving = [&states](const te::MidiNote& candidate)
+    {
+        return std::find(states.begin(), states.end(), candidate.state) != states.end();
+    };
+    constexpr double tolerance = 0.0001;
+    auto resolvedDelta = stepDelta;
+    for (int pass = 0; pass < sequence.getNumNotes() + 1; ++pass)
+    {
+        auto adjusted = false;
+        for (const auto& move : moves)
+        {
+            const auto targetPitch = move.pitch + pitchDelta;
+            if (targetPitch < 0 || targetPitch > 127)
+                return juce::Result::fail("Move notes inside the visible pitch grid.");
+            const auto targetStart = move.start + resolvedDelta;
+            const auto targetEnd = targetStart + move.length;
+            for (auto* other : sequence.getNotes())
+            {
+                if (isMoving(*other) || other->getNoteNumber() != targetPitch)
+                    continue;
+                const auto otherStart = other->getStartBeat().inBeats() / stepBeats;
+                const auto otherEnd = other->getEndBeat().inBeats() / stepBeats;
+                if (targetStart < otherEnd - tolerance && otherStart < targetEnd - tolerance)
+                {
+                    resolvedDelta += stepDelta < 0.0 ? otherStart - targetEnd : otherEnd - targetStart;
+                    adjusted = true;
+                    break;
+                }
+            }
+            if (adjusted) break;
+        }
+        if (!adjusted) break;
+    }
+
+    for (const auto& move : moves)
+        if (move.start + resolvedDelta < 0.0
+            || move.start + resolvedDelta + move.length > editorStepCount() + tolerance)
+            return juce::Result::fail("That note group does not fit here.");
+
+    const auto wasPlaying = edit->getTransport().isPlaying();
+    if (wasPlaying) panicMidiOnTrack(pattern().getClipTrack());
+    auto* undoManager = &edit->getUndoManager();
+    for (const auto& move : moves)
+    {
+        move.note->setStartAndLength(tracktion::core::BeatPosition::fromBeats((move.start + resolvedDelta) * stepBeats),
+                                     move.note->getLengthBeats(), undoManager);
+        move.note->setNoteNumber(move.pitch + pitchDelta, undoManager);
+    }
+    markModified();
+    if (wasPlaying) edit->restartPlayback();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
 }
 
-bool Session::subdivideNotes(const std::vector<std::pair<int, int>>& sources, int divisions)
+juce::Result Session::redistributeNotes(const std::vector<juce::ValueTree>& states, int divisions,
+                                        std::vector<juce::ValueTree>& replacementStates)
 {
-    if (divisions < 2) return false;
-    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    replacementStates.clear();
+    divisions = juce::jlimit(2, 32, divisions);
+    if (states.empty())
+        return juce::Result::fail("Select a note to divide.");
+
     auto& sequence = pattern().getSequence();
-    auto* undoManager = &edit->getUndoManager();
-    bool changed = false;
-    for (const auto& [step, pitch] : sources)
-        for (auto* note : sequence.getNotes())
-            if (note->getNoteNumber() == pitch && std::abs(note->getStartBeat().inBeats() - step * stepBeats) < 0.0001)
-            {
-                const auto start = note->getStartBeat().inBeats();
-                const auto length = note->getLengthBeats().inBeats() / divisions;
-                if (length < 0.0001) break;
-                for (int part = 0; part < divisions; ++part)
-                    sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(start + part * length),
-                                     tracktion::core::BeatDuration::fromBeats(length), note->getVelocity(), note->getColour(), undoManager);
-                sequence.removeNote(*note, undoManager);
-                changed = true;
-                break;
-            }
-    if (changed)
+    std::vector<te::MidiNote*> sources;
+    sources.reserve(states.size());
+    for (const auto& state : states)
+        if (auto* note = sequence.getNoteFor(state)) sources.push_back(note);
+    if (sources.size() != states.size())
+        return juce::Result::fail("The selected notes changed before they could be divided.");
+
+    const auto pitch = sources.front()->getNoteNumber();
+    auto start = sources.front()->getStartBeat().inBeats();
+    auto end = sources.front()->getEndBeat().inBeats();
+    for (auto* note : sources)
     {
-        markModified();
-        if (edit->getTransport().isPlaying()) { panicMidiOnTrack(pattern().getClipTrack()); edit->restartPlayback(); }
-        sendSynchronousChangeMessage();
+        if (note->getNoteNumber() != pitch)
+            return juce::Result::fail("Divide notes on one pitch lane at a time.");
+        start = std::min(start, note->getStartBeat().inBeats());
+        end = std::max(end, note->getEndBeat().inBeats());
     }
-    return changed;
+    if (end - start < 0.0001)
+        return juce::Result::fail("The selected note is too short to divide.");
+    for (auto* other : sequence.getNotes())
+        if (other->getNoteNumber() == pitch
+            && std::find(sources.begin(), sources.end(), other) == sources.end()
+            && other->getStartBeat().inBeats() < end - 0.0001
+            && start < other->getEndBeat().inBeats() - 0.0001)
+            return juce::Result::fail("The selected span contains another note.");
+
+    const auto velocity = sources.front()->getVelocity();
+    const auto colour = sources.front()->getColour();
+    auto* undoManager = &edit->getUndoManager();
+    for (auto* note : sources)
+        sequence.removeNote(*note, undoManager);
+    const auto length = (end - start) / divisions;
+    replacementStates.reserve(static_cast<size_t>(divisions));
+    for (int division = 0; division < divisions; ++division)
+        if (auto* note = sequence.addNote(pitch,
+                tracktion::core::BeatPosition::fromBeats(start + division * length),
+                tracktion::core::BeatDuration::fromBeats(length), velocity, colour, undoManager))
+            replacementStates.push_back(note->state);
+
+    markModified();
+    if (edit->getTransport().isPlaying())
+    {
+        panicMidiOnTrack(pattern().getClipTrack());
+        edit->restartPlayback();
+    }
+    sendSynchronousChangeMessage();
+    return replacementStates.size() == static_cast<size_t>(divisions)
+        ? juce::Result::ok() : juce::Result::fail("The note could not be divided.");
 }
 
 void Session::clearPattern()

@@ -89,6 +89,15 @@ public:
         float minimum = 0.0f;
         float maximum = 1.0f;
     };
+    struct EditorNote
+    {
+        juce::ValueTree state;
+        double startSteps = 0.0;
+        double lengthSteps = 1.0;
+        int pitch = 0;
+        int velocity = 100;
+        int colour = 0;
+    };
     struct Listener
     {
         virtual ~Listener() = default;
@@ -118,13 +127,19 @@ public:
     double patternLengthBeats() const;
     void setEditorStepCount(int newSteps);
     bool hasNote(int step, int pitch) const;
+    std::vector<EditorNote> editorNotes() const;
+    juce::Result addNote(double startSteps, int pitch, double lengthSteps, juce::ValueTree* addedState = nullptr);
+    bool removeNotes(const std::vector<juce::ValueTree>&);
     void setNote(int step, int pitch, bool enabled);
     int noteLengthSteps(int step, int pitch) const;
     juce::Result resizeNote(int step, int pitch, int lengthSteps);
     juce::Result resizeNote(int step, int pitch, double lengthSteps);
+    juce::Result resizeNote(const juce::ValueTree&, double lengthSteps);
     juce::Result resizeNoteFromLeft(double startStep, int pitch, double newStartStep);
+    juce::Result resizeNoteFromLeft(const juce::ValueTree&, double newStartStep);
     bool ensurePatternLengthSteps(int requiredSteps);
     juce::Result fillNoteToClipEnd(int step, int pitch);
+    juce::Result fillNoteToClipEnd(const juce::ValueTree&);
     void beginNoteGesture(juce::String actionName = "Draw notes");
     void endNoteGesture();
     void clearPattern();
@@ -169,8 +184,9 @@ public:
     void applyClipAutomationAt(double timelineSeconds);
     juce::Result moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch);
     juce::Result moveNotes(const std::vector<std::pair<int, int>>&, int stepDelta, int pitchDelta);
-    bool splitNotesAtGrid(const std::vector<std::pair<int, int>>&);
-    bool subdivideNotes(const std::vector<std::pair<int, int>>&, int divisions);
+    juce::Result moveNotes(const std::vector<juce::ValueTree>&, double stepDelta, int pitchDelta);
+    juce::Result redistributeNotes(const std::vector<juce::ValueTree>&, int divisions,
+                                   std::vector<juce::ValueTree>& replacementStates);
     juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture, int targetTrack = -1);
     juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
     juce::Result duplicateClip(te::EditItemID);

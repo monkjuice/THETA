@@ -27,8 +27,14 @@ public:
 private:
     friend int runArrangementTest();
     enum class Gesture { none, draw, move, resize, select };
-    struct CopiedNote { int step = 0, pitch = 0; double length = 1.0; };
-    struct MovingNote { int step = 0, pitch = 0; };
+    struct CopiedNote { double step = 0.0; int pitch = 0; double length = 1.0; };
+    struct MovingNote { juce::ValueTree state; double step = 0.0; int pitch = 0; };
+    struct VisibleNote
+    {
+        juce::ValueTree state;
+        double start = 0.0, length = 1.0;
+        int pitch = 0, row = 0;
+    };
     juce::Rectangle<float> cell(int step, int row) const;
     float rowAreaHeight() const;
     float cellWidth() const;
@@ -42,6 +48,14 @@ private:
     int cellHit(juce::Point<float>) const;
     int hit(juce::Point<float>) const;
     int resizeHit(juce::Point<float>) const;
+    juce::Rectangle<float> boundsFor(const VisibleNote&) const;
+    const VisibleNote* noteForState(const juce::ValueTree&) const;
+    std::vector<juce::ValueTree> selectedStates() const;
+    bool isSelected(const juce::ValueTree&) const;
+    void setSelectedStates(std::vector<juce::ValueTree>);
+    void finishSubdivision();
+    bool beginSubdivision();
+    bool adjustSubdivision(int delta);
     void apply(int index);
     void toggleSelection(int index);
     bool selectAllNotes();
@@ -50,8 +64,6 @@ private:
     bool copySelection();
     bool pasteSelection();
     bool deleteSelection();
-    bool splitSelectionAtGrid();
-    bool subdivideSelection();
     bool fillSelectionToClipEnd();
     juce::Result moveCurrentNotesBy(int stepDelta, int pitchDelta);
     juce::Result resizeCurrentNoteTo(int index);
@@ -70,18 +82,23 @@ private:
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited, selectedNotes;
     std::array<float, Session::steps * Session::pitches> noteLengths {}, noteStartOffsets {};
+    std::vector<VisibleNote> visibleNotes;
+    std::vector<juce::ValueTree> selectedNoteStates;
     std::vector<CopiedNote> noteClipboard;
     std::vector<MovingNote> movingNotes;
     Gesture gesture = Gesture::none;
     bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, movingGroup = false, resizingFromLeft = false;
-    int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1, clipboardBasePitch = 0;
+    int lastHit = -1, pasteAnchorIndex = -1, clipboardBasePitch = 0;
     int lastMoveStep = -1, lastMovePitch = -1;
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;
-    double resizingStartStep = 0.0, resizingEndStep = 0.0;
+    double resizingStartStep = 0.0;
+    juce::ValueTree movingNoteState, resizingNoteState;
+    bool subdivisionActive = false;
+    int subdivisionCount = 0;
+    juce::Rectangle<float> subdivisionSourceBounds;
     int scaleHighlight = 1;
-    int visualSubdivisions = 1;
     float verticalAutoScroll = 0.0f;
     juce::Point<float> dragPosition {-1.0f, -1.0f};
     juce::Point<float> selectionAnchor {-1.0f, -1.0f};

@@ -67,10 +67,25 @@
                 "Dragging from the body of a sustained note follows the pointer and preserves its length");
         selectionGrid.selectedNotes.reset();
         selectionGrid.selectedNotes.set(static_cast<size_t>(selectionGrid.indexForCell(2, 49)));
+        const auto resolutionBeforeDivision = session.editorStepResolution();
         require(selectionGrid.keyPressed(juce::KeyPress('E', juce::ModifierKeys::ctrlModifier, 'e')),
                 "Ctrl-E splits selected sustained notes");
         require(session.hasNote(2, 49) && session.hasNote(3, 49) && session.hasNote(4, 49) && session.hasNote(5, 49),
                 "Split notes occupy their original grid cells");
+        require(session.editorStepResolution() == resolutionBeforeDivision,
+                "Dividing a note does not change the editor grid resolution");
+        for (int division = 0; division < 5; ++division)
+            require(selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::upKey,
+                                                             juce::ModifierKeys::ctrlModifier, 0)),
+                    "Ctrl-Up increases the live note division count");
+        require(selectionGrid.subdivisionCount == 9 && selectionGrid.selectedNoteStates.size() == 9,
+                "A four-cell note can be redistributed into nine independently selected retriggers");
+        auto startsInFirstCell = 0;
+        for (const auto& note : selectionGrid.visibleNotes)
+            if (note.pitch == 49 && note.start >= 2.0 - 0.0001 && note.start < 3.0 - 0.0001)
+                ++startsInFirstCell;
+        require(startsInFirstCell > 1,
+                "Multiple retriggers remain visible inside one unchanged editor cell");
         const auto splitPoint = selectionGrid.cell(3, rowForPitch(48)).getCentre();
         selectionGrid.mouseDown(gridEvent(splitPoint, splitPoint, false));
         selectionGrid.mouseUp(gridEvent(splitPoint, splitPoint, false));

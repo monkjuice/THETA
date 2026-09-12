@@ -47,7 +47,7 @@ In the current workspace, portable CMake tools are also available at `native/.to
 
 ## Create A Pattern
 
-1. Draw notes in the grid. Drag from an empty cell to add notes; drag from an existing note or right-drag to erase. Each stroke is one undo action.
+1. Draw notes in the grid. Drag from an empty cell to add notes; drag from an existing note or right-drag to erase. Each stroke is one undo action. Select a sustained note and press **Ctrl+E** to divide its span into retriggers without changing the visible grid; keep Ctrl held and use the arrow keys or wheel to choose 2-32 equal divisions.
 2. Press **Play**. Adjust BPM to change tempo while keeping the pattern one bar long. **Synth Gain** controls the Utility device after the synth.
 3. Use **Add audio** to place audio on the separate track. The first file starts at zero, and later files append to that track.
 4. Use **Save** to keep the project and **Open** to return to it. An asterisk beside the project name marks unsaved changes.
@@ -66,6 +66,7 @@ The loop covers both the pattern and imported audio. If audio extends beyond one
 | Ctrl+S | Save |
 | Ctrl+Shift+S | Save as |
 | Ctrl+O | Open |
+| Ctrl+E, then Ctrl+arrows/wheel | Divide a selected note into retriggers |
 
 Command-key handling is included for macOS, but remains unvalidated there.
 
