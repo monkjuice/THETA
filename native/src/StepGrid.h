@@ -36,6 +36,7 @@ private:
     float gridWidth() const;
     double visibleStepSpan() const;
     void syncHorizontalScroll();
+    void zoomAt(double factor, float pointerX);
     void scrollDraggedNotes();
     void moveDraggedNotesAt(juce::Point<float>);
     int hit(juce::Point<float>) const;

@@ -54,15 +54,20 @@ juce::Rectangle<float> StepGrid::cell(int step, int row) const
 
 void StepGrid::zoomIn()
 {
-    stepZoom = std::min(8.0, stepZoom * 1.5);
-    syncHorizontalScroll();
-    updatePlayhead();
-    repaint();
+    zoomAt(1.5, labelWidth + gridWidth() * 0.5f);
 }
 
 void StepGrid::zoomOut()
 {
-    stepZoom = std::max(1.0, stepZoom / 1.5);
+    zoomAt(1.0 / 1.5, labelWidth + gridWidth() * 0.5f);
+}
+
+void StepGrid::zoomAt(double factor, float pointerX)
+{
+    const auto anchor = std::clamp((pointerX - labelWidth) / gridWidth(), 0.0f, 1.0f);
+    const auto anchorStep = stepScroll + static_cast<double>(anchor) * visibleStepSpan();
+    stepZoom = std::clamp(stepZoom * factor, 1.0, 8.0);
+    stepScroll = anchorStep - static_cast<double>(anchor) * visibleStepSpan();
     syncHorizontalScroll();
     updatePlayhead();
     repaint();
@@ -829,12 +834,20 @@ void StepGrid::focusLost(juce::Component::FocusChangeType)
     repaint();
 }
 
-void StepGrid::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+void StepGrid::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
 {
-    if (gesture != Gesture::none || session.isPatternDrums())
+    if (gesture != Gesture::none)
         return;
     const auto wheelDelta = std::abs(wheel.deltaY) >= std::abs(wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
     if (std::abs(wheelDelta) < 0.0001f)
+        return;
+    if (event.mods.isShiftDown())
+    {
+        // Keep the step below the pointer stable while the visible range changes.
+        zoomAt(std::exp(wheelDelta * 2.0f), event.position.x);
+        return;
+    }
+    if (session.isPatternDrums())
         return;
     const auto semitones = std::max(1, juce::roundToInt(std::abs(wheelDelta) * 8.0f));
     lowestVisiblePitch = juce::jlimit(0, 127 - Session::pitches + 1,
@@ -902,6 +915,8 @@ void StepGrid::rebuildVisibleNotes()
     const auto lengthsChanged = nextLengths != noteLengths;
     const auto offsetsChanged = nextStartOffsets != noteStartOffsets;
     const auto stepCountChanged = steps != visibleStepCount;
+    if (stepCountChanged)
+        stepZoom = std::max(1.0, static_cast<double>(steps) / static_cast<double>(Session::defaultSteps));
     visibleStepCount = steps;
     syncHorizontalScroll();
     notes = next;
@@ -961,7 +976,6 @@ float StepGrid::playheadXForTime(double seconds) const
 void StepGrid::syncHorizontalScroll()
 {
     const auto steps = session.editorStepCount();
-    stepZoom = std::max(1.0, static_cast<double>(steps) / static_cast<double>(Session::defaultSteps));
     const auto visible = visibleStepSpan();
     const auto maximumStart = std::max(0.0, static_cast<double>(steps) - visible);
     stepScroll = std::clamp(stepScroll, 0.0, maximumStart);
