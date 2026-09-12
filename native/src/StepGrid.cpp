@@ -159,8 +159,10 @@ void StepGrid::paint(juce::Graphics& g)
                 g.fillRect(bounds);
             }
         }
-        g.setColour(juce::Colour(0xff1a2026));
-        g.drawHorizontalLine(juce::roundToInt(cell(0, row).getBottom()), labelWidth, gridRight());
+        // Keep every pitch-row boundary identical; bar shading must not make
+        // any row look merged with its neighbour.
+        g.setColour(juce::Colour(0xff27323b));
+        g.fillRect(juce::Rectangle<float>(labelWidth, std::floor(cell(0, row).getBottom()), gridWidth(), 1.0f));
         for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
         {
             const auto x = cell(step, row).getX();
