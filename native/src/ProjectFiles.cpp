@@ -92,21 +92,39 @@ void ProjectFiles::chooseOpen()
             if (!weak) return;
             const auto file = selected.getResult();
             if (file == juce::File{}) { weak->busy = false; return; }
-            if (weak->loadingChanged) weak->loadingChanged(true);
-            weak->report("Opening " + file.getFileName() + "...");
-            weak->workers.addJob([weak, file]
-            {
-                auto xml = juce::parseXML(file);
-                auto state = xml ? juce::ValueTree::fromXml(*xml) : juce::ValueTree{};
-                juce::MessageManager::callAsync([weak, file, state]
-                {
-                    if (!weak) return;
-                    weak->busy = false;
-                    const auto result = weak->session.restoreProject(state, file);
-                    if (weak->loadingChanged) weak->loadingChanged(false);
-                    weak->report(result.wasOk() ? "Opened " + file.getFileName() : result.getErrorMessage());
-                });
-            });
+            weak->busy = false;
+            weak->load(file);
         });
+}
+
+void ProjectFiles::openFile(const juce::File& file)
+{
+    if (!file.existsAsFile() || !file.hasFileExtension("thetaedit"))
+    {
+        report("Could not open the selected Theta project.");
+        return;
+    }
+    confirmUnsaved([weak = juce::WeakReference<ProjectFiles>(this), file] { if (weak) weak->load(file); });
+}
+
+void ProjectFiles::load(const juce::File& file)
+{
+    if (busy) return;
+    busy = true;
+    if (loadingChanged) loadingChanged(true);
+    report("Opening " + file.getFileName() + "...");
+    workers.addJob([weak = juce::WeakReference<ProjectFiles>(this), file]
+    {
+        auto xml = juce::parseXML(file);
+        auto state = xml ? juce::ValueTree::fromXml(*xml) : juce::ValueTree{};
+        juce::MessageManager::callAsync([weak, file, state]
+        {
+            if (!weak) return;
+            weak->busy = false;
+            const auto result = weak->session.restoreProject(state, file);
+            if (weak->loadingChanged) weak->loadingChanged(false);
+            weak->report(result.wasOk() ? "Opened " + file.getFileName() : result.getErrorMessage());
+        });
+    });
 }
 }

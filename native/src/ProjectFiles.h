@@ -10,12 +10,14 @@ public:
     explicit ProjectFiles(Session& s) : session(s) {}
     void save(bool saveAs = false, std::function<void(bool)> completion = {});
     void open();
+    void openFile(const juce::File&);
     void confirmUnsaved(std::function<void()>);
     std::function<void(juce::String)> status;
     std::function<void(bool)> loadingChanged;
 private:
     void write(const juce::File&, std::function<void(bool)>);
     void chooseOpen();
+    void load(const juce::File&);
     void report(const juce::String& text) { if (status) status(text); }
     Session& session;
     bool busy = false;

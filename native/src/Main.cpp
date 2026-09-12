@@ -10,6 +10,17 @@
 #include <cmath>
 #include <stdexcept>
 
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+ #include <shlobj.h>
+#endif
+
 namespace theta
 {
 juce::File thetaLogFile()
@@ -44,6 +55,25 @@ void prepareCommandLineAudio()
     te::Engine testEngine {"Theta Native Tests"};
     avoidLegacyDirectSound(testEngine);
     testEngine.getDeviceManager().deviceManager.closeAudioDevice();
+   #endif
+}
+
+void registerThetaProjectFileAssociation()
+{
+   #if JUCE_WINDOWS
+    constexpr auto registryRoot = "HKEY_CURRENT_USER\\Software\\Classes\\";
+    constexpr auto projectType = "Theta.Project";
+    const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName().quoted();
+    const auto typeKey = juce::String(registryRoot) + projectType;
+    const auto extensionKey = juce::String(registryRoot) + ".thetaedit\\";
+    const auto associated = juce::WindowsRegistry::setValue(extensionKey, projectType)
+                         && juce::WindowsRegistry::setValue(typeKey + "\\", "Theta project")
+                         && juce::WindowsRegistry::setValue(typeKey + "\\DefaultIcon\\", executable + ",0")
+                         && juce::WindowsRegistry::setValue(typeKey + "\\shell\\open\\command\\", executable + " \"%1\"");
+    if (associated)
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+    else
+        juce::Logger::writeToLog("Theta: could not register .thetaedit file association");
    #endif
 }
 
@@ -404,6 +434,7 @@ public:
     }
 
     void requestClose() { files.confirmUnsaved([] { juce::JUCEApplication::getInstance()->quit(); }); }
+    void openProjectFile(const juce::File& file) { files.openFile(file); }
 
 private:
     juce::TooltipWindow tooltipWindow {this, 700};
@@ -542,10 +573,15 @@ public:
             quit();
             return;
         }
+        startupTest = args == "--startup-test";
+        if (!startupTest)
+            registerThetaProjectFileAssociation();
+        const auto requestedProject = juce::File(args.trim().unquoted());
+        if (requestedProject.existsAsFile() && requestedProject.hasFileExtension("thetaedit"))
+            projectToOpen = requestedProject;
         theme.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff343a40));
         theme.setColour(juce::Slider::trackColourId, juce::Colour(0xffc6d58c));
         juce::LookAndFeel::setDefaultLookAndFeel(&theme);
-        startupTest = args == "--startup-test";
         window = std::make_unique<Window>();
         loading = new StartupScreen();
         loading->setSize(560, 320);
@@ -608,6 +644,9 @@ private:
                 window->setResizable(true, false);
                 window->setResizeLimits(960, 680, 2400, 1600);
                 window->centreWithSize(1120, 760);
+                if (projectToOpen != juce::File{})
+                    if (auto* controls = dynamic_cast<ControlWindow*>(window->getContentComponent()))
+                        controls->openProjectFile(projectToOpen);
                 if (startupTest) quit();
                 return;
             }
@@ -639,6 +678,7 @@ private:
     juce::Component::SafePointer<StartupScreen> loading;
     int startupStage = 0;
     bool startupTest = false;
+    juce::File projectToOpen;
 };
 }
 START_JUCE_APPLICATION(theta::Application)
