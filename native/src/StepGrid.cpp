@@ -150,7 +150,7 @@ void StepGrid::paint(juce::Graphics& g)
         {
             const auto bounds = cell(step, row);
             if (!dirty.intersects(bounds)) continue;
-            const auto barColour = step / 4 % 2 == 0 ? juce::Colour(0xff303941) : juce::Colour(0xff252d35);
+            const auto barColour = step / 4 % 2 == 0 ? juce::Colour(0xff46515a) : juce::Colour(0xff3b4650);
             g.setColour(barColour);
             g.fillRect(bounds);
             if (scaleEnabled && inScale)
@@ -161,13 +161,12 @@ void StepGrid::paint(juce::Graphics& g)
         }
         g.setColour(juce::Colour(0xff1a2026));
         g.drawHorizontalLine(juce::roundToInt(cell(0, row).getBottom()), labelWidth, gridRight());
-        if (row == 0)
-            for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
-            {
-                const auto x = cell(step, row).getX();
-                g.setColour(juce::Colour(step % 4 == 0 ? 0xff151a20 : 0xff222a31));
-                g.drawVerticalLine(juce::roundToInt(x), headerHeight, headerHeight + rowAreaHeight());
-            }
+        for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
+        {
+            const auto x = cell(step, row).getX();
+            g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
+            g.drawVerticalLine(juce::roundToInt(x), cell(0, row).getY(), cell(0, row).getBottom());
+        }
 
         for (int step = 0; step <= lastVisibleStep; ++step)
         {
