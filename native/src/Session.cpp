@@ -73,6 +73,16 @@ PresetPattern presetPattern(Session::PatternPreset preset)
     return {};
 }
 
+void panicMidiOnTrack(te::ClipTrack* clipTrack)
+{
+    auto* track = dynamic_cast<te::AudioTrack*>(clipTrack);
+    if (track == nullptr)
+        return;
+    for (auto* plugin : track->pluginList)
+        if (plugin != nullptr)
+            plugin->midiPanic();
+}
+
 juce::Colour presetColour(Session::PatternPreset preset)
 {
     switch (preset)
@@ -1088,6 +1098,8 @@ juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources,
     // A moved sustained note may already be active in the current playback
     // graph. Its old note-off can otherwise disappear when the MIDI sequence
     // changes, leaving the instrument sounding indefinitely.
+    if (wasPlaying)
+        panicMidiOnTrack(pattern().getClipTrack());
     auto* undoManager = &edit->getUndoManager();
     for (const auto& move : moves)
         move.note->setStartAndLength(tracktion::core::BeatPosition::fromBeats(move.targetStep * stepBeats),
