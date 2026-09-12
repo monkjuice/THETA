@@ -159,17 +159,6 @@ void StepGrid::paint(juce::Graphics& g)
                 g.fillRect(bounds);
             }
         }
-        // Keep every pitch-row boundary identical; bar shading must not make
-        // any row look merged with its neighbour.
-        g.setColour(juce::Colour(0xff202930));
-        g.fillRect(juce::Rectangle<float>(labelWidth, std::floor(cell(0, row).getBottom()), gridWidth(), 1.0f));
-        for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
-        {
-            const auto x = cell(step, row).getX();
-            g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
-            g.drawVerticalLine(juce::roundToInt(x), cell(0, row).getY(), cell(0, row).getBottom());
-        }
-
         for (int step = 0; step <= lastVisibleStep; ++step)
         {
             const auto index = row * Session::steps + step;
@@ -197,6 +186,20 @@ void StepGrid::paint(juce::Graphics& g)
                 g.drawRect(bounds.reduced(1.0f), 2.0f);
             }
         }
+    }
+    // Draw the grid after all cells. This avoids the next row's fractional
+    // fill covering the preceding row separator on high-DPI displays.
+    g.setColour(juce::Colour(0xff202930));
+    for (int row = 0; row <= Session::pitches; ++row)
+    {
+        const auto y = headerHeight + row * rowAreaHeight() / Session::pitches;
+        g.fillRect(juce::Rectangle<float>(labelWidth, std::floor(y), gridWidth(), 1.0f));
+    }
+    for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
+    {
+        const auto x = cell(step, 0).getX();
+        g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
+        g.drawVerticalLine(juce::roundToInt(x), headerHeight, headerHeight + rowAreaHeight());
     }
     if (!session.isPatternDrums())
     {
