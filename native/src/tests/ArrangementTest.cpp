@@ -602,6 +602,20 @@ int runArrangementTest()
         selectionGrid.mouseDown(gridEvent(selectionGrid.cell(8, rowForPitch(60)).getCentre(),
                                           selectionGrid.cell(8, rowForPitch(60)).getCentre(), false, commandLeft));
         require(selectionGrid.selectedNotes.count() == 2, "Command-click selects multiple note cells");
+        const auto groupFrom = selectionGrid.cell(4, rowForPitch(55)).getCentre();
+        const auto groupTo = selectionGrid.cell(5, rowForPitch(55)).getCentre();
+        selectionGrid.mouseDown(gridEvent(groupFrom, groupFrom, false));
+        selectionGrid.mouseDrag(gridEvent(groupFrom, groupTo, true));
+        selectionGrid.mouseUp(gridEvent(groupFrom, groupTo, true));
+        selectionGrid.changeListenerCallback(nullptr);
+        require(!session.hasNote(4, 55) && !session.hasNote(8, 60)
+                && session.hasNote(5, 55) && session.hasNote(9, 60)
+                && selectionGrid.selectedNotes.count() == 2,
+                "Dragging a selected note moves the complete selected shape and keeps it selected");
+        session.undo();
+        selectionGrid.changeListenerCallback(nullptr);
+        require(session.hasNote(4, 55) && session.hasNote(8, 60),
+                "Undo restores a grouped note drag in one step");
         require(selectionGrid.keyPressed(juce::KeyPress('C', juce::ModifierKeys::commandModifier, 'c')),
                 "Command-C copies selected notes");
         require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys::commandModifier, 'v')),
@@ -644,6 +658,7 @@ int runArrangementTest()
                 "Ctrl-A selects all currently visible editor notes");
         require(selectionGrid.keyPressed(juce::KeyPress('C', juce::ModifierKeys::ctrlModifier, 'c')),
                 "Ctrl-C copies every note after Ctrl-A");
+        selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
         const auto sourceCell = selectionGrid.cell(1, rowForPitch(48)).getCentre();
         const auto targetCell = selectionGrid.cell(1, rowForPitch(50)).getCentre();
         const auto shiftLeft = juce::ModifierKeys(juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::shiftModifier);

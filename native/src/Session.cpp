@@ -1,4 +1,5 @@
 #include "Session.h"
+#include <set>
 
 namespace theta
 {
@@ -1007,6 +1008,61 @@ juce::Result Session::moveNote(int sourceStep, int sourcePitch, int targetStep, 
         return juce::Result::fail("Move notes inside the clip.");
     moving->setStartAndLength(targetStart, std::min(moving->getLengthBeats(), maximumLength), undoManager);
     moving->setNoteNumber(targetPitch, undoManager);
+    markModified();
+    sendSynchronousChangeMessage();
+    return juce::Result::ok();
+}
+
+juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources, int stepDelta, int pitchDelta)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    if (sources.empty() || (stepDelta == 0 && pitchDelta == 0))
+        return juce::Result::ok();
+
+    const auto gridSteps = editorStepCount();
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    struct PlannedMove { te::MidiNote* note; int targetStep, targetPitch; };
+    std::vector<PlannedMove> moves;
+    std::set<std::pair<int, int>> sourceCells, targetCells;
+
+    for (const auto& [sourceStep, sourcePitch] : sources)
+    {
+        const auto targetStep = sourceStep + stepDelta;
+        const auto targetPitch = sourcePitch + pitchDelta;
+        if (targetStep < 0 || targetStep >= gridSteps || targetPitch < 0 || targetPitch > 127)
+            return juce::Result::fail("Move notes inside the visible grid.");
+        const auto sourceBeat = sourceStep * stepBeats;
+        auto* note = static_cast<te::MidiNote*>(nullptr);
+        for (auto* candidate : pattern().getSequence().getNotes())
+            if (candidate->getNoteNumber() == sourcePitch
+                && std::abs(candidate->getStartBeat().inBeats() - sourceBeat) < 0.0001)
+            {
+                note = candidate;
+                break;
+            }
+        if (note == nullptr)
+            return juce::Result::fail("Select notes to move.");
+        const auto lengthSteps = std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats() / stepBeats)));
+        if (targetStep + lengthSteps > gridSteps || !sourceCells.insert({sourceStep, sourcePitch}).second
+            || !targetCells.insert({targetStep, targetPitch}).second)
+            return juce::Result::fail("That note group does not fit here.");
+        moves.push_back({note, targetStep, targetPitch});
+    }
+
+    for (auto* note : pattern().getSequence().getNotes())
+    {
+        const auto step = juce::roundToInt(note->getStartBeat().inBeats() / stepBeats);
+        const auto cell = std::pair {step, note->getNoteNumber()};
+        if (targetCells.contains(cell) && !sourceCells.contains(cell))
+            return juce::Result::fail("That note cell is already occupied.");
+    }
+
+    auto* undoManager = &edit->getUndoManager();
+    for (const auto& move : moves)
+        move.note->setStartAndLength(tracktion::core::BeatPosition::fromBeats(move.targetStep * stepBeats),
+                                     move.note->getLengthBeats(), undoManager);
+    for (const auto& move : moves)
+        move.note->setNoteNumber(move.targetPitch, undoManager);
     markModified();
     sendSynchronousChangeMessage();
     return juce::Result::ok();

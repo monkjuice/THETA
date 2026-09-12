@@ -234,6 +234,18 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
     {
         gesture = Gesture::move;
         movingNoteIndex = index;
+        movingNotes.clear();
+        movingGroup = selectedNotes.test(static_cast<size_t>(index));
+        if (movingGroup)
+            for (int row = 0; row < Session::pitches; ++row)
+                for (int step = 0; step < session.editorStepCount(); ++step)
+                {
+                    const auto selected = row * Session::steps + step;
+                    if (selectedNotes.test(static_cast<size_t>(selected)) && notes.test(static_cast<size_t>(selected)))
+                        movingNotes.push_back({step, pitchForIndex(selected)});
+                }
+        if (movingNotes.empty())
+            movingNotes.push_back({index % Session::steps, pitchForIndex(index)});
         noteMoved = false;
         session.beginNoteGesture("Move note");
         return;
@@ -448,15 +460,26 @@ int StepGrid::indexForCell(int step, int pitch) const
     return row * Session::steps + step;
 }
 
-juce::Result StepGrid::moveCurrentNoteTo(int index)
+juce::Result StepGrid::moveCurrentNotesBy(int stepDelta, int pitchDelta)
 {
-    if (index < 0 || movingNoteIndex < 0 || index == movingNoteIndex)
+    if (movingNotes.empty() || (stepDelta == 0 && pitchDelta == 0))
         return juce::Result::ok();
-    const auto result = session.moveNote(movingNoteIndex % Session::steps, pitchForIndex(movingNoteIndex),
-                                         index % Session::steps, pitchForIndex(index));
+    std::vector<std::pair<int, int>> sources;
+    sources.reserve(movingNotes.size());
+    for (const auto& note : movingNotes)
+        sources.emplace_back(note.step, note.pitch);
+    const auto result = session.moveNotes(sources, stepDelta, pitchDelta);
     if (result.wasOk())
     {
-        movingNoteIndex = index;
+        selectedNotes.reset();
+        for (auto& note : movingNotes)
+        {
+            note.step += stepDelta;
+            note.pitch += pitchDelta;
+            if (const auto selected = indexForCell(note.step, note.pitch); selected >= 0)
+                selectedNotes.set(static_cast<size_t>(selected));
+        }
+        movingNoteIndex = indexForCell(movingNotes.front().step, movingNotes.front().pitch);
         noteMoved = true;
     }
     return result;
@@ -483,7 +506,12 @@ void StepGrid::mouseDrag(const juce::MouseEvent& event)
     const auto index = hit(event.position);
     if (gesture == Gesture::move)
     {
-        moveCurrentNoteTo(index);
+        if (index >= 0 && lastHit >= 0)
+        {
+            if (moveCurrentNotesBy(index % Session::steps - lastHit % Session::steps,
+                                   pitchForIndex(index) - pitchForIndex(lastHit)).wasOk())
+                lastHit = index;
+        }
         return;
     }
     if (gesture == Gesture::resize)
@@ -502,12 +530,14 @@ void StepGrid::mouseDrag(const juce::MouseEvent& event)
 
 void StepGrid::mouseUp(const juce::MouseEvent&)
 {
-    if (gesture == Gesture::move && !noteMoved && movingNoteIndex >= 0)
+    if (gesture == Gesture::move && !movingGroup && !noteMoved && movingNoteIndex >= 0)
         session.setNote(movingNoteIndex % Session::steps, pitchForIndex(movingNoteIndex), false);
     if (gesture != Gesture::none) session.endNoteGesture();
     gesture = Gesture::none;
     lastHit = -1;
     movingNoteIndex = -1;
+    movingNotes.clear();
+    movingGroup = false;
     resizingNoteIndex = -1;
     noteMoved = false;
 }
