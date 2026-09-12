@@ -212,4 +212,5 @@ private:
 int runSelfTest();
 int runPatternTest();
 int runArrangementTest();
+int runArrangementGeometryTest();
 }

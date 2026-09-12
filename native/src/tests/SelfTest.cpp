@@ -1,5 +1,6 @@
 #include "../Session.h"
 #include <cmath>
+#include <source_location>
 #include <stdexcept>
 
 namespace theta
@@ -8,7 +9,11 @@ int runSelfTest()
 {
     try
     {
-        auto require = [](bool valid) { if (!valid) throw std::runtime_error("Native device check failed"); };
+        auto require = [](bool valid, const std::source_location location = std::source_location::current())
+        {
+            if (!valid)
+                throw std::runtime_error("Native device check failed at line " + std::to_string(location.line()));
+        };
         Session session;
         require(session.utility != nullptr);
         auto& device = *session.utility;
@@ -51,6 +56,7 @@ int runSelfTest()
 
         session.drums->initialise({{}, 48000.0, 512});
         juce::AudioBuffer<float> drumBuffer(2, 4096);
+        drumBuffer.clear();
         te::MidiMessageArray midi;
         midi.addMidiMessage(juce::MidiMessage::noteOn(1, 56, 1.0f), 0.0, {});
         te::PluginRenderContext drumContext(&drumBuffer, 0, drumBuffer.getNumSamples(), &midi, 0.0, {}, true, false, true, false);
@@ -103,6 +109,7 @@ int runSelfTest()
         require(wave != nullptr);
         wave->initialise({{}, 48000.0, 512});
         juce::AudioBuffer<float> waveBuffer(2, 4096);
+        waveBuffer.clear();
         te::MidiMessageArray lowMidi;
         lowMidi.addMidiMessage(juce::MidiMessage::noteOn(1, 5, 1.0f), 0.0, {});
         te::PluginRenderContext waveContext(&waveBuffer, 0, waveBuffer.getNumSamples(), &lowMidi, 0.0, {}, true, false, true, false);
@@ -162,6 +169,7 @@ int runSelfTest()
     catch (const std::exception& error)
     {
         juce::Logger::writeToLog(error.what());
+        std::fprintf(stderr, "%s\n", error.what());
         return 1;
     }
 }

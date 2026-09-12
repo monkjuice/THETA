@@ -1,0 +1,104 @@
+        // Fit is four seconds wide here. Exercise actual component hit testing,
+        // gesture preview, and commit rather than calling only the model facade.
+        scenario("gestures: clip drag and trim");
+        view.mouseDown(event({240, 180}, {240, 180}, false));
+        view.mouseDrag(event({240, 180}, {346.5f, 180}, true));
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.0), "Drag must not rebuild live clip before release");
+        view.mouseUp(event({240, 180}, {346.5f, 180}, true));
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.5), "Pointer drag moves audio");
+        require(close(clip->getPosition().offset.inSeconds(), 0.0), "Move preserves source offset");
+        session.undo();
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.0), "One undo restores move");
+        session.redo();
+
+        drag({view.xFor(0.5) + 2.0f, 180}, {view.xFor(0.75), 180});
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.75), "Left handle trims start");
+        require(close(clip->getPosition().offset.inSeconds(), 0.25), "Left trim advances source offset");
+        drag({view.xFor(1.5) - 2.0f, 180}, {view.xFor(1.25), 180});
+        require(close(clip->getPosition().time.getEnd().inSeconds(), 1.25), "Right handle trims end");
+        require(close(clip->getPosition().offset.inSeconds(), 0.25), "Right trim preserves source offset");
+        drag({view.xFor(1.25) - 2.0f, 180}, {view.xFor(1.5), 180});
+        require(close(clip->getPosition().time.getEnd().inSeconds(), 1.5), "Right handle expands audio to available source end");
+        drag({view.xFor(0.75) + 2.0f, 180}, {view.xFor(0.5), 180});
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.5), "Left handle expands audio to available source start");
+        require(close(clip->getPosition().offset.inSeconds(), 0.0), "Left expansion rewinds source offset");
+        session.undo();
+        session.undo();
+        require(close(clip->getPosition().time.getStart().inSeconds(), 0.75), "Undo restores left expansion");
+        require(close(clip->getPosition().time.getEnd().inSeconds(), 1.25), "Undo restores right expansion");
+        const auto originalPosition = clip->getPosition();
+        view.mouseDown(event({360, 180}, {360, 180}, false));
+        view.mouseDrag(event({360, 180}, {500, 180}, true));
+        view.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey));
+        view.mouseUp(event({360, 180}, {500, 180}, true));
+        require(close(clip->getPosition().time.getStart().inSeconds(), originalPosition.time.getStart().inSeconds()), "Escape cancels preview");
+
+        // Check the visible waveform, using the real thumbnail scanner. This is
+        // a tiny rendering correctness check, not a frame-rate benchmark.
+        scenario("gestures: waveform snapshot");
+        juce::Image picture;
+        int waveformPixels = 0;
+        for (int attempt = 0; attempt < 100 && waveformPixels < 100; ++attempt)
+        {
+            picture = view.createComponentSnapshot(view.getLocalBounds());
+            waveformPixels = 0;
+            for (int y = 175; y < 215; ++y)
+                for (int x = 312; x < 410; ++x)
+                    if (picture.getPixelAt(x, y) == juce::Colour(0xff8cc5d2)) ++waveformPixels;
+            if (waveformPixels < 100) juce::Thread::sleep(10);
+        }
+        require(waveformPixels >= 100, "Imported audio must draw a visible waveform");
+        const auto screenshot = juce::SystemStats::getEnvironmentVariable("THETA_UI_SNAPSHOT", {});
+        if (screenshot.isNotEmpty())
+        {
+            auto stream = juce::File(screenshot).createOutputStream();
+            require(stream != nullptr && juce::PNGImageFormat().writeImageToStream(picture, *stream), "Write arrangement snapshot");
+        }
+
+        scenario("persistence: track state");
+        session.toggleTrackMute(1);
+        require(te::getAudioTracks(*session.edit)[1]->isMuted(false), "Audio mute");
+        session.undo();
+        require(!te::getAudioTracks(*session.edit)[1]->isMuted(false), "Undo mute");
+        session.toggleTrackSolo(1);
+        require(te::getAudioTracks(*session.edit)[1]->isSolo(false), "Audio solo");
+        session.undo();
+        view.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey));
+        require(session.findAudioClip(id) == nullptr, "Delete selected clip");
+        session.undo();
+        require(session.findAudioClip(id) != nullptr, "Undo restores deleted clip");
+        scenario("persistence: project restore");
+        const auto saved = session.projectSnapshot();
+        juce::TemporaryFile project(".thetaedit");
+        require(session.restoreProject(saved, project.getFile()).wasOk(), "Reopen arranged project");
+        clip = session.findAudioClip(id);
+        require(clip != nullptr, "Clip identity survives reopen");
+        require(close(clip->getPosition().offset.inSeconds(), 0.25), "Source offset survives reopen");
+
+        scenario("persistence: trimmed render");
+        juce::TemporaryFile rendered(".wav");
+        te::Renderer::Parameters parameters(*session.edit);
+        parameters.destFile = rendered.getFile();
+        parameters.audioFormat = &wav;
+        parameters.sampleRateForAudio = 48000;
+        parameters.bitDepth = 24;
+        parameters.time = clip->getPosition().time;
+        {
+            te::Renderer::RenderTask task("Trimmed audio test", parameters, nullptr, nullptr);
+            const auto deadline = juce::Time::getMillisecondCounterHiRes() + 15000.0;
+            while (task.runJob() != juce::ThreadPoolJob::jobHasFinished)
+                require(juce::Time::getMillisecondCounterHiRes() < deadline, "Render timeout");
+            require(task.errorMessage.isEmpty(), task.errorMessage.toRawUTF8());
+        }
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(rendered.getFile()));
+        require(reader != nullptr, "Read trimmed render");
+        require(std::abs(static_cast<double>(reader->lengthInSamples) - 24000.0) <= 512.0, "Render matches trimmed duration");
+        juce::AudioBuffer<float> output(2, static_cast<int>(reader->lengthInSamples));
+        require(reader->read(&output, 0, output.getNumSamples(), 0, true, true), "Read trimmed samples");
+        const auto early = output.getRMSLevel(0, 2400, 4800);
+        const auto late = output.getRMSLevel(0, 14400, 4800);
+        require(early > 0.01f && late > early * 4.0f, "Rendered source window must match the visible trim");
+        view.setLookAndFeel(nullptr);
+        session.releaseAudioDevice();

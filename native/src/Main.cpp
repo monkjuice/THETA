@@ -531,12 +531,14 @@ public:
         logger = std::make_unique<juce::FileLogger>(logFile, "Theta debug log", 512 * 1024);
         juce::Logger::setCurrentLogger(logger.get());
         juce::Logger::writeToLog("Theta: log started at " + logFile.getFullPathName());
-        if (args == "--self-test" || args == "--pattern-test" || args == "--arrangement-test")
+        if (args == "--self-test" || args == "--pattern-test" || args == "--arrangement-test"
+            || args == "--arrangement-geometry-test")
         {
             Session::setCommandLineTestMode(true);
-            prepareCommandLineAudio();
+            if (args != "--arrangement-geometry-test") prepareCommandLineAudio();
             setApplicationReturnValue(args == "--self-test" ? runSelfTest()
-                : args == "--pattern-test" ? runPatternTest() : runArrangementTest());
+                : args == "--pattern-test" ? runPatternTest()
+                : args == "--arrangement-test" ? runArrangementTest() : runArrangementGeometryTest());
             quit();
             return;
         }

@@ -77,7 +77,7 @@ Save writes a detached project snapshot on a worker thread to a temporary file b
 
 ## Validation
 
-Windows validation includes the Release build and four CTest cases. Tests cover Utility DSP, note gestures and undo/redo, tempo and loop duration, a real 48 kHz MIDI-to-synth WAV render, audio import, project state/media-reference round trips, invalid-project rejection, and changes made after a save snapshot. The arrangement test exercises pointer drags, visible waveform drawing, trim bounds, cancellation, mute/solo undo, deletion/recovery, reopened clip offsets, and a render that verifies the trimmed source region.
+Windows validation includes the Release build and five CTest cases. Tests cover arrangement geometry, Utility DSP, note gestures and undo/redo, tempo and loop duration, a real 48 kHz MIDI-to-synth WAV render, audio import, project state/media-reference round trips, invalid-project rejection, and changes made after a save snapshot. The arrangement workflow exercises pointer drags, visible waveform drawing, cancellation, mute/solo undo, deletion/recovery, reopened clip offsets, and a render that verifies the trimmed source region.
 
 These checks do not establish physical audio-device behavior, end-to-end pointer latency, sustained FPS, large-project capacity, or macOS compatibility. The render is an integration test; there is no export button yet.
 

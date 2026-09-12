@@ -34,7 +34,11 @@ target_sources(ThetaNative PRIVATE
     src/Main.cpp src/Session.cpp src/SessionTransport.cpp src/StepGrid.cpp src/Arrangement.cpp src/ArrangementGeometry.cpp src/ProjectFiles.cpp src/Playhead.cpp
     src/BrowserPanel.cpp src/DeviceRack.cpp src/DrumDevice.cpp src/UtilityDevice.cpp src/ThetaSpaceDevice.cpp src/ThetaBloomDevice.cpp src/ThetaArpDevice.cpp
     src/ThetaWaveDevice.cpp
-    src/tests/SelfTest.cpp src/tests/PatternTest.cpp src/tests/ArrangementTest.cpp)
+    src/tests/SelfTest.cpp
+    src/tests/Pattern/DeviceRackTest.cpp
+    src/tests/Pattern/WorkflowTest.cpp
+    src/tests/Arrangement/ClipGeometryTest.cpp
+    src/tests/Arrangement/WorkflowTest.cpp)
 target_compile_definitions(ThetaNative PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
     JUCE_PLUGINHOST_VST3=0 JUCE_PLUGINHOST_AU=0
@@ -49,6 +53,8 @@ if(MSVC)
     target_compile_options(ThetaNative PRIVATE /bigobj)
 endif()
 enable_testing()
+add_test(NAME native_arrangement_geometry COMMAND ThetaNative --arrangement-geometry-test)
+set_tests_properties(native_arrangement_geometry PROPERTIES TIMEOUT 10)
 add_test(NAME native_device_correctness COMMAND ThetaNative --self-test)
 set_tests_properties(native_device_correctness PROPERTIES TIMEOUT 30)
 add_test(NAME native_pattern_workflow COMMAND ThetaNative --pattern-test)
