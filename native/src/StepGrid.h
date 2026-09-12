@@ -15,6 +15,7 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed(const juce::KeyPress&) override;
     void zoomIn();
@@ -51,6 +52,7 @@ private:
     juce::Result moveCurrentNotesBy(int stepDelta, int pitchDelta);
     juce::Result resizeCurrentNoteTo(int index);
     juce::Result resizeCurrentNoteTo(juce::Point<float>, bool freeLength);
+    void updatePointer(juce::Point<float>, const juce::ModifierKeys&);
     int pitchForIndex(int index) const;
     int indexForCell(int step, int pitch) const;
     int automaticLowestPitch() const;
@@ -62,16 +64,17 @@ private:
     void updatePlayhead();
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited, selectedNotes;
-    std::array<float, Session::steps * Session::pitches> noteLengths {};
+    std::array<float, Session::steps * Session::pitches> noteLengths {}, noteStartOffsets {};
     std::vector<CopiedNote> noteClipboard;
     std::vector<MovingNote> movingNotes;
     Gesture gesture = Gesture::none;
-    bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, movingGroup = false;
+    bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, movingGroup = false, resizingFromLeft = false;
     int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1, clipboardBasePitch = 0;
     int lastMoveStep = -1, lastMovePitch = -1;
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;
+    double resizingStartStep = 0.0, resizingEndStep = 0.0;
     int scaleHighlight = 1;
     float verticalAutoScroll = 0.0f;
     juce::Point<float> dragPosition {-1.0f, -1.0f};

@@ -148,12 +148,26 @@ void StepGrid::paint(juce::Graphics& g)
                    key, juce::Justification::centred);
         for (int step = firstVisibleStep; step <= lastVisibleStep; ++step)
         {
-            auto bounds = cell(step, row).reduced(2.0f, 2.0f);
+            const auto bounds = cell(step, row);
             if (!dirty.intersects(bounds)) continue;
             const auto barColour = step / 4 % 2 == 0 ? juce::Colour(0xff303941) : juce::Colour(0xff252d35);
-            g.setColour(inScale ? barColour : juce::Colour(0xff1c2228));
+            g.setColour(barColour);
             g.fillRect(bounds);
+            if (scaleEnabled && inScale)
+            {
+                g.setColour(juce::Colour(0x123b8d9e));
+                g.fillRect(bounds);
+            }
         }
+        g.setColour(juce::Colour(0xff1a2026));
+        g.drawHorizontalLine(juce::roundToInt(cell(0, row).getBottom()), labelWidth, gridRight());
+        if (row == 0)
+            for (int step = firstVisibleStep; step <= lastVisibleStep + 1; ++step)
+            {
+                const auto x = cell(step, row).getX();
+                g.setColour(juce::Colour(step % 4 == 0 ? 0xff151a20 : 0xff222a31));
+                g.drawVerticalLine(juce::roundToInt(x), headerHeight, headerHeight + rowAreaHeight());
+            }
 
         for (int step = 0; step <= lastVisibleStep; ++step)
         {
@@ -162,9 +176,10 @@ void StepGrid::paint(juce::Graphics& g)
                 continue;
 
             const auto length = std::max(0.0625f, noteLengths[static_cast<size_t>(index)]);
-            auto bounds = cell(step, row).reduced(2.0f, 2.0f);
-            bounds.setWidth(std::max(3.0f, cellWidth() * length - 4.0f));
-            bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
+            auto bounds = cell(step, row);
+            bounds.translate(noteStartOffsets[static_cast<size_t>(index)] * cellWidth(), 0.0f);
+            bounds.setWidth(std::max(3.0f, cellWidth() * length));
+            bounds.setRight(std::min(bounds.getRight(), gridRight()));
             if (bounds.getRight() < labelWidth || !dirty.intersects(bounds))
                 continue;
 
@@ -172,9 +187,9 @@ void StepGrid::paint(juce::Graphics& g)
             g.setColour(selected ? juce::Colour(0xffe9a84a) : juce::Colour(0xffc6d58c));
             g.fillRect(bounds);
             g.setColour(selected ? juce::Colour(0x77482d15) : juce::Colour(0x55363f46));
-            g.fillRect(bounds.withWidth(2.0f));
+            g.fillRect(bounds.withWidth(1.0f));
             g.setColour(selected ? juce::Colour(0xffffe3a3) : juce::Colour(0xffe8f2aa));
-            g.fillRect(bounds.withX(bounds.getRight() - 3.0f).withWidth(3.0f));
+            g.fillRect(bounds.withX(bounds.getRight() - 2.0f).withWidth(2.0f));
             if (selected)
             {
                 g.setColour(juce::Colour(0xfffff0c2));
@@ -222,8 +237,9 @@ int StepGrid::hit(juce::Point<float> point) const
     {
         const auto candidateIndex = row * Session::steps + candidate;
         if (!notes.test(static_cast<size_t>(candidateIndex))) continue;
-        auto bounds = cell(candidate, row).reduced(2.0f, 2.0f);
-        bounds.setWidth(std::max(3.0f, cellWidth() * noteLengths[static_cast<size_t>(candidateIndex)] - 4.0f));
+        auto bounds = cell(candidate, row);
+        bounds.translate(noteStartOffsets[static_cast<size_t>(candidateIndex)] * cellWidth(), 0.0f);
+        bounds.setWidth(std::max(3.0f, cellWidth() * noteLengths[static_cast<size_t>(candidateIndex)]));
         if (bounds.contains(point)) return candidateIndex;
     }
     return row * Session::steps + step;
@@ -244,17 +260,37 @@ int StepGrid::resizeHit(juce::Point<float> point) const
         if (!notes.test(static_cast<size_t>(index)))
             continue;
         const auto length = std::max(0.0625f, noteLengths[static_cast<size_t>(index)]);
-        auto bounds = cell(step, row).reduced(2.0f, 2.0f);
-        bounds.setWidth(std::max(3.0f, cellWidth() * length - 4.0f));
-        bounds.setRight(std::min(bounds.getRight(), gridRight() - 2.0f));
+        auto bounds = cell(step, row);
+        bounds.translate(noteStartOffsets[static_cast<size_t>(index)] * cellWidth(), 0.0f);
+        bounds.setWidth(std::max(3.0f, cellWidth() * length));
+        bounds.setRight(std::min(bounds.getRight(), gridRight()));
         if (bounds.getRight() < labelWidth || bounds.getX() > gridRight())
             continue;
         const auto handleWidth = std::min(5.0f, std::max(3.0f, bounds.getWidth() * 0.25f));
-        const auto handle = bounds.withX(bounds.getRight() - handleWidth).withWidth(handleWidth);
-        if (handle.contains(point))
+        const auto rightHandle = bounds.withX(bounds.getRight() - handleWidth).withWidth(handleWidth);
+        const auto leftHandle = bounds.withWidth(handleWidth);
+        if (rightHandle.contains(point) || leftHandle.contains(point))
             return index;
     }
     return -1;
+}
+
+void StepGrid::updatePointer(juce::Point<float> position, const juce::ModifierKeys& modifiers)
+{
+    const auto note = hit(position);
+    if (isShortcutDown(modifiers) && note >= 0 && notes.test(static_cast<size_t>(note)))
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    else if (!modifiers.isRightButtonDown() && resizeHit(position) >= 0)
+        setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+    else if (note >= 0)
+        setMouseCursor(juce::MouseCursor::CrosshairCursor);
+    else
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+}
+
+void StepGrid::mouseMove(const juce::MouseEvent& event)
+{
+    updatePointer(event.position, event.mods);
 }
 
 void StepGrid::mouseDown(const juce::MouseEvent& event)
@@ -267,6 +303,14 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
             grabKeyboardFocus();
             gesture = Gesture::resize;
             resizingNoteIndex = resizeIndex;
+            const auto row = resizeIndex / Session::steps;
+            const auto step = resizeIndex % Session::steps;
+            const auto offset = noteStartOffsets[static_cast<size_t>(resizeIndex)];
+            const auto length = noteLengths[static_cast<size_t>(resizeIndex)];
+            const auto left = cell(step, row).getX() + offset * cellWidth();
+            resizingFromLeft = event.position.x < left + cellWidth() * length * 0.5f;
+            resizingStartStep = step + offset;
+            resizingEndStep = resizingStartStep + length;
             noteMoved = false;
             session.beginNoteGesture("Resize note");
             return;
@@ -612,7 +656,22 @@ juce::Result StepGrid::resizeCurrentNoteTo(juce::Point<float> position, bool fre
     if (resizingNoteIndex < 0)
         return juce::Result::ok();
     const auto sourceStep = resizingNoteIndex % Session::steps;
-    auto length = static_cast<double>((position.x - cell(sourceStep, 0).getX()) / cellWidth());
+    if (resizingFromLeft)
+    {
+        auto newStart = static_cast<double>(stepScroll + (position.x - labelWidth) / cellWidth());
+        if (!freeLength && newStart < std::floor(resizingStartStep))
+            newStart = std::round(newStart);
+        else
+            newStart = std::round(newStart * 16.0) / 16.0;
+        const auto result = session.resizeNoteFromLeft(resizingStartStep, pitchForIndex(resizingNoteIndex), newStart);
+        if (result.wasOk())
+        {
+            resizingStartStep = newStart;
+            noteMoved = true;
+        }
+        return result;
+    }
+    auto length = static_cast<double>((position.x - cell(sourceStep, 0).getX()) / cellWidth()) - resizingStartStep + sourceStep;
     length = std::max(0.0625, length);
     // The first grid space may be freely adjusted. Once past it, resize snaps
     // to grid boundaries unless Alt/Option is held.
@@ -665,6 +724,7 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
     dragPosition = {-1.0f, -1.0f};
     stopTimer();
     resizingNoteIndex = -1;
+    resizingFromLeft = false;
     noteMoved = false;
 }
 
@@ -785,30 +845,35 @@ void StepGrid::changeListenerCallback(juce::ChangeBroadcaster*)
 void StepGrid::rebuildVisibleNotes()
 {
     std::bitset<Session::steps * Session::pitches> next;
-    std::array<float, Session::steps * Session::pitches> nextLengths {};
+    std::array<float, Session::steps * Session::pitches> nextLengths {}, nextStartOffsets {};
     const auto nextDrumLabels = session.isPatternDrums();
     const auto steps = session.editorStepCount();
     const auto beatsPerStep = 4.0 / static_cast<double>(session.editorStepResolution());
     for (auto* note : session.pattern().getSequence().getNotes())
     {
         const auto row = lowestVisiblePitch + Session::pitches - 1 - note->getNoteNumber();
-        const auto step = juce::roundToInt(note->getStartBeat().inBeats() / beatsPerStep);
+        const auto startInSteps = note->getStartBeat().inBeats() / beatsPerStep;
+        const auto step = static_cast<int>(std::floor(startInSteps));
         if (row >= 0 && row < Session::pitches && step >= 0 && step < steps)
         {
             next.set(static_cast<size_t>(row * Session::steps + step));
             nextLengths[static_cast<size_t>(row * Session::steps + step)] =
                 static_cast<float>(std::max(0.0625, note->getLengthBeats().inBeats() / beatsPerStep));
+            nextStartOffsets[static_cast<size_t>(row * Session::steps + step)] =
+                static_cast<float>(startInSteps - step);
         }
     }
     const auto changed = next ^ notes;
     const auto lengthsChanged = nextLengths != noteLengths;
+    const auto offsetsChanged = nextStartOffsets != noteStartOffsets;
     const auto stepCountChanged = steps != visibleStepCount;
     visibleStepCount = steps;
     syncHorizontalScroll();
     notes = next;
     noteLengths = nextLengths;
+    noteStartOffsets = nextStartOffsets;
     selectedNotes &= notes;
-    if (stepCountChanged || lengthsChanged || showingDrumLabels != nextDrumLabels)
+    if (stepCountChanged || lengthsChanged || offsetsChanged || showingDrumLabels != nextDrumLabels)
     {
         showingDrumLabels = nextDrumLabels;
         repaint();

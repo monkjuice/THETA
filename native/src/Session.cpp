@@ -869,7 +869,7 @@ void Session::setNote(int step, int pitch, bool enabled)
         }
 
         pattern().state.removeProperty(starterPlaceholderID, undoManager);
-        const auto duration = std::max(0.02, stepBeats * 0.9);
+        const auto duration = std::max(0.02, stepBeats);
         sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(beat),
                          tracktion::core::BeatDuration::fromBeats(duration), 100, 0, undoManager);
         markModified();
@@ -920,6 +920,31 @@ juce::Result Session::resizeNote(int step, int pitch, double lengthSteps)
             const auto start = tracktion::core::BeatPosition::fromBeats(beat);
             const auto length = tracktion::core::BeatDuration::fromBeats(lengthSteps * stepBeats);
             note->setStartAndLength(start, length, undoManager);
+            markModified();
+            sendSynchronousChangeMessage();
+            return juce::Result::ok();
+        }
+    return juce::Result::fail("Select a note to resize.");
+}
+
+juce::Result Session::resizeNoteFromLeft(double startStep, int pitch, double newStartStep)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    const auto startBeat = startStep * stepBeats;
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    for (auto* note : sequence.getNotes())
+        if (note->getNoteNumber() == pitch && std::abs(note->getStartBeat().inBeats() - startBeat) < 0.0001)
+        {
+            const auto endStep = startStep + note->getLengthBeats().inBeats() / stepBeats;
+            auto previousEnd = 0.0;
+            for (auto* other : sequence.getNotes())
+                if (other->getNoteNumber() == pitch && other != note && other->getStartBeat().inBeats() < startBeat)
+                    previousEnd = std::max(previousEnd, (other->getStartBeat().inBeats() + other->getLengthBeats().inBeats()) / stepBeats);
+            newStartStep = std::clamp(newStartStep, previousEnd, endStep - 0.0625);
+            note->setStartAndLength(tracktion::core::BeatPosition::fromBeats(newStartStep * stepBeats),
+                                    tracktion::core::BeatDuration::fromBeats((endStep - newStartStep) * stepBeats), undoManager);
             markModified();
             sendSynchronousChangeMessage();
             return juce::Result::ok();
