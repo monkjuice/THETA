@@ -846,6 +846,13 @@ void Session::setNote(int step, int pitch, bool enabled)
     const auto beat = step * stepBeats;
     auto& sequence = pattern().getSequence();
     auto* undoManager = &edit->getUndoManager();
+    const auto restartLivePlayback = [this]
+    {
+        if (!edit->getTransport().isPlaying())
+            return;
+        panicMidiOnTrack(pattern().getClipTrack());
+        edit->restartPlayback();
+    };
     for (auto* note : sequence.getNotes())
         if (note->getNoteNumber() == pitch
             && std::abs(note->getStartBeat().inBeats() - beat) < 0.0001)
@@ -854,6 +861,7 @@ void Session::setNote(int step, int pitch, bool enabled)
             {
                 sequence.removeNote(*note, undoManager);
                 markModified();
+                restartLivePlayback();
             }
             sendSynchronousChangeMessage();
             return;
@@ -883,6 +891,7 @@ void Session::setNote(int step, int pitch, bool enabled)
         sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(beat),
                          tracktion::core::BeatDuration::fromBeats(duration), 100, 0, undoManager);
         markModified();
+        restartLivePlayback();
     }
     sendSynchronousChangeMessage();
 }
