@@ -1122,6 +1122,72 @@ juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources,
     return juce::Result::ok();
 }
 
+bool Session::splitNotesAtGrid(const std::vector<std::pair<int, int>>& sources)
+{
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    bool changed = false;
+    for (const auto& [step, pitch] : sources)
+        for (auto* note : sequence.getNotes())
+            if (note->getNoteNumber() == pitch && std::abs(note->getStartBeat().inBeats() - step * stepBeats) < 0.0001)
+            {
+                const auto start = note->getStartBeat().inBeats();
+                const auto end = note->getEndBeat().inBeats();
+                std::vector<std::pair<double, double>> parts;
+                for (auto partStart = start; partStart < end - 0.0001;)
+                {
+                    const auto partEnd = std::min(end, (std::floor(partStart / stepBeats + 0.0001) + 1.0) * stepBeats);
+                    parts.emplace_back(partStart, partEnd);
+                    partStart = partEnd;
+                }
+                if (parts.size() < 2) break;
+                for (const auto& [partStart, partEnd] : parts)
+                    sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(partStart),
+                                     tracktion::core::BeatDuration::fromBeats(partEnd - partStart), note->getVelocity(), note->getColour(), undoManager);
+                sequence.removeNote(*note, undoManager);
+                changed = true;
+                break;
+            }
+    if (changed)
+    {
+        markModified();
+        if (edit->getTransport().isPlaying()) { panicMidiOnTrack(pattern().getClipTrack()); edit->restartPlayback(); }
+        sendSynchronousChangeMessage();
+    }
+    return changed;
+}
+
+bool Session::subdivideNotes(const std::vector<std::pair<int, int>>& sources, int divisions)
+{
+    if (divisions < 2) return false;
+    const auto stepBeats = stepDurationBeats(editorStepResolution());
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    bool changed = false;
+    for (const auto& [step, pitch] : sources)
+        for (auto* note : sequence.getNotes())
+            if (note->getNoteNumber() == pitch && std::abs(note->getStartBeat().inBeats() - step * stepBeats) < 0.0001)
+            {
+                const auto start = note->getStartBeat().inBeats();
+                const auto length = note->getLengthBeats().inBeats() / divisions;
+                if (length < 0.0001) break;
+                for (int part = 0; part < divisions; ++part)
+                    sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(start + part * length),
+                                     tracktion::core::BeatDuration::fromBeats(length), note->getVelocity(), note->getColour(), undoManager);
+                sequence.removeNote(*note, undoManager);
+                changed = true;
+                break;
+            }
+    if (changed)
+    {
+        markModified();
+        if (edit->getTransport().isPlaying()) { panicMidiOnTrack(pattern().getClipTrack()); edit->restartPlayback(); }
+        sendSynchronousChangeMessage();
+    }
+    return changed;
+}
+
 void Session::clearPattern()
 {
     if (pattern().getSequence().getNumNotes() == 0) return;

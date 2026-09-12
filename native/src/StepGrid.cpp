@@ -2,6 +2,7 @@
 #include "Playhead.h"
 #include <algorithm>
 #include <cmath>
+#include <tuple>
 
 namespace theta
 {
@@ -598,6 +599,71 @@ bool StepGrid::deleteSelection()
     return true;
 }
 
+bool StepGrid::splitSelectionAtGrid()
+{
+    if (selectedNotes.none()) return false;
+    const auto stepBeats = 4.0 / static_cast<double>(session.editorStepResolution());
+    std::vector<std::pair<int, int>> sources;
+    std::vector<std::tuple<double, double, int>> ranges;
+    for (int row = 0; row < Session::pitches; ++row)
+        for (int step = 0; step < session.editorStepCount(); ++step)
+        {
+            const auto index = row * Session::steps + step;
+            if (!selectedNotes.test(static_cast<size_t>(index)) || !notes.test(static_cast<size_t>(index))) continue;
+            sources.emplace_back(step, pitchForIndex(index));
+            const auto start = (step + noteStartOffsets[static_cast<size_t>(index)]) * stepBeats;
+            ranges.emplace_back(start, start + noteLengths[static_cast<size_t>(index)] * stepBeats, pitchForIndex(index));
+        }
+    session.beginNoteGesture("Split notes");
+    const auto changed = session.splitNotesAtGrid(sources);
+    session.endNoteGesture();
+    if (!changed) return false;
+    rebuildVisibleNotes();
+    selectedNotes.reset();
+    for (auto* note : session.pattern().getSequence().getNotes())
+        for (const auto& [start, end, pitch] : ranges)
+            if (note->getNoteNumber() == pitch && note->getStartBeat().inBeats() >= start - 0.0001
+                && note->getEndBeat().inBeats() <= end + 0.0001)
+                if (const auto index = indexForCell(static_cast<int>(std::floor(note->getStartBeat().inBeats() / stepBeats + 0.0001)), pitch); index >= 0)
+                    selectedNotes.set(static_cast<size_t>(index));
+    repaint();
+    return true;
+}
+
+bool StepGrid::subdivideSelection()
+{
+    const auto oldResolution = session.editorStepResolution();
+    if (selectedNotes.none() || oldResolution >= 64) return false;
+    const auto stepBeats = 4.0 / static_cast<double>(oldResolution);
+    std::vector<std::pair<int, int>> sources;
+    std::vector<std::tuple<double, double, int>> ranges;
+    for (int row = 0; row < Session::pitches; ++row)
+        for (int step = 0; step < session.editorStepCount(); ++step)
+        {
+            const auto index = row * Session::steps + step;
+            if (!selectedNotes.test(static_cast<size_t>(index)) || !notes.test(static_cast<size_t>(index))) continue;
+            sources.emplace_back(step, pitchForIndex(index));
+            const auto start = (step + noteStartOffsets[static_cast<size_t>(index)]) * stepBeats;
+            ranges.emplace_back(start, start + noteLengths[static_cast<size_t>(index)] * stepBeats, pitchForIndex(index));
+        }
+    session.beginNoteGesture("Subdivide notes");
+    const auto changed = session.subdivideNotes(sources, 2);
+    if (changed) session.setEditorStepCount(oldResolution * 2);
+    session.endNoteGesture();
+    if (!changed) return false;
+    rebuildVisibleNotes();
+    selectedNotes.reset();
+    const auto newStepBeats = 4.0 / static_cast<double>(session.editorStepResolution());
+    for (auto* note : session.pattern().getSequence().getNotes())
+        for (const auto& [start, end, pitch] : ranges)
+            if (note->getNoteNumber() == pitch && note->getStartBeat().inBeats() >= start - 0.0001
+                && note->getEndBeat().inBeats() <= end + 0.0001)
+                if (const auto index = indexForCell(static_cast<int>(std::floor(note->getStartBeat().inBeats() / newStepBeats + 0.0001)), pitch); index >= 0)
+                    selectedNotes.set(static_cast<size_t>(index));
+    repaint();
+    return true;
+}
+
 bool StepGrid::fillSelectionToClipEnd()
 {
     if (selectedNotes.none())
@@ -824,6 +890,8 @@ bool StepGrid::keyPressed(const juce::KeyPress& key)
         return selectAllNotes();
     if (command && key.getKeyCode() == 'C')
         return copySelection();
+    if (command && key.getKeyCode() == 'E')
+        return splitSelectionAtGrid();
     if (command && key.getKeyCode() == 'V')
         return pasteSelection();
     if (key.getModifiers().isShiftDown()
@@ -877,6 +945,11 @@ void StepGrid::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWh
     {
         // Keep the step below the pointer stable while the visible range changes.
         zoomAt(std::exp(wheelDelta * 2.0f), event.position.x);
+        return;
+    }
+    if (isShortcutDown(event.mods) && wheelDelta > 0.0f)
+    {
+        subdivideSelection();
         return;
     }
     if (session.isPatternDrums())

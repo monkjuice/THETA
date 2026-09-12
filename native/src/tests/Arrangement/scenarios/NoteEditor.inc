@@ -65,6 +65,12 @@
         selectionGrid.changeListenerCallback(nullptr);
         require(!session.hasNote(1, 49) && session.hasNote(2, 49) && session.noteLengthSteps(2, 49) == 4,
                 "Dragging from the body of a sustained note follows the pointer and preserves its length");
+        selectionGrid.selectedNotes.reset();
+        selectionGrid.selectedNotes.set(static_cast<size_t>(selectionGrid.indexForCell(2, 49)));
+        require(selectionGrid.keyPressed(juce::KeyPress('E', juce::ModifierKeys::ctrlModifier, 'e')),
+                "Ctrl-E splits selected sustained notes");
+        require(session.hasNote(2, 49) && session.hasNote(3, 49) && session.hasNote(4, 49) && session.hasNote(5, 49),
+                "Split notes occupy their original grid cells");
         const auto splitPoint = selectionGrid.cell(3, rowForPitch(48)).getCentre();
         selectionGrid.mouseDown(gridEvent(splitPoint, splitPoint, false));
         selectionGrid.mouseUp(gridEvent(splitPoint, splitPoint, false));

@@ -50,6 +50,8 @@ private:
     bool copySelection();
     bool pasteSelection();
     bool deleteSelection();
+    bool splitSelectionAtGrid();
+    bool subdivideSelection();
     bool fillSelectionToClipEnd();
     juce::Result moveCurrentNotesBy(int stepDelta, int pitchDelta);
     juce::Result resizeCurrentNoteTo(int index);

@@ -169,6 +169,8 @@ public:
     void applyClipAutomationAt(double timelineSeconds);
     juce::Result moveNote(int sourceStep, int sourcePitch, int targetStep, int targetPitch);
     juce::Result moveNotes(const std::vector<std::pair<int, int>>&, int stepDelta, int pitchDelta);
+    bool splitNotesAtGrid(const std::vector<std::pair<int, int>>&);
+    bool subdivideNotes(const std::vector<std::pair<int, int>>&, int divisions);
     juce::Result editClip(te::EditItemID, ClipGeometry, ClipGesture, int targetTrack = -1);
     juce::Result splitClip(te::EditItemID, double splitTimeSeconds);
     juce::Result duplicateClip(te::EditItemID);
