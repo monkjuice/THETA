@@ -35,6 +35,11 @@
                 mods, 1.0f, 0, 0, 0, 0,
                 &selectionGrid, &selectionGrid, juce::Time::getCurrentTime(), down, juce::Time::getCurrentTime(), 1, dragged);
         };
+        const auto rulerPoint = juce::Point<float>(selectionGrid.cell(8, 0).getCentreX(), 13.0f);
+        selectionGrid.mouseDown(gridEvent(rulerPoint, rulerPoint, false));
+        require(close(selectionGrid.playheadXForTime(session.edit->getTransport().getPosition().inSeconds()), rulerPoint.x)
+                    && close(selectionGrid.playhead, rulerPoint.x),
+                "Clicking the note-editor ruler seeks within the selected clip");
         const auto rowForPitch = [&selectionGrid](int pitch)
         {
             return selectionGrid.lowestVisiblePitch + Session::pitches - 1 - pitch;

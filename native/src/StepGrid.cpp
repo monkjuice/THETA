@@ -335,6 +335,23 @@ void StepGrid::mouseMove(const juce::MouseEvent& event)
 
 void StepGrid::mouseDown(const juce::MouseEvent& event)
 {
+    if (!event.mods.isRightButtonDown()
+        && event.position.y >= 0.0f && event.position.y < headerHeight
+        && event.position.x >= labelWidth && event.position.x < gridRight())
+    {
+        const auto localStep = std::clamp(stepScroll + (event.position.x - labelWidth) / cellWidth(),
+                                          0.0, static_cast<double>(session.editorStepCount()));
+        const auto localBeat = localStep * 4.0 / static_cast<double>(session.editorStepResolution());
+        const auto& position = session.pattern().getPosition();
+        const auto clipStartBeat = session.edit->tempoSequence.toBeats(position.time.getStart()).inBeats();
+        const auto offsetBeat = position.offset.inSeconds() * session.tempo() / 60.0;
+        const auto requestedTime = session.edit->tempoSequence.toTime(
+            tracktion::core::BeatPosition::fromBeats(clipStartBeat - offsetBeat + localBeat)).inSeconds();
+        const auto clippedTime = std::clamp(requestedTime, position.time.getStart().inSeconds(), position.time.getEnd().inSeconds());
+        session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(clippedTime));
+        updatePlayhead();
+        return;
+    }
     if (!event.mods.isRightButtonDown() && !isShortcutDown(event.mods))
     {
         const auto resizeIndex = resizeHit(event.position);
@@ -946,8 +963,7 @@ void StepGrid::updatePlayhead()
 {
     float next = -1.0f;
     auto& transport = session.edit->getTransport();
-    if (isShowing() && transport.isPlaying())
-        next = playheadXForTime(playheadTime(transport));
+    next = playheadXForTime(playheadTime(transport));
     movePlayhead(*this, playhead, next,
                  getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight))
                                  .withTrimmedBottom(horizontalScroll.isVisible() ? static_cast<int>(scrollHeight) : 0));
