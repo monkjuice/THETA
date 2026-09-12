@@ -130,6 +130,7 @@ public:
     std::vector<EditorNote> editorNotes() const;
     juce::Result addNote(double startSteps, int pitch, double lengthSteps, juce::ValueTree* addedState = nullptr);
     bool removeNotes(const std::vector<juce::ValueTree>&);
+    bool adjustNoteVelocities(const std::vector<juce::ValueTree>&, int percentageDelta);
     void setNote(int step, int pitch, bool enabled);
     int noteLengthSteps(int step, int pitch) const;
     juce::Result resizeNote(int step, int pitch, int lengthSteps);

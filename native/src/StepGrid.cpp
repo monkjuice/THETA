@@ -42,6 +42,7 @@ StepGrid::StepGrid(Session& s) : session(s), vblank(this, [this] { updatePlayhea
 StepGrid::~StepGrid()
 {
     finishSubdivision();
+    finishVelocityAdjustment();
     if (gesture != Gesture::none) session.endNoteGesture();
     horizontalScroll.removeListener(this);
     session.removeChangeListener(this);
@@ -115,6 +116,8 @@ void StepGrid::setSelectedStates(std::vector<juce::ValueTree> states)
             const auto index = note->row * Session::steps + static_cast<int>(std::floor(note->start));
             if (index >= 0) selectedNotes.set(static_cast<size_t>(index));
         }
+    if (getHeight() > 0)
+        repaint(footerBounds().getSmallestIntegerContainer());
 }
 
 void StepGrid::zoomIn()
@@ -149,7 +152,14 @@ void StepGrid::setScaleHighlight(int selection)
 
 float StepGrid::rowAreaHeight() const
 {
-    return std::max(1.0f, getHeight() - headerHeight - (horizontalScroll.isVisible() ? scrollHeight : 0.0f));
+    return std::max(1.0f, getHeight() - headerHeight - footerHeight
+                              - (horizontalScroll.isVisible() ? scrollHeight : 0.0f));
+}
+
+juce::Rectangle<float> StepGrid::footerBounds() const
+{
+    return {0.0f, static_cast<float>(getHeight()) - footerHeight,
+            static_cast<float>(getWidth()), footerHeight};
 }
 
 float StepGrid::cellWidth() const
@@ -339,6 +349,26 @@ void StepGrid::paint(juce::Graphics& g)
         g.setFont(juce::FontOptions(13.0f).withStyle("Bold"));
         g.drawText(juce::String(subdivisionCount), badge, juce::Justification::centred);
     }
+    const auto footer = footerBounds();
+    if (dirty.intersects(footer))
+    {
+        g.setColour(juce::Colour(velocityAdjustActive ? 0xff29343b : 0xff171c21));
+        g.fillRect(footer);
+        g.setColour(juce::Colour(0xff3b4650));
+        g.fillRect(footer.withHeight(1.0f));
+        const auto velocity = selectedVelocityPercent();
+        const auto value = velocity >= 0 ? juce::String(velocity) + "%"
+                                         : velocity == -1 ? juce::String("MIXED") : juce::String("-");
+        g.setFont(juce::FontOptions(11.5f).withStyle("Bold"));
+        g.setColour(velocityAdjustActive ? juce::Colour(0xffe9a84a) : juce::Colour(0xffb8c4aa));
+        g.drawText("VELOCITY  " + value, footer.reduced(9.0f, 2.0f), juce::Justification::centredRight);
+        if (velocity >= -1)
+        {
+            g.setFont(juce::FontOptions(10.5f));
+            g.setColour(juce::Colour(0xff78818a));
+            g.drawText("Hold V + Up/Down or wheel", footer.reduced(9.0f, 2.0f), juce::Justification::centredLeft);
+        }
+    }
 }
 
 int StepGrid::cellHit(juce::Point<float> point) const
@@ -410,6 +440,7 @@ void StepGrid::mouseMove(const juce::MouseEvent& event)
 void StepGrid::mouseDown(const juce::MouseEvent& event)
 {
     finishSubdivision();
+    finishVelocityAdjustment();
     if (!event.mods.isRightButtonDown() && juce::KeyPress::isKeyCurrentlyDown('S')
         && event.position.x >= labelWidth && event.position.y >= headerHeight)
     {
@@ -705,8 +736,52 @@ void StepGrid::finishSubdivision()
     if (!subdivisionActive) return;
     subdivisionActive = false;
     session.endNoteGesture();
-    if (gesture != Gesture::move) stopTimer();
+    if (gesture != Gesture::move && !velocityAdjustActive) stopTimer();
     repaint();
+}
+
+int StepGrid::selectedVelocityPercent() const
+{
+    const auto states = selectedStates();
+    if (states.empty()) return -2;
+    auto midiVelocity = -1;
+    for (const auto& state : states)
+        if (const auto* note = noteForState(state))
+        {
+            if (midiVelocity < 0) midiVelocity = note->velocity;
+            else if (midiVelocity != note->velocity) return -1;
+        }
+    return midiVelocity < 0 ? -2 : juce::roundToInt(midiVelocity * 100.0 / 127.0);
+}
+
+bool StepGrid::beginVelocityAdjustment()
+{
+    if (selectedStates().empty()) return false;
+    if (!velocityAdjustActive)
+    {
+        session.beginNoteGesture("Adjust note velocity");
+        velocityAdjustActive = true;
+        startTimerHz(30);
+        repaint(footerBounds().getSmallestIntegerContainer());
+    }
+    return true;
+}
+
+bool StepGrid::adjustVelocity(int delta)
+{
+    if (delta == 0 || (!velocityAdjustActive && !beginVelocityAdjustment())) return false;
+    const auto changed = session.adjustNoteVelocities(selectedStates(), delta);
+    repaint(footerBounds().getSmallestIntegerContainer());
+    return changed || velocityAdjustActive;
+}
+
+void StepGrid::finishVelocityAdjustment()
+{
+    if (!velocityAdjustActive) return;
+    velocityAdjustActive = false;
+    session.endNoteGesture();
+    if (gesture != Gesture::move && !subdivisionActive) stopTimer();
+    repaint(footerBounds().getSmallestIntegerContainer());
 }
 
 bool StepGrid::fillSelectionToClipEnd()
@@ -931,6 +1006,8 @@ void StepGrid::updateMarqueeSelection()
 
 void StepGrid::timerCallback()
 {
+    if (velocityAdjustActive && !juce::KeyPress::isKeyCurrentlyDown('V'))
+        finishVelocityAdjustment();
     if (subdivisionActive)
     {
         if (!isShortcutDown(juce::ModifierKeys::getCurrentModifiersRealtime())) finishSubdivision();
@@ -943,6 +1020,13 @@ void StepGrid::timerCallback()
 bool StepGrid::keyPressed(const juce::KeyPress& key)
 {
     const auto command = isShortcutDown(key.getModifiers());
+    if (velocityAdjustActive
+        && (key.getKeyCode() == juce::KeyPress::upKey || key.getKeyCode() == juce::KeyPress::downKey))
+        return adjustVelocity(key.getKeyCode() == juce::KeyPress::upKey ? 1 : -1);
+    if (!command && (key.getKeyCode() == 'V' || key.getTextCharacter() == 'v' || key.getTextCharacter() == 'V'))
+        return beginVelocityAdjustment();
+    if (velocityAdjustActive)
+        finishVelocityAdjustment();
     if (subdivisionActive && command
         && (key.getKeyCode() == juce::KeyPress::upKey || key.getKeyCode() == juce::KeyPress::rightKey
             || key.getKeyCode() == juce::KeyPress::downKey || key.getKeyCode() == juce::KeyPress::leftKey))
@@ -1003,6 +1087,7 @@ void StepGrid::focusGained(juce::Component::FocusChangeType)
 void StepGrid::focusLost(juce::Component::FocusChangeType)
 {
     finishSubdivision();
+    finishVelocityAdjustment();
     repaint();
 }
 
@@ -1013,6 +1098,12 @@ void StepGrid::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWh
     const auto wheelDelta = std::abs(wheel.deltaY) >= std::abs(wheel.deltaX) ? wheel.deltaY : -wheel.deltaX;
     if (std::abs(wheelDelta) < 0.0001f)
         return;
+    if (velocityAdjustActive || juce::KeyPress::isKeyCurrentlyDown('V'))
+    {
+        if (!velocityAdjustActive && !beginVelocityAdjustment()) return;
+        adjustVelocity(wheelDelta > 0.0f ? 1 : -1);
+        return;
+    }
     if (isShortcutDown(event.mods))
     {
         if (!subdivisionActive)
@@ -1086,7 +1177,7 @@ void StepGrid::rebuildVisibleNotes()
         const auto step = static_cast<int>(std::floor(note.startSteps));
         if (row >= 0 && row < Session::pitches && step >= 0 && step < steps)
         {
-            nextVisible.push_back({note.state, note.startSteps, note.lengthSteps, note.pitch, row});
+            nextVisible.push_back({note.state, note.startSteps, note.lengthSteps, note.pitch, row, note.velocity});
             next.set(static_cast<size_t>(row * Session::steps + step));
             nextLengths[static_cast<size_t>(row * Session::steps + step)] =
                 static_cast<float>(std::max(0.0625, note.lengthSteps));
@@ -1134,7 +1225,8 @@ void StepGrid::updatePlayhead()
     next = playheadXForTime(playheadTime(transport));
     movePlayhead(*this, playhead, next,
                  getLocalBounds().withTrimmedTop(static_cast<int>(headerHeight))
-                                 .withTrimmedBottom(horizontalScroll.isVisible() ? static_cast<int>(scrollHeight) : 0));
+                                 .withTrimmedBottom(static_cast<int>(footerHeight)
+                                     + (horizontalScroll.isVisible() ? static_cast<int>(scrollHeight) : 0)));
 }
 
 float StepGrid::playheadXForTime(double seconds) const
@@ -1181,7 +1273,8 @@ void StepGrid::scrollBarMoved(juce::ScrollBar* bar, double start)
 void StepGrid::resized()
 {
     syncHorizontalScroll();
-    horizontalScroll.setBounds(static_cast<int>(labelWidth), getHeight() - static_cast<int>(scrollHeight),
+    horizontalScroll.setBounds(static_cast<int>(labelWidth),
+                               getHeight() - static_cast<int>(footerHeight + scrollHeight),
                                std::max(1, static_cast<int>(gridRight() - labelWidth)), static_cast<int>(scrollHeight));
     updatePlayhead();
     repaint();

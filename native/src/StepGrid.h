@@ -33,10 +33,11 @@ private:
     {
         juce::ValueTree state;
         double start = 0.0, length = 1.0;
-        int pitch = 0, row = 0;
+        int pitch = 0, row = 0, velocity = 100;
     };
     juce::Rectangle<float> cell(int step, int row) const;
     float rowAreaHeight() const;
+    juce::Rectangle<float> footerBounds() const;
     float cellWidth() const;
     float gridRight() const;
     float gridWidth() const;
@@ -56,6 +57,10 @@ private:
     void finishSubdivision();
     bool beginSubdivision();
     bool adjustSubdivision(int delta);
+    bool beginVelocityAdjustment();
+    bool adjustVelocity(int delta);
+    void finishVelocityAdjustment();
+    int selectedVelocityPercent() const;
     void apply(int index);
     void toggleSelection(int index);
     bool selectAllNotes();
@@ -98,6 +103,7 @@ private:
     bool subdivisionActive = false;
     int subdivisionCount = 0;
     juce::Rectangle<float> subdivisionSourceBounds;
+    bool velocityAdjustActive = false;
     int scaleHighlight = 1;
     float verticalAutoScroll = 0.0f;
     juce::Point<float> dragPosition {-1.0f, -1.0f};
@@ -106,6 +112,6 @@ private:
     float playhead = -1.0f;
     juce::ScrollBar horizontalScroll {false};
     juce::VBlankAttachment vblank;
-    static constexpr float labelWidth = 54.0f, headerHeight = 26.0f, scrollHeight = 14.0f;
+    static constexpr float labelWidth = 54.0f, headerHeight = 26.0f, scrollHeight = 14.0f, footerHeight = 24.0f;
 };
 }

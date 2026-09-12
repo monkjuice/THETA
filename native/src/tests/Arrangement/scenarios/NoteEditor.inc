@@ -111,6 +111,36 @@
         selectionGrid.mouseDown(gridEvent(selectionGrid.cell(8, rowForPitch(60)).getCentre(),
                                           selectionGrid.cell(8, rowForPitch(60)).getCentre(), false, commandLeft));
         require(selectionGrid.selectedNotes.count() == 2, "Command-click selects multiple note cells");
+        require(selectionGrid.selectedVelocityPercent() == 79,
+                "The velocity footer reports a shared selected-note percentage");
+        require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys(), 'v')),
+                "V starts selected-note velocity adjustment");
+        juce::MouseWheelDetails velocityWheel;
+        velocityWheel.deltaY = 1.0f;
+        selectionGrid.mouseWheelMove(gridEvent(selectionGrid.cell(4, rowForPitch(55)).getCentre(),
+                                               selectionGrid.cell(4, rowForPitch(55)).getCentre(), false),
+                                     velocityWheel);
+        require(selectionGrid.selectedVelocityPercent() == 80,
+                "The wheel adjusts every selected note while V is held");
+        require(selectionGrid.keyPressed(juce::KeyPress(juce::KeyPress::upKey)),
+                "Up adjusts every selected note while V is held");
+        require(selectionGrid.selectedVelocityPercent() == 81,
+                "A selected group retains a visible shared velocity after adjustment");
+        selectionGrid.finishVelocityAdjustment();
+        session.undo();
+        selectionGrid.changeListenerCallback(nullptr);
+        require(selectionGrid.selectedVelocityPercent() == 79,
+                "One undo restores the complete velocity gesture");
+        const auto velocityStates = selectionGrid.selectedStates();
+        session.beginNoteGesture("Test mixed velocities");
+        require(session.adjustNoteVelocities({velocityStates.front()}, -1),
+                "A note in the selected group can receive a distinct velocity");
+        session.endNoteGesture();
+        selectionGrid.changeListenerCallback(nullptr);
+        require(selectionGrid.selectedVelocityPercent() == -1,
+                "The velocity footer reports a mixed selection");
+        session.undo();
+        selectionGrid.changeListenerCallback(nullptr);
         const auto groupFrom = selectionGrid.cell(4, rowForPitch(55)).getCentre();
         const auto groupTo = selectionGrid.cell(6, rowForPitch(55)).getCentre();
         selectionGrid.mouseDown(gridEvent(groupFrom, groupFrom, false));

@@ -864,6 +864,34 @@ bool Session::removeNotes(const std::vector<juce::ValueTree>& states)
     return changed;
 }
 
+bool Session::adjustNoteVelocities(const std::vector<juce::ValueTree>& states, int percentageDelta)
+{
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    if (states.empty() || percentageDelta == 0)
+        return false;
+    auto& sequence = pattern().getSequence();
+    auto* undoManager = &edit->getUndoManager();
+    auto changed = false;
+    for (const auto& state : states)
+        if (auto* note = sequence.getNoteFor(state))
+        {
+            const auto oldPercent = juce::roundToInt(note->getVelocity() * 100.0 / 127.0);
+            const auto newPercent = juce::jlimit(1, 100, oldPercent + percentageDelta);
+            const auto newVelocity = juce::jlimit(1, 127, juce::roundToInt(newPercent * 127.0 / 100.0));
+            if (newVelocity != note->getVelocity())
+            {
+                note->setVelocity(newVelocity, undoManager);
+                changed = true;
+            }
+        }
+    if (changed)
+    {
+        markModified();
+        sendSynchronousChangeMessage();
+    }
+    return changed;
+}
+
 void Session::beginNoteGesture(juce::String actionName) { edit->getUndoManager().beginNewTransaction(actionName); }
 void Session::endNoteGesture() { edit->getUndoManager().beginNewTransaction(); }
 
