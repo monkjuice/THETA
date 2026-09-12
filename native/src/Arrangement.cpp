@@ -1182,10 +1182,14 @@ void Arrangement::editDidChange() { sync(); fit(); }
 void Arrangement::updatePlayhead()
 {
     float next = -1.0f;
-    if (isShowing())
+    // Keep the logical position current even while the component is not yet
+    // attached to a peer.  Zoom and fit can be invoked before the next vblank.
+    const auto x = xFor(playheadTime(session.edit->getTransport()));
+    if (x >= headerWidth && x < getWidth()) next = x;
+    if (!isShowing())
     {
-        const auto x = xFor(playheadTime(session.edit->getTransport()));
-        if (x >= headerWidth && x < getWidth()) next = x;
+        playhead = next;
+        return;
     }
     movePlayhead(*this, playhead, next,
                  getLocalBounds().withTrimmedTop(static_cast<int>(rulerTop)).withTrimmedBottom(18));
