@@ -80,6 +80,7 @@ private:
     double stepScroll = 0.0, stepZoom = 1.0;
     double resizingStartStep = 0.0, resizingEndStep = 0.0;
     int scaleHighlight = 1;
+    int visualSubdivisions = 1;
     float verticalAutoScroll = 0.0f;
     juce::Point<float> dragPosition {-1.0f, -1.0f};
     float playhead = -1.0f;

@@ -120,15 +120,18 @@ void StepGrid::paint(juce::Graphics& g)
     g.setFont(juce::FontOptions(12.0f));
     const auto dirty = g.getClipBounds().toFloat();
     const auto steps = session.editorStepCount();
+    const auto visualSubdivision = visualSubdivisions;
     const auto firstVisibleStep = std::max(0, static_cast<int>(std::floor(stepScroll)));
     const auto lastVisibleStep = std::min(steps - 1, static_cast<int>(std::ceil(stepScroll + visibleStepSpan())));
     for (int step = 0; step < steps; ++step)
     {
+        if (step % visualSubdivision != 0)
+            continue;
         const auto headerCell = cell(step, 0).withY(0).withHeight(headerHeight);
         if (headerCell.getRight() < labelWidth || headerCell.getX() > gridRight())
             continue;
         g.setColour(juce::Colour(step % 4 == 0 ? 0xffd4dacd : 0xff78818a));
-        g.drawText(juce::String(step + 1), headerCell, juce::Justification::centred);
+        g.drawText(juce::String(step / visualSubdivision + 1), headerCell.withWidth(headerCell.getWidth() * visualSubdivision), juce::Justification::centred);
     }
     for (int row = 0; row < Session::pitches; ++row)
     {
@@ -156,7 +159,7 @@ void StepGrid::paint(juce::Graphics& g)
         {
             const auto bounds = cell(step, row);
             if (!dirty.intersects(bounds)) continue;
-            const auto barColour = step / 4 % 2 == 0 ? juce::Colour(0xff46515a) : juce::Colour(0xff3b4650);
+            const auto barColour = (step / visualSubdivision) / 4 % 2 == 0 ? juce::Colour(0xff46515a) : juce::Colour(0xff3b4650);
             g.setColour(barColour);
             g.fillRect(bounds);
             if (scaleEnabled && inScale)
@@ -230,7 +233,7 @@ void StepGrid::paint(juce::Graphics& g)
         for (int step = 0; step <= lastVisibleStep + 1; ++step)
         {
             sustainedNotes += sustainedBoundaryDeltas[static_cast<size_t>(step)];
-            if (step >= firstVisibleStep && sustainedNotes == 0)
+            if (step >= firstVisibleStep && sustainedNotes == 0 && step % visualSubdivision == 0)
             {
                 const auto x = cell(step, 0).getX();
                 g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
@@ -651,6 +654,7 @@ bool StepGrid::subdivideSelection()
     if (changed) session.setEditorStepCount(oldResolution * 2);
     session.endNoteGesture();
     if (!changed) return false;
+    visualSubdivisions *= 2;
     rebuildVisibleNotes();
     selectedNotes.reset();
     const auto newStepBeats = 4.0 / static_cast<double>(session.editorStepResolution());
