@@ -14,7 +14,7 @@ DrumDevice::~DrumDevice()
 void DrumDevice::initialise(const te::PluginInitialisationInfo& info)
 {
     sampleRate = info.sampleRate > 0.0 ? info.sampleRate : 48000.0;
-    loadClapSample();
+    loadSamples();
     reset();
 }
 
@@ -33,17 +33,40 @@ bool DrumDevice::hasNameForMidiNoteNumber(int note, int midiChannel, juce::Strin
 {
     juce::ignoreUnused(midiChannel);
     if (note == 48) name = "Kick";
+    else if (note == 50) name = "Low Tom";
+    else if (note == 52) name = "Mid Tom";
     else if (note == 53) name = "Snare";
+    else if (note == 54) name = "High Tom";
     else if (note == 56) name = "Clap";
-    else if (note == 58) name = "Hat";
+    else if (note == 58) name = "Closed Hat";
+    else if (note == 59) name = "Open Hat";
     else return false;
     return true;
 }
 
 void DrumDevice::trigger(int note, float velocity)
 {
+    VoiceType type;
+    switch (note)
+    {
+        case 48: type = VoiceType::kick; break;
+        case 50: type = VoiceType::lowTom; break;
+        case 52: type = VoiceType::midTom; break;
+        case 53: type = VoiceType::snare; break;
+        case 54: type = VoiceType::highTom; break;
+        case 56: type = VoiceType::clap; break;
+        case 58: type = VoiceType::closedHat; break;
+        case 59: type = VoiceType::openHat; break;
+        default: return;
+    }
+
+    if (type == VoiceType::closedHat)
+        for (auto& existing : voices)
+            if (existing.active && existing.type == VoiceType::openHat)
+                existing.active = false;
+
     auto& voice = voices[nextVoice++ % voices.size()];
-    voice.type = note < 52 ? VoiceType::kick : note == 56 ? VoiceType::clap : note < 57 ? VoiceType::snare : VoiceType::hat;
+    voice.type = type;
     voice.active = true;
     voice.age = 0.0f;
     voice.velocity = std::clamp(velocity, 0.0f, 1.0f);
@@ -65,23 +88,23 @@ float DrumDevice::render(Voice& voice)
     const auto dt = static_cast<float>(1.0 / sampleRate);
     voice.age += dt;
 
-    if (voice.type == VoiceType::kick)
+    const auto sampleForVoice = [type = voice.type]() -> int
     {
-        if (t > 0.55f) { voice.active = false; return 0.0f; }
-        const auto env = std::exp(-t * 9.0f);
-        const auto freq = 42.0f + 95.0f * std::exp(-t * 24.0f);
-        voice.phase += juce::MathConstants<float>::twoPi * freq * dt;
-        return std::sin(voice.phase) * env * voice.velocity * 0.9f;
-    }
-
-    if (voice.type == VoiceType::snare)
-    {
-        if (t > 0.32f) { voice.active = false; return 0.0f; }
-        const auto noiseEnv = std::exp(-t * 15.0f);
-        const auto bodyEnv = std::exp(-t * 18.0f);
-        voice.phase += juce::MathConstants<float>::twoPi * 185.0f * dt;
-        return (nextNoise(voice) * noiseEnv * 0.62f + std::sin(voice.phase) * bodyEnv * 0.28f) * voice.velocity;
-    }
+        switch (type)
+        {
+            case VoiceType::kick:      return 0;
+            case VoiceType::snare:     return 1;
+            case VoiceType::closedHat: return 2;
+            case VoiceType::openHat:   return 3;
+            case VoiceType::lowTom:    return 4;
+            case VoiceType::midTom:    return 5;
+            case VoiceType::highTom:   return 6;
+            default:                    return -1;
+        }
+    }();
+    if (sampleForVoice >= 0)
+        return renderSample(voice, tr808Samples[static_cast<size_t>(sampleForVoice)],
+                            tr808SampleRates[static_cast<size_t>(sampleForVoice)]);
 
     if (voice.type == VoiceType::clap)
     {
@@ -111,10 +134,7 @@ float DrumDevice::render(Voice& voice)
         return highPassed * (0.42f * crack + 0.32f * body) * voice.velocity;
     }
 
-    if (t > 0.12f) { voice.active = false; return 0.0f; }
-    const auto noise = nextNoise(voice);
-    voice.noise = noise - voice.noise * 0.72f;
-    return voice.noise * std::exp(-t * 45.0f) * voice.velocity * 0.32f;
+    return 0.0f;
 }
 
 void DrumDevice::applyToBuffer(const te::PluginRenderContext& context)
@@ -140,24 +160,57 @@ void DrumDevice::applyToBuffer(const te::PluginRenderContext& context)
     }
 }
 
-void DrumDevice::loadClapSample()
+void DrumDevice::loadSample(juce::AudioBuffer<float>& destination, double& sourceRate,
+                            const void* data, int dataSize)
 {
-    if (clapSample.getNumSamples() > 0)
+    if (destination.getNumSamples() > 0)
         return;
 
     juce::AudioFormatManager formats;
     formats.registerBasicFormats();
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(
-        std::make_unique<juce::MemoryInputStream>(BinaryData::HandClap01_09_flac,
-                                                  static_cast<size_t>(BinaryData::HandClap01_09_flacSize),
-                                                  false)));
+        std::make_unique<juce::MemoryInputStream>(data, static_cast<size_t>(dataSize), false)));
     if (reader == nullptr || reader->lengthInSamples <= 0)
         return;
 
-    clapSampleRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
+    sourceRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
     const auto samples = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples,
                                                                static_cast<juce::int64>(std::ceil(sampleRate))));
-    clapSample.setSize(static_cast<int>(reader->numChannels), samples);
-    reader->read(&clapSample, 0, samples, 0, true, true);
+    destination.setSize(static_cast<int>(reader->numChannels), samples);
+    reader->read(&destination, 0, samples, 0, true, true);
+}
+
+float DrumDevice::renderSample(Voice& voice, const juce::AudioBuffer<float>& sample, double sourceRate)
+{
+    if (sample.getNumSamples() < 2)
+    {
+        voice.active = false;
+        return 0.0f;
+    }
+    const auto sourcePosition = voice.samplePosition++ * sourceRate / sampleRate;
+    const auto index = static_cast<int>(sourcePosition);
+    if (index >= sample.getNumSamples() - 1)
+    {
+        voice.active = false;
+        return 0.0f;
+    }
+    const auto fraction = static_cast<float>(sourcePosition - index);
+    auto value = 0.0f;
+    for (int channel = 0; channel < sample.getNumChannels(); ++channel)
+        value += sample.getSample(channel, index) * (1.0f - fraction)
+               + sample.getSample(channel, index + 1) * fraction;
+    return value / static_cast<float>(sample.getNumChannels()) * voice.velocity * 0.9f;
+}
+
+void DrumDevice::loadSamples()
+{
+    loadSample(clapSample, clapSampleRate, BinaryData::HandClap01_09_flac, BinaryData::HandClap01_09_flacSize);
+    loadSample(tr808Samples[0], tr808SampleRates[0], BinaryData::TR808Kick_wav, BinaryData::TR808Kick_wavSize);
+    loadSample(tr808Samples[1], tr808SampleRates[1], BinaryData::TR808Snare_wav, BinaryData::TR808Snare_wavSize);
+    loadSample(tr808Samples[2], tr808SampleRates[2], BinaryData::TR808ClosedHat_wav, BinaryData::TR808ClosedHat_wavSize);
+    loadSample(tr808Samples[3], tr808SampleRates[3], BinaryData::TR808OpenHat_wav, BinaryData::TR808OpenHat_wavSize);
+    loadSample(tr808Samples[4], tr808SampleRates[4], BinaryData::TR808LowTom_wav, BinaryData::TR808LowTom_wavSize);
+    loadSample(tr808Samples[5], tr808SampleRates[5], BinaryData::TR808MidTom_wav, BinaryData::TR808MidTom_wavSize);
+    loadSample(tr808Samples[6], tr808SampleRates[6], BinaryData::TR808HighTom_wav, BinaryData::TR808HighTom_wavSize);
 }
 }

@@ -21,7 +21,15 @@ juce_add_gui_app(ThetaNative
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 juce_add_binary_data(ThetaNativeAssets
-    SOURCES assets/HandClap-01_09.flac)
+    SOURCES
+        assets/HandClap-01_09.flac
+        assets/TR808/TR808Kick.wav
+        assets/TR808/TR808Snare.wav
+        assets/TR808/TR808ClosedHat.wav
+        assets/TR808/TR808OpenHat.wav
+        assets/TR808/TR808LowTom.wav
+        assets/TR808/TR808MidTom.wav
+        assets/TR808/TR808HighTom.wav)
 target_sources(ThetaNative PRIVATE
     src/Main.cpp src/Session.cpp src/SessionTransport.cpp src/StepGrid.cpp src/Arrangement.cpp src/ArrangementGeometry.cpp src/ProjectFiles.cpp src/Playhead.cpp
     src/BrowserPanel.cpp src/DeviceRack.cpp src/DrumDevice.cpp src/UtilityDevice.cpp src/ThetaSpaceDevice.cpp src/ThetaBloomDevice.cpp src/ThetaArpDevice.cpp

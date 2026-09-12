@@ -29,7 +29,7 @@ public:
     bool hasNameForMidiNoteNumber(int note, int midiChannel, juce::String& name) override;
 
 private:
-    enum class VoiceType { kick, snare, clap, hat };
+    enum class VoiceType { kick, lowTom, midTom, snare, highTom, clap, closedHat, openHat };
     struct Voice
     {
         VoiceType type = VoiceType::kick;
@@ -42,9 +42,15 @@ private:
     void trigger(int note, float velocity);
     float render(Voice&);
     float nextNoise(Voice&) noexcept;
-    void loadClapSample();
+    void loadSamples();
+    void loadSample(juce::AudioBuffer<float>& destination, double& sourceRate,
+                    const void* data, int dataSize);
+    float renderSample(Voice&, const juce::AudioBuffer<float>&, double sourceRate);
 
     std::array<Voice, 32> voices;
+    std::array<juce::AudioBuffer<float>, 7> tr808Samples;
+    std::array<double, 7> tr808SampleRates { 44100.0, 44100.0, 44100.0, 44100.0,
+                                              44100.0, 44100.0, 44100.0 };
     juce::AudioBuffer<float> clapSample;
     double sampleRate = 48000.0;
     double clapSampleRate = 44100.0;
