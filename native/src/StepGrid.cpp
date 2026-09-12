@@ -262,7 +262,7 @@ void StepGrid::paint(juce::Graphics& g)
     }
 }
 
-int StepGrid::hit(juce::Point<float> point) const
+int StepGrid::cellHit(juce::Point<float> point) const
 {
     if (point.x < labelWidth || point.y < headerHeight || point.x >= gridRight() || point.y >= headerHeight + rowAreaHeight())
         return -1;
@@ -271,6 +271,16 @@ int StepGrid::hit(juce::Point<float> point) const
     if (step < 0 || step >= steps)
         return -1;
     const auto row = static_cast<int>((point.y - headerHeight) / rowAreaHeight() * Session::pitches);
+    return row * Session::steps + step;
+}
+
+int StepGrid::hit(juce::Point<float> point) const
+{
+    const auto cellIndex = cellHit(point);
+    if (cellIndex < 0)
+        return -1;
+    const auto row = cellIndex / Session::steps;
+    const auto steps = session.editorStepCount();
     // A sustained note is selected from anywhere in its drawn body, not only
     // its start cell. This is especially important for Ctrl-click selection.
     for (int candidate = 0; candidate < steps; ++candidate)
@@ -282,7 +292,7 @@ int StepGrid::hit(juce::Point<float> point) const
         bounds.setWidth(std::max(3.0f, cellWidth() * noteLengths[static_cast<size_t>(candidateIndex)]));
         if (bounds.contains(point)) return candidateIndex;
     }
-    return row * Session::steps + step;
+    return cellIndex;
 }
 
 int StepGrid::resizeHit(juce::Point<float> point) const
@@ -399,8 +409,9 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
                 }
         if (movingNotes.empty())
             movingNotes.push_back({index % Session::steps, pitchForIndex(index)});
-        lastMoveStep = index % Session::steps;
-        lastMovePitch = pitchForIndex(index);
+        const auto grabbedCell = cellHit(event.position);
+        lastMoveStep = grabbedCell % Session::steps;
+        lastMovePitch = pitchForIndex(grabbedCell);
         dragPosition = event.position;
         verticalAutoScroll = 0.0f;
         noteMoved = false;
@@ -432,7 +443,11 @@ void StepGrid::toggleSelection(int index)
         return;
     }
     selectedNotes.flip(static_cast<size_t>(index));
-    repaint(cell(index % Session::steps, index / Session::steps).getSmallestIntegerContainer().expanded(3));
+    auto bounds = cell(index % Session::steps, index / Session::steps);
+    bounds.translate(noteStartOffsets[static_cast<size_t>(index)] * cellWidth(), 0.0f);
+    bounds.setWidth(std::max(3.0f, cellWidth() * noteLengths[static_cast<size_t>(index)]));
+    bounds.setRight(std::min(bounds.getRight(), gridRight()));
+    repaint(bounds.getSmallestIntegerContainer().expanded(3));
 }
 
 bool StepGrid::selectAllNotes()
@@ -645,7 +660,7 @@ juce::Result StepGrid::moveCurrentNotesBy(int stepDelta, int pitchDelta)
 
 void StepGrid::moveDraggedNotesAt(juce::Point<float> position)
 {
-    const auto index = hit(position);
+    const auto index = cellHit(position);
     if (index < 0 || lastMoveStep < 0 || lastMovePitch < 0)
         return;
     const auto step = index % Session::steps;

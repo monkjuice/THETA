@@ -39,6 +39,7 @@ private:
     void zoomAt(double factor, float pointerX);
     void scrollDraggedNotes();
     void moveDraggedNotesAt(juce::Point<float>);
+    int cellHit(juce::Point<float>) const;
     int hit(juce::Point<float>) const;
     int resizeHit(juce::Point<float>) const;
     void apply(int index);

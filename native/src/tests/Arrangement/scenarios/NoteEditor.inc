@@ -54,6 +54,17 @@
         require(session.noteLengthSteps(1, 48) == 4
                 && selectionGrid.noteLengths[static_cast<size_t>(selectionGrid.indexForCell(1, 48))] == 4,
                 "Dragging a note edge resizes its musical length in the editor");
+        session.setNote(1, 49, true);
+        require(session.resizeNote(1, 49, 4).wasOk(), "Can create a sustained note for drag testing");
+        selectionGrid.changeListenerCallback(nullptr);
+        const auto sustainedFrom = selectionGrid.cell(2, rowForPitch(49)).getCentre();
+        const auto sustainedTo = selectionGrid.cell(3, rowForPitch(49)).getCentre();
+        selectionGrid.mouseDown(gridEvent(sustainedFrom, sustainedFrom, false));
+        selectionGrid.mouseDrag(gridEvent(sustainedFrom, sustainedTo, true));
+        selectionGrid.mouseUp(gridEvent(sustainedFrom, sustainedTo, true));
+        selectionGrid.changeListenerCallback(nullptr);
+        require(!session.hasNote(1, 49) && session.hasNote(2, 49) && session.noteLengthSteps(2, 49) == 4,
+                "Dragging from the body of a sustained note follows the pointer and preserves its length");
         const auto splitPoint = selectionGrid.cell(3, rowForPitch(48)).getCentre();
         selectionGrid.mouseDown(gridEvent(splitPoint, splitPoint, false));
         selectionGrid.mouseUp(gridEvent(splitPoint, splitPoint, false));
