@@ -6,7 +6,7 @@
 
 namespace theta
 {
-class StepGrid final : public juce::Component, private juce::ChangeListener, private juce::ScrollBar::Listener
+class StepGrid final : public juce::Component, private juce::ChangeListener, private juce::ScrollBar::Listener, private juce::Timer
 {
 public:
     explicit StepGrid(Session&);
@@ -32,6 +32,8 @@ private:
     float gridWidth() const;
     double visibleStepSpan() const;
     void syncHorizontalScroll();
+    void scrollDraggedNotes();
+    void moveDraggedNotesAt(juce::Point<float>);
     int hit(juce::Point<float>) const;
     int resizeHit(juce::Point<float>) const;
     void apply(int index);
@@ -52,6 +54,7 @@ private:
     float playheadXForTime(double seconds) const;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void scrollBarMoved(juce::ScrollBar*, double) override;
+    void timerCallback() override;
     void updatePlayhead();
     Session& session;
     std::bitset<Session::steps * Session::pitches> notes, visited, selectedNotes;
@@ -61,9 +64,12 @@ private:
     Gesture gesture = Gesture::none;
     bool adding = true, showingDrumLabels = false, noteMoved = false, manualPitchScroll = false, movingGroup = false;
     int lastHit = -1, movingNoteIndex = -1, resizingNoteIndex = -1, pasteAnchorIndex = -1, clipboardBasePitch = 0;
+    int lastMoveStep = -1, lastMovePitch = -1;
     int visibleStepCount = Session::defaultSteps;
     int lowestVisiblePitch = Session::lowestNote;
     double stepScroll = 0.0, stepZoom = 1.0;
+    float verticalAutoScroll = 0.0f;
+    juce::Point<float> dragPosition {-1.0f, -1.0f};
     float playhead = -1.0f;
     juce::ScrollBar horizontalScroll {false};
     juce::VBlankAttachment vblank;

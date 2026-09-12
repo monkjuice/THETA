@@ -1031,31 +1031,27 @@ juce::Result Session::moveNotes(const std::vector<std::pair<int, int>>& sources,
         const auto targetPitch = sourcePitch + pitchDelta;
         if (targetStep < 0 || targetStep >= gridSteps || targetPitch < 0 || targetPitch > 127)
             return juce::Result::fail("Move notes inside the visible grid.");
-        const auto sourceBeat = sourceStep * stepBeats;
-        auto* note = static_cast<te::MidiNote*>(nullptr);
-        for (auto* candidate : pattern().getSequence().getNotes())
-            if (candidate->getNoteNumber() == sourcePitch
-                && std::abs(candidate->getStartBeat().inBeats() - sourceBeat) < 0.0001)
-            {
-                note = candidate;
-                break;
-            }
-        if (note == nullptr)
-            return juce::Result::fail("Select notes to move.");
-        const auto lengthSteps = std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats() / stepBeats)));
-        if (targetStep + lengthSteps > gridSteps || !sourceCells.insert({sourceStep, sourcePitch}).second
+        if (!sourceCells.insert({sourceStep, sourcePitch}).second
             || !targetCells.insert({targetStep, targetPitch}).second)
             return juce::Result::fail("That note group does not fit here.");
-        moves.push_back({note, targetStep, targetPitch});
     }
 
     for (auto* note : pattern().getSequence().getNotes())
     {
         const auto step = juce::roundToInt(note->getStartBeat().inBeats() / stepBeats);
         const auto cell = std::pair {step, note->getNoteNumber()};
-        if (targetCells.contains(cell) && !sourceCells.contains(cell))
+        if (sourceCells.contains(cell))
+        {
+            const auto lengthSteps = std::max(1, static_cast<int>(std::ceil(note->getLengthBeats().inBeats() / stepBeats)));
+            if (step + stepDelta + lengthSteps > gridSteps)
+                return juce::Result::fail("That note group does not fit here.");
+            moves.push_back({note, step + stepDelta, note->getNoteNumber() + pitchDelta});
+        }
+        else if (targetCells.contains(cell))
             return juce::Result::fail("That note cell is already occupied.");
     }
+    if (moves.size() != sources.size())
+        return juce::Result::fail("Select notes to move.");
 
     auto* undoManager = &edit->getUndoManager();
     for (const auto& move : moves)

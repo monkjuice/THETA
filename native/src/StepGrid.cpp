@@ -246,8 +246,13 @@ void StepGrid::mouseDown(const juce::MouseEvent& event)
                 }
         if (movingNotes.empty())
             movingNotes.push_back({index % Session::steps, pitchForIndex(index)});
+        lastMoveStep = index % Session::steps;
+        lastMovePitch = pitchForIndex(index);
+        dragPosition = event.position;
+        verticalAutoScroll = 0.0f;
         noteMoved = false;
         session.beginNoteGesture("Move note");
+        startTimerHz(60);
         return;
     }
 
@@ -485,6 +490,56 @@ juce::Result StepGrid::moveCurrentNotesBy(int stepDelta, int pitchDelta)
     return result;
 }
 
+void StepGrid::moveDraggedNotesAt(juce::Point<float> position)
+{
+    const auto index = hit(position);
+    if (index < 0 || lastMoveStep < 0 || lastMovePitch < 0)
+        return;
+    const auto step = index % Session::steps;
+    const auto pitch = pitchForIndex(index);
+    if (moveCurrentNotesBy(step - lastMoveStep, pitch - lastMovePitch).wasOk())
+    {
+        lastMoveStep = step;
+        lastMovePitch = pitch;
+    }
+}
+
+void StepGrid::scrollDraggedNotes()
+{
+    if (gesture != Gesture::move || dragPosition.x < 0.0f)
+        return;
+
+    constexpr auto edge = 28.0f;
+    const auto maximumStart = std::max(0.0, static_cast<double>(session.editorStepCount()) - visibleStepSpan());
+    const auto horizontalDirection = dragPosition.x < labelWidth + edge ? -1.0
+        : dragPosition.x > gridRight() - edge ? 1.0 : 0.0;
+    const auto nextStepScroll = std::clamp(stepScroll + horizontalDirection * 0.28, 0.0, maximumStart);
+    auto changed = nextStepScroll != stepScroll;
+    stepScroll = nextStepScroll;
+    if (!session.isPatternDrums())
+    {
+        const auto verticalDirection = dragPosition.y < headerHeight + edge ? 1.0f
+            : dragPosition.y > headerHeight + rowAreaHeight() - edge ? -1.0f : 0.0f;
+        verticalAutoScroll += verticalDirection * 0.18f;
+        const auto pitchSteps = static_cast<int>(verticalAutoScroll);
+        if (pitchSteps != 0)
+        {
+            const auto nextLowest = juce::jlimit(0, 127 - Session::pitches + 1, lowestVisiblePitch + pitchSteps);
+            changed = changed || nextLowest != lowestVisiblePitch;
+            lowestVisiblePitch = nextLowest;
+            verticalAutoScroll -= static_cast<float>(pitchSteps);
+            manualPitchScroll = true;
+            rebuildVisibleNotes();
+        }
+    }
+    if (changed)
+    {
+        horizontalScroll.setCurrentRange(stepScroll, visibleStepSpan(), juce::dontSendNotification);
+        updatePlayhead();
+        repaint();
+    }
+}
+
 juce::Result StepGrid::resizeCurrentNoteTo(int index)
 {
     if (resizingNoteIndex < 0)
@@ -503,15 +558,12 @@ juce::Result StepGrid::resizeCurrentNoteTo(int index)
 void StepGrid::mouseDrag(const juce::MouseEvent& event)
 {
     if (gesture == Gesture::none) return;
+    dragPosition = event.position;
     const auto index = hit(event.position);
     if (gesture == Gesture::move)
     {
-        if (index >= 0 && lastHit >= 0)
-        {
-            if (moveCurrentNotesBy(index % Session::steps - lastHit % Session::steps,
-                                   pitchForIndex(index) - pitchForIndex(lastHit)).wasOk())
-                lastHit = index;
-        }
+        scrollDraggedNotes();
+        moveDraggedNotesAt(event.position);
         return;
     }
     if (gesture == Gesture::resize)
@@ -538,8 +590,18 @@ void StepGrid::mouseUp(const juce::MouseEvent&)
     movingNoteIndex = -1;
     movingNotes.clear();
     movingGroup = false;
+    lastMoveStep = -1;
+    lastMovePitch = -1;
+    dragPosition = {-1.0f, -1.0f};
+    stopTimer();
     resizingNoteIndex = -1;
     noteMoved = false;
+}
+
+void StepGrid::timerCallback()
+{
+    scrollDraggedNotes();
+    moveDraggedNotesAt(dragPosition);
 }
 
 bool StepGrid::keyPressed(const juce::KeyPress& key)
