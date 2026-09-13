@@ -25,5 +25,6 @@ private:
     juce::CachedValue<float> cutoff, resonance, attack, decay, sustain, release;
     juce::CachedValue<float> filterEnvAmount, filterAttack, filterDecay, filterSustain, filterRelease;
     juce::CachedValue<float> lfoRate, lfoCutoff, drive, output;
-    std::array<te::AutomatableParameter::Ptr, 23> parameters;
+    juce::CachedValue<float> lfoPosition, lfoPitch, chorusMix, chorusRate, chorusDepth, delayMix, delayTime, delayFeedback;
+    std::array<te::AutomatableParameter::Ptr, 31> parameters;
 }; }

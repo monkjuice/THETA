@@ -4,17 +4,19 @@ namespace theta
 {
 namespace
 {
-constexpr std::array<const char*, 23> ids {
+constexpr std::array<const char*, 31> ids {
     "oscAPosition", "oscBPosition", "oscBLevel", "oscBTune", "subLevel", "noiseLevel", "unison", "detune",
     "cutoff", "resonance", "attack", "decay", "sustain", "release", "filterEnvAmount", "filterAttack",
-    "filterDecay", "filterSustain", "filterRelease", "lfoRate", "lfoCutoff", "drive", "output"};
-constexpr std::array<const char*, 23> names {
+    "filterDecay", "filterSustain", "filterRelease", "lfoRate", "lfoCutoff", "drive", "output",
+    "lfoPosition", "lfoPitch", "chorusMix", "chorusRate", "chorusDepth", "delayMix", "delayTime", "delayFeedback"};
+constexpr std::array<const char*, 31> names {
     "A Position", "B Position", "B Level", "B Tune", "Sub", "Noise", "Unison", "Detune", "Cutoff", "Resonance",
     "Attack", "Decay", "Sustain", "Release", "Filter Env", "Filter Attack", "Filter Decay", "Filter Sustain",
-    "Filter Release", "LFO Rate", "LFO Cutoff", "Drive", "Output"};
-constexpr std::array<float, 23> defaults {
+    "Filter Release", "LFO Rate", "LFO Cutoff", "Drive", "Output", "LFO Position", "LFO Pitch", "Chorus Mix",
+    "Chorus Rate", "Chorus Depth", "Delay Mix", "Delay Time", "Delay Feedback"};
+constexpr std::array<float, 31> defaults {
     .55f, .18f, .25f, 7.0f, .12f, 0.0f, 2.0f, .18f, 7800.0f, .12f, .01f, .24f, .75f, .35f,
-    .25f, .005f, .3f, .35f, .3f, .5f, 0.0f, .08f, .75f};
+    .25f, .005f, .3f, .35f, .3f, .5f, 0.0f, .08f, .75f, 0.0f, 0.0f, 0.0f, .35f, .4f, 0.0f, .375f, .3f};
 
 juce::NormalisableRange<float> rangeFor(int index)
 {
@@ -23,9 +25,13 @@ juce::NormalisableRange<float> rangeFor(int index)
     if (index == 8) return {30.0f, 18000.0f, 0.0f, .25f};
     if (index == 10 || index == 11 || index == 15 || index == 16) return {.001f, 4.0f, 0.0f, .35f};
     if (index == 13 || index == 18) return {.001f, 8.0f, 0.0f, .35f};
-    if (index == 14 || index == 20) return {-1.0f, 1.0f};
+    if (index == 14 || index == 20 || index == 23) return {-1.0f, 1.0f};
     if (index == 19) return {.05f, 20.0f, 0.0f, .35f};
     if (index == 22) return {0.0f, 1.25f};
+    if (index == 24) return {-12.0f, 12.0f};
+    if (index == 26) return {.02f, 8.0f, 0.0f, .35f};
+    if (index == 29) return {.02f, 2.0f, 0.0f, .35f};
+    if (index == 30) return {0.0f, .92f};
     return {0.0f, 1.0f};
 }
 }
@@ -36,7 +42,8 @@ ThetaForgeDevice::ThetaForgeDevice(te::PluginCreationInfo info) : Plugin(info)
     juce::CachedValue<float>* values[] {
         &oscAPosition, &oscBPosition, &oscBLevel, &oscBTune, &subLevel, &noiseLevel, &unison, &detune,
         &cutoff, &resonance, &attack, &decay, &sustain, &release, &filterEnvAmount, &filterAttack,
-        &filterDecay, &filterSustain, &filterRelease, &lfoRate, &lfoCutoff, &drive, &output};
+        &filterDecay, &filterSustain, &filterRelease, &lfoRate, &lfoCutoff, &drive, &output,
+        &lfoPosition, &lfoPitch, &chorusMix, &chorusRate, &chorusDepth, &delayMix, &delayTime, &delayFeedback};
     for (int i = 0; i < static_cast<int>(parameters.size()); ++i)
     {
         values[i]->referTo(state, ids[static_cast<size_t>(i)], undo, defaults[static_cast<size_t>(i)]);
@@ -58,7 +65,8 @@ forge::Patch ThetaForgeDevice::patch()
 {
     return {oscAPosition, oscBPosition, oscBLevel, oscBTune, subLevel, noiseLevel, unison, detune,
             cutoff, resonance, attack, decay, sustain, release, filterEnvAmount, filterAttack,
-            filterDecay, filterSustain, filterRelease, lfoRate, lfoCutoff, drive, output};
+            filterDecay, filterSustain, filterRelease, lfoRate, lfoCutoff, drive, output,
+            lfoPosition, lfoPitch, chorusMix, chorusRate, chorusDepth, delayMix, delayTime, delayFeedback};
 }
 
 void ThetaForgeDevice::applyToBuffer(const te::PluginRenderContext& context)
@@ -88,7 +96,8 @@ void ThetaForgeDevice::restorePluginStateFromValueTree(const juce::ValueTree& so
     te::copyPropertiesToCachedValues(source, oscAPosition, oscBPosition, oscBLevel, oscBTune, subLevel, noiseLevel,
                                      unison, detune, cutoff, resonance, attack, decay, sustain, release,
                                      filterEnvAmount, filterAttack, filterDecay, filterSustain, filterRelease,
-                                     lfoRate, lfoCutoff, drive, output);
+                                     lfoRate, lfoCutoff, drive, output, lfoPosition, lfoPitch, chorusMix,
+                                     chorusRate, chorusDepth, delayMix, delayTime, delayFeedback);
     for (auto* parameter : getAutomatableParameters()) parameter->updateFromAttachedValue();
 }
 }

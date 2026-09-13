@@ -39,6 +39,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout Processor::parameterLayout()
     result.push_back(parameter("lfoCutoff", "LFO to Cutoff", {-1.0f, 1.0f}, 0.0f));
     result.push_back(parameter("drive", "Drive", {0.0f, 1.0f}, 0.08f));
     result.push_back(parameter("output", "Output", {0.0f, 1.25f}, 0.75f));
+    result.push_back(parameter("lfoPosition", "LFO to Position", {-1.0f, 1.0f}, 0.0f));
+    result.push_back(parameter("lfoPitch", "LFO to Pitch", {-12.0f, 12.0f}, 0.0f));
+    result.push_back(parameter("chorusMix", "Chorus Mix", {0.0f, 1.0f}, 0.0f));
+    result.push_back(parameter("chorusRate", "Chorus Rate", {0.02f, 8.0f, 0.0f, 0.35f}, 0.35f));
+    result.push_back(parameter("chorusDepth", "Chorus Depth", {0.0f, 1.0f}, 0.4f));
+    result.push_back(parameter("delayMix", "Delay Mix", {0.0f, 1.0f}, 0.0f));
+    result.push_back(parameter("delayTime", "Delay Time", {0.02f, 2.0f, 0.0f, 0.35f}, 0.375f));
+    result.push_back(parameter("delayFeedback", "Delay Feedback", {0.0f, 0.92f}, 0.3f));
     return {result.begin(), result.end()};
 }
 
@@ -62,16 +70,21 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
-    for (const auto metadata : midi)
-    {
-        const auto message = metadata.getMessage();
-        if (message.isNoteOn()) core.noteOn(message.getNoteNumber(), message.getFloatVelocity());
-        else if (message.isNoteOff()) core.noteOff(message.getNoteNumber());
-        else if (message.isAllNotesOff()) core.allNotesOff();
-    }
     const auto values = patch();
+    auto event = midi.cbegin();
+    const auto end = midi.cend();
     for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
+        while (event != end)
+        {
+            const auto metadata = *event;
+            if (metadata.samplePosition > i) break;
+            const auto message = metadata.getMessage();
+            if (message.isNoteOn()) core.noteOn(message.getNoteNumber(), message.getFloatVelocity());
+            else if (message.isNoteOff()) core.noteOff(message.getNoteNumber());
+            else if (message.isAllNotesOff()) core.allNotesOff();
+            ++event;
+        }
         float left, right; core.renderSample(values, left, right);
         buffer.addSample(0, i, left);
         if (buffer.getNumChannels() > 1) buffer.addSample(1, i, right);
@@ -85,7 +98,9 @@ Patch Processor::patch() const
             value("subLevel"), value("noiseLevel"), value("unison"), value("detune"), value("cutoff"),
             value("resonance"), value("attack"), value("decay"), value("sustain"), value("release"),
             value("filterEnvAmount"), value("filterAttack"), value("filterDecay"), value("filterSustain"),
-            value("filterRelease"), value("lfoRate"), value("lfoCutoff"), value("drive"), value("output")};
+            value("filterRelease"), value("lfoRate"), value("lfoCutoff"), value("drive"), value("output"),
+            value("lfoPosition"), value("lfoPitch"), value("chorusMix"), value("chorusRate"),
+            value("chorusDepth"), value("delayMix"), value("delayTime"), value("delayFeedback")};
 }
 
 juce::AudioProcessorEditor* Processor::createEditor() { return new Editor(*this); }

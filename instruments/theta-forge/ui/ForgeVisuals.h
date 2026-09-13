@@ -5,7 +5,7 @@
 
 namespace theta::forge::ui
 {
-inline constexpr int parameterCount = 23;
+inline constexpr int parameterCount = 31;
 
 inline juce::Colour accentForParameter(int index)
 {
@@ -13,7 +13,8 @@ inline juce::Colour accentForParameter(int index)
     if (index < 10) return juce::Colour(0xff4de0c1);
     if (index < 14) return juce::Colour(0xffffc66d);
     if (index < 19) return juce::Colour(0xffc996ff);
-    return juce::Colour(0xff65bfff);
+    if (index < 25) return juce::Colour(0xff65bfff);
+    return juce::Colour(0xfff08bc2);
 }
 
 inline float waveform(float phase, float position)
@@ -91,8 +92,8 @@ inline juce::Rectangle<int> controlCell(juce::Rectangle<int> bounds, int index)
     const auto left = 44;
     const auto available = bounds.getWidth() - 88;
     const auto controlTop = 262;
-    const auto controlHeight = juce::jmax(300, bounds.getHeight() - controlTop - 40);
-    const auto rowHeight = controlHeight / 3;
+    const auto controlHeight = juce::jmax(380, bounds.getHeight() - controlTop - 40);
+    const auto rowHeight = controlHeight / 4;
     if (index < 8)
     {
         const auto cellWidth = available / 8;
@@ -104,8 +105,14 @@ inline juce::Rectangle<int> controlCell(juce::Rectangle<int> bounds, int index)
         const auto cellWidth = available / 6;
         return {left + local * cellWidth, controlTop + rowHeight, cellWidth, rowHeight};
     }
-    const auto local = index - 14;
-    const auto cellWidth = available / 9;
-    return {left + local * cellWidth, controlTop + rowHeight * 2, cellWidth, rowHeight};
+    if (index < 23)
+    {
+        const auto local = index - 14;
+        const auto cellWidth = available / 9;
+        return {left + local * cellWidth, controlTop + rowHeight * 2, cellWidth, rowHeight};
+    }
+    const auto local = index - 23;
+    const auto cellWidth = available / 8;
+    return {left + local * cellWidth, controlTop + rowHeight * 3, cellWidth, rowHeight};
 }
 }

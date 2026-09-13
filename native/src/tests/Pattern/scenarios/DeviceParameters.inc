@@ -56,11 +56,12 @@
                     forgeSlot = i;
             require(forgeSlot >= 0, "Theta Forge is inserted in the target track chain");
             auto forgeParameters = parameterSession.deviceParameters(1, forgeSlot);
-            require(forgeParameters.size() == 23 && forgeParameters[0].name == "A Position"
+            require(forgeParameters.size() == 31 && forgeParameters[0].name == "A Position"
                     && forgeParameters[8].name == "Cutoff" && forgeParameters[13].name == "Release"
                     && forgeParameters[14].name == "Filter Env" && forgeParameters[19].name == "LFO Rate"
-                    && forgeParameters[22].name == "Output",
-                    "Theta Forge exposes its oscillator, modulation, and output controls");
+                    && forgeParameters[22].name == "Output" && forgeParameters[25].name == "Chorus Mix"
+                    && forgeParameters[28].name == "Delay Mix" && forgeParameters[30].name == "Delay Feedback",
+                    "Theta Forge exposes its oscillator, modulation, effects, and output controls");
             require(parameterSession.addInstrument(Session::Instrument::ThetaForge, 0).wasOk(),
                     "Theta Forge can replace the Pattern synth");
             require(parameterSession.projectSnapshot().getProperty("thetaPatternInstrument").toString() == "forge",

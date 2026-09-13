@@ -56,7 +56,7 @@ public:
             setOpaque(true);
             refresh();
             setSize(isThetaWave ? 920 : isThetaForge ? 1100 : 680,
-                    isThetaWave ? 800 : isThetaForge ? 700 : 430);
+                    isThetaWave ? 800 : isThetaForge ? 820 : 430);
             startTimerHz(30);
         }
 

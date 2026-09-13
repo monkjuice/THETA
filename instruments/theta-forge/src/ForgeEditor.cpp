@@ -5,16 +5,18 @@ namespace theta::forge
 {
 namespace
 {
-constexpr std::array<const char*, 23> ids {"oscAPosition", "oscBPosition", "oscBLevel", "oscBTune", "subLevel", "noiseLevel", "unison", "detune", "cutoff", "resonance", "attack", "decay", "sustain", "release", "filterEnvAmount", "filterAttack", "filterDecay", "filterSustain", "filterRelease", "lfoRate", "lfoCutoff", "drive", "output"};
-constexpr std::array<const char*, 23> names {"A POS", "B POS", "B LEVEL", "B TUNE", "SUB", "NOISE", "UNISON", "DETUNE", "CUTOFF", "RES", "ATTACK", "DECAY", "SUSTAIN", "RELEASE", "ENV > FILTER", "F ATTACK", "F DECAY", "F SUSTAIN", "F RELEASE", "LFO RATE", "LFO > FILTER", "DRIVE", "OUTPUT"};
-constexpr std::array<const char*, 23> tips {
+constexpr std::array<const char*, 31> ids {"oscAPosition", "oscBPosition", "oscBLevel", "oscBTune", "subLevel", "noiseLevel", "unison", "detune", "cutoff", "resonance", "attack", "decay", "sustain", "release", "filterEnvAmount", "filterAttack", "filterDecay", "filterSustain", "filterRelease", "lfoRate", "lfoCutoff", "drive", "output", "lfoPosition", "lfoPitch", "chorusMix", "chorusRate", "chorusDepth", "delayMix", "delayTime", "delayFeedback"};
+constexpr std::array<const char*, 31> names {"A POS", "B POS", "B LEVEL", "B TUNE", "SUB", "NOISE", "UNISON", "DETUNE", "CUTOFF", "RES", "ATTACK", "DECAY", "SUSTAIN", "RELEASE", "ENV > FILTER", "F ATTACK", "F DECAY", "F SUSTAIN", "F RELEASE", "LFO RATE", "LFO > FILTER", "DRIVE", "OUTPUT", "LFO > POS", "LFO > PITCH", "CHORUS", "CH RATE", "CH DEPTH", "DELAY", "TIME", "FEEDBACK"};
+constexpr std::array<const char*, 31> tips {
     "Scan oscillator A's harmonic shape", "Scan oscillator B's harmonic shape", "Set oscillator B's level", "Tune oscillator B in semitones",
     "Blend a grounded sub oscillator", "Add a little heat and air", "Stack voices for width", "Spread stacked oscillator voices",
     "Open or close the low-pass filter", "Emphasise the filter edge", "Set how the sound begins", "Set the fall after the attack",
     "Set the held level", "Set how the sound fades", "Push the filter envelope up or invert it",
     "Set the filter envelope attack", "Set the filter envelope decay", "Set the filter envelope sustain",
     "Set the filter envelope release", "Set free-running LFO speed", "Move cutoff with the LFO",
-    "Add saturation and density", "Set Forge's final level"};
+    "Add saturation and density", "Set Forge's final level", "Animate both oscillator positions",
+    "Add vibrato or wide pitch movement", "Blend the stereo chorus", "Set chorus movement speed",
+    "Set chorus delay sweep", "Blend the ping-pong delay", "Set delay time in seconds", "Set delay regeneration"};
 }
 
 Editor::Editor(Processor& p) : AudioProcessorEditor(&p), processor(p)
@@ -40,7 +42,7 @@ Editor::Editor(Processor& p) : AudioProcessorEditor(&p), processor(p)
     }
     setResizable(true, true);
     setResizeLimits(900, 600, 1600, 1000);
-    setSize(1100, 700);
+    setSize(1100, 820);
     startTimerHz(24);
 }
 

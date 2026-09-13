@@ -186,7 +186,15 @@ int runSelfTest()
         forgePatch.filterEnvAmount = 0.9f;
         forgePatch.lfoRate = 7.0f;
         forgePatch.lfoCutoff = 0.65f;
+        forgePatch.lfoPosition = 0.7f;
+        forgePatch.lfoPitch = 1.5f;
         forgePatch.drive = 0.7f;
+        forgePatch.chorusMix = 0.45f;
+        forgePatch.chorusRate = 1.2f;
+        forgePatch.chorusDepth = 0.8f;
+        forgePatch.delayMix = 0.3f;
+        forgePatch.delayTime = 0.08f;
+        forgePatch.delayFeedback = 0.7f;
         forgeCore.noteOn(36, 0.9f);
         float forgePeak = 0.0f, stereoDifference = 0.0f;
         for (int i = 0; i < 16384; ++i)
