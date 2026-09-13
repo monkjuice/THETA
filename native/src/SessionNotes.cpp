@@ -67,19 +67,31 @@ bool Session::removeNotes(const std::vector<juce::ValueTree>& states)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     auto& sequence = pattern().getSequence();
+    auto& transport = edit->getTransport();
+    const auto playing = transport.isPlaying();
+    const auto clipStartBeat = edit->tempoSequence.toBeats(pattern().getPosition().time.getStart()).inBeats();
+    const auto playheadBeat = edit->tempoSequence.toBeats(transport.getPosition()).inBeats() - clipStartBeat;
+    auto removedActiveNote = false;
     auto changed = false;
     for (const auto& state : states)
         if (auto* note = sequence.getNoteFor(state))
         {
+            removedActiveNote = removedActiveNote || (playing
+                && playheadBeat >= note->getStartBeat().inBeats()
+                && playheadBeat < note->getEndBeat().inBeats());
             sequence.removeNote(*note, &edit->getUndoManager());
             changed = true;
         }
     if (changed)
     {
         markModified();
-        if (edit->getTransport().isPlaying())
+        if (playing)
         {
-            panicMidiOnTrack(pattern().getClipTrack());
+            // Rebuild so the next pass uses the edited sequence. A MIDI panic
+            // is only needed when the removed note was already sounding;
+            // panicking for every edit audibly cuts unrelated notes and FX.
+            if (removedActiveNote)
+                panicMidiOnTrack(pattern().getClipTrack());
             edit->restartPlayback();
         }
         sendSynchronousChangeMessage();
