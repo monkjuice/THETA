@@ -23,4 +23,4 @@ private:
     forge::Core core;
     juce::CachedValue<float> oscAPosition, oscBPosition, oscBLevel, oscBTune, subLevel, noiseLevel, unison, detune, cutoff, resonance, attack, decay, sustain, release;
     std::array<te::AutomatableParameter::Ptr, 14> parameters;
-}; } 
+}; }
