@@ -2,6 +2,8 @@
 
 Theta is a native desktop DAW: C++20, Tracktion Engine, JUCE. The application lives entirely in `native/src`. See [the root README](README.md) for what it does, [ARCHITECTURE.md](ARCHITECTURE.md) for direction, and [native/README.md](native/README.md) for implementation contracts.
 
+> **Read [HANDOVER.md](HANDOVER.md) first if you last worked on this before commit `105cd78`.** `Session.cpp`, `StepGrid.cpp` and `Arrangement.cpp` were split into focused files in September 2026. No header, signature or call site changed, but the file you remember editing has probably moved. HANDOVER.md maps every move and lists the issues currently being inherited.
+
 ## Working preferences
 
 - Build a polished native desktop DAW. Prioritize Windows while preserving macOS portability.
