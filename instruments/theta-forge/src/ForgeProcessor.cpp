@@ -30,6 +30,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout Processor::parameterLayout()
     result.push_back(parameter("decay", "Decay", {0.001f, 4.0f, 0.0f, 0.35f}, 0.24f));
     result.push_back(parameter("sustain", "Sustain", {0.0f, 1.0f}, 0.75f));
     result.push_back(parameter("release", "Release", {0.001f, 8.0f, 0.0f, 0.35f}, 0.35f));
+    result.push_back(parameter("filterEnvAmount", "Filter Env Amount", {-1.0f, 1.0f}, 0.25f));
+    result.push_back(parameter("filterAttack", "Filter Attack", {0.001f, 4.0f, 0.0f, 0.35f}, 0.005f));
+    result.push_back(parameter("filterDecay", "Filter Decay", {0.001f, 4.0f, 0.0f, 0.35f}, 0.3f));
+    result.push_back(parameter("filterSustain", "Filter Sustain", {0.0f, 1.0f}, 0.35f));
+    result.push_back(parameter("filterRelease", "Filter Release", {0.001f, 8.0f, 0.0f, 0.35f}, 0.3f));
+    result.push_back(parameter("lfoRate", "LFO Rate", {0.05f, 20.0f, 0.0f, 0.35f}, 0.5f));
+    result.push_back(parameter("lfoCutoff", "LFO to Cutoff", {-1.0f, 1.0f}, 0.0f));
+    result.push_back(parameter("drive", "Drive", {0.0f, 1.0f}, 0.08f));
+    result.push_back(parameter("output", "Output", {0.0f, 1.25f}, 0.75f));
     return {result.begin(), result.end()};
 }
 
@@ -74,7 +83,9 @@ Patch Processor::patch() const
     const auto value = [this] (const char* id) { return state.getRawParameterValue(id)->load(); };
     return {value("oscAPosition"), value("oscBPosition"), value("oscBLevel"), value("oscBTune"),
             value("subLevel"), value("noiseLevel"), value("unison"), value("detune"), value("cutoff"),
-            value("resonance"), value("attack"), value("decay"), value("sustain"), value("release")};
+            value("resonance"), value("attack"), value("decay"), value("sustain"), value("release"),
+            value("filterEnvAmount"), value("filterAttack"), value("filterDecay"), value("filterSustain"),
+            value("filterRelease"), value("lfoRate"), value("lfoCutoff"), value("drive"), value("output")};
 }
 
 juce::AudioProcessorEditor* Processor::createEditor() { return new Editor(*this); }

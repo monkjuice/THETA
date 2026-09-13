@@ -21,6 +21,9 @@ public:
 private:
     forge::Patch patch();
     forge::Core core;
-    juce::CachedValue<float> oscAPosition, oscBPosition, oscBLevel, oscBTune, subLevel, noiseLevel, unison, detune, cutoff, resonance, attack, decay, sustain, release;
-    std::array<te::AutomatableParameter::Ptr, 14> parameters;
+    juce::CachedValue<float> oscAPosition, oscBPosition, oscBLevel, oscBTune, subLevel, noiseLevel, unison, detune;
+    juce::CachedValue<float> cutoff, resonance, attack, decay, sustain, release;
+    juce::CachedValue<float> filterEnvAmount, filterAttack, filterDecay, filterSustain, filterRelease;
+    juce::CachedValue<float> lfoRate, lfoCutoff, drive, output;
+    std::array<te::AutomatableParameter::Ptr, 23> parameters;
 }; }

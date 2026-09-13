@@ -20,7 +20,7 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
     Processor& processor;
-    std::array<Control, 14> controls;
+    std::array<Control, 23> controls;
 
     void timerCallback() override;
 };

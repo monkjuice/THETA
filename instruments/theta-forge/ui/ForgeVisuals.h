@@ -5,13 +5,15 @@
 
 namespace theta::forge::ui
 {
-inline constexpr int parameterCount = 14;
+inline constexpr int parameterCount = 23;
 
 inline juce::Colour accentForParameter(int index)
 {
     if (index < 8) return juce::Colour(0xffff7a59);
     if (index < 10) return juce::Colour(0xff4de0c1);
-    return juce::Colour(0xffffc66d);
+    if (index < 14) return juce::Colour(0xffffc66d);
+    if (index < 19) return juce::Colour(0xffc996ff);
+    return juce::Colour(0xff65bfff);
 }
 
 inline float waveform(float phase, float position)
@@ -81,27 +83,29 @@ void paint(juce::Graphics& g, juce::Rectangle<int> componentBounds, NormalisedVa
     g.setColour(juce::Colour(0xff94a9b6));
     g.setFont(juce::FontOptions(10.0f));
     g.drawText("OSCILLATOR FORGE", 52, 238, 220, 16, juce::Justification::centredLeft);
-    g.drawText("TONE", componentBounds.getWidth() * 3 / 5 + 42, 238, 100, 16, juce::Justification::centredLeft);
+    g.drawText("OSCILLATORS", 52, 238, 180, 16, juce::Justification::centredLeft);
 }
 
 inline juce::Rectangle<int> controlCell(juce::Rectangle<int> bounds, int index)
 {
     const auto left = 44;
     const auto available = bounds.getWidth() - 88;
-    const auto oscillatorWidth = available * 3 / 5;
-    const auto rightX = left + oscillatorWidth + 8;
-    const auto rightWidth = available - oscillatorWidth - 8;
     const auto controlTop = 262;
-    const auto controlHeight = juce::jmax(180, bounds.getHeight() - controlTop - 40);
+    const auto controlHeight = juce::jmax(300, bounds.getHeight() - controlTop - 40);
+    const auto rowHeight = controlHeight / 3;
     if (index < 8)
     {
-        const auto cellWidth = oscillatorWidth / 4;
-        const auto cellHeight = controlHeight / 2;
-        return {left + (index % 4) * cellWidth, controlTop + (index / 4) * cellHeight, cellWidth, cellHeight};
+        const auto cellWidth = available / 8;
+        return {left + index * cellWidth, controlTop, cellWidth, rowHeight};
     }
-    const auto local = index - 8;
-    const auto cellWidth = rightWidth / 2;
-    const auto cellHeight = controlHeight / 3;
-    return {rightX + (local % 2) * cellWidth, controlTop + (local / 2) * cellHeight, cellWidth, cellHeight};
+    if (index < 14)
+    {
+        const auto local = index - 8;
+        const auto cellWidth = available / 6;
+        return {left + local * cellWidth, controlTop + rowHeight, cellWidth, rowHeight};
+    }
+    const auto local = index - 14;
+    const auto cellWidth = available / 9;
+    return {left + local * cellWidth, controlTop + rowHeight * 2, cellWidth, rowHeight};
 }
 }

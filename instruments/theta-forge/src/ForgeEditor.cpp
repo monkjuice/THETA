@@ -5,13 +5,16 @@ namespace theta::forge
 {
 namespace
 {
-constexpr std::array<const char*, 14> ids {"oscAPosition", "oscBPosition", "oscBLevel", "oscBTune", "subLevel", "noiseLevel", "unison", "detune", "cutoff", "resonance", "attack", "decay", "sustain", "release"};
-constexpr std::array<const char*, 14> names {"A POS", "B POS", "B LEVEL", "B TUNE", "SUB", "NOISE", "UNISON", "DETUNE", "CUTOFF", "RES", "ATTACK", "DECAY", "SUSTAIN", "RELEASE"};
-constexpr std::array<const char*, 14> tips {
+constexpr std::array<const char*, 23> ids {"oscAPosition", "oscBPosition", "oscBLevel", "oscBTune", "subLevel", "noiseLevel", "unison", "detune", "cutoff", "resonance", "attack", "decay", "sustain", "release", "filterEnvAmount", "filterAttack", "filterDecay", "filterSustain", "filterRelease", "lfoRate", "lfoCutoff", "drive", "output"};
+constexpr std::array<const char*, 23> names {"A POS", "B POS", "B LEVEL", "B TUNE", "SUB", "NOISE", "UNISON", "DETUNE", "CUTOFF", "RES", "ATTACK", "DECAY", "SUSTAIN", "RELEASE", "ENV > FILTER", "F ATTACK", "F DECAY", "F SUSTAIN", "F RELEASE", "LFO RATE", "LFO > FILTER", "DRIVE", "OUTPUT"};
+constexpr std::array<const char*, 23> tips {
     "Scan oscillator A's harmonic shape", "Scan oscillator B's harmonic shape", "Set oscillator B's level", "Tune oscillator B in semitones",
     "Blend a grounded sub oscillator", "Add a little heat and air", "Stack voices for width", "Spread stacked oscillator voices",
     "Open or close the low-pass filter", "Emphasise the filter edge", "Set how the sound begins", "Set the fall after the attack",
-    "Set the held level", "Set how the sound fades"};
+    "Set the held level", "Set how the sound fades", "Push the filter envelope up or invert it",
+    "Set the filter envelope attack", "Set the filter envelope decay", "Set the filter envelope sustain",
+    "Set the filter envelope release", "Set free-running LFO speed", "Move cutoff with the LFO",
+    "Add saturation and density", "Set Forge's final level"};
 }
 
 Editor::Editor(Processor& p) : AudioProcessorEditor(&p), processor(p)
@@ -36,8 +39,8 @@ Editor::Editor(Processor& p) : AudioProcessorEditor(&p), processor(p)
         addAndMakeVisible(control.slider);
     }
     setResizable(true, true);
-    setResizeLimits(700, 560, 1400, 900);
-    setSize(980, 640);
+    setResizeLimits(900, 600, 1600, 1000);
+    setSize(1100, 700);
     startTimerHz(24);
 }
 
