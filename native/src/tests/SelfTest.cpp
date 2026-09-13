@@ -130,8 +130,15 @@ int runSelfTest()
         auto waveOsc2 = wave->getAutomatableParameterByID("osc2Level");
         auto waveTune2 = wave->getAutomatableParameterByID("osc2Tune");
         auto waveCutoff = wave->getAutomatableParameterByID("cutoff");
+        auto waveLfoRate = wave->getAutomatableParameterByID("lfoRate");
+        auto waveLfoPosition = wave->getAutomatableParameterByID("lfoPosition");
+        auto waveLfoCutoff = wave->getAutomatableParameterByID("lfoCutoff");
+        auto waveLfoPitch = wave->getAutomatableParameterByID("lfoPitch");
+        auto waveLfoMotion = wave->getAutomatableParameterByID("lfoMotion");
         require(wavePosition != nullptr && waveShape != nullptr && waveMotion != nullptr
-                && waveOsc2 != nullptr && waveTune2 != nullptr && waveCutoff != nullptr);
+                && waveOsc2 != nullptr && waveTune2 != nullptr && waveCutoff != nullptr
+                && waveLfoRate != nullptr && waveLfoPosition != nullptr && waveLfoCutoff != nullptr
+                && waveLfoPitch != nullptr && waveLfoMotion != nullptr);
         juce::AudioBuffer<float> sweepBuffer(2, 512);
         te::MidiMessageArray sweepMidi;
         float sweepPeak = 0.0f, maxJump = 0.0f, previousSample = 0.0f;
@@ -150,6 +157,11 @@ int runSelfTest()
             waveOsc2->setParameter(phase, juce::dontSendNotification);
             waveTune2->setParameter(block % 2 == 0 ? 12.0f : -12.0f, juce::dontSendNotification);
             waveCutoff->setParameter(350.0f + phase * 12000.0f, juce::dontSendNotification);
+            waveLfoRate->setParameter(0.25f + phase * 12.0f, juce::dontSendNotification);
+            waveLfoPosition->setParameter(-0.6f + phase * 1.2f, juce::dontSendNotification);
+            waveLfoCutoff->setParameter(0.5f - phase, juce::dontSendNotification);
+            waveLfoPitch->setParameter(-4.0f + phase * 8.0f, juce::dontSendNotification);
+            waveLfoMotion->setParameter(phase * 0.75f, juce::dontSendNotification);
             te::PluginRenderContext sweepContext(&sweepBuffer, 0, sweepBuffer.getNumSamples(), &sweepMidi, 0.0, {}, true, false, true, false);
             wave->applyToBuffer(sweepContext);
             for (int i = 0; i < sweepBuffer.getNumSamples(); ++i)

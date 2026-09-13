@@ -54,7 +54,7 @@ public:
         {
             setOpaque(true);
             refresh();
-            setSize(isThetaWave ? 920 : 680, isThetaWave ? 700 : 430);
+            setSize(isThetaWave ? 920 : 680, isThetaWave ? 800 : 430);
             startTimerHz(30);
         }
 
@@ -363,7 +363,7 @@ public:
             paintSection(g, oscillatorArea, "Oscillators", juce::Colour(0xff75d3e6));
             paintSection(g, filterArea, "Filter + Tone", juce::Colour(0xffc8de8f));
             paintSection(g, envelopeArea, "Amp Envelope", juce::Colour(0xffd9a5ff));
-            paintSection(g, voiceArea, "Movement + Output", juce::Colour(0xffffbf7a));
+            paintSection(g, voiceArea, "Modulation + Output", juce::Colour(0xffffbf7a));
             paintWaveScope(g, oscillatorArea);
             paintEnvelope(g, envelopeArea);
         }
@@ -427,12 +427,17 @@ public:
             placeControl(13, envControls, 3, 0, 4, 1, 60);
 
             const auto voiceControls = voiceArea.reduced(18, 42);
-            placeControl(2, voiceControls, 0, 0, 3, 2, 62);
-            placeControl(8, voiceControls, 1, 0, 3, 2, 62);
-            placeControl(14, voiceControls, 2, 0, 3, 2, 62);
-            placeControl(15, voiceControls, 0, 1, 3, 2, 62);
-            placeControl(16, voiceControls, 1, 1, 3, 2, 62);
-            placeControl(17, voiceControls, 2, 1, 3, 2, 62);
+            placeControl(2, voiceControls, 0, 0, 3, 4, 52);
+            placeControl(8, voiceControls, 1, 0, 3, 4, 52);
+            placeControl(14, voiceControls, 2, 0, 3, 4, 52);
+            placeControl(15, voiceControls, 0, 1, 3, 4, 52);
+            placeControl(16, voiceControls, 1, 1, 3, 4, 52);
+            placeControl(17, voiceControls, 2, 1, 3, 4, 52);
+            placeControl(18, voiceControls, 0, 2, 3, 4, 52);
+            placeControl(19, voiceControls, 1, 2, 3, 4, 52);
+            placeControl(20, voiceControls, 2, 2, 3, 4, 52);
+            placeControl(21, voiceControls, 0, 3, 3, 4, 52);
+            placeControl(22, voiceControls, 1, 3, 3, 4, 52);
         }
 
         Session& session;

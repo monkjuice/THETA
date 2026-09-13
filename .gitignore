@@ -17,3 +17,5 @@ __pycache__/
 !.env.example
 .DS_Store
 Thumbs.db
+
+instruments/theta-forge/build/

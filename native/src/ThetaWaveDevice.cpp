@@ -1,4 +1,5 @@
 #include "ThetaWaveDevice.h"
+#include "ThetaWaveTables.h"
 #include <algorithm>
 #include <cmath>
 
@@ -25,6 +26,11 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     outputDb.referTo(state, "outputDb", undo, -8.0f);
     osc2Level.referTo(state, "osc2Level", undo, 0.0f);
     osc2Tune.referTo(state, "osc2Tune", undo, 0.0f);
+    lfoRate.referTo(state, "lfoRate", undo, 1.4f);
+    lfoPosition.referTo(state, "lfoPosition", undo, 0.0f);
+    lfoCutoff.referTo(state, "lfoCutoff", undo, 0.0f);
+    lfoPitch.referTo(state, "lfoPitch", undo, 0.0f);
+    lfoMotion.referTo(state, "lfoMotion", undo, 0.0f);
 
     positionParam = addParam("position", "Position", {0.0f, 1.0f});
     shapeParam = addParam("shape", "Shape", {0.0f, 1.0f});
@@ -44,13 +50,20 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     outputParam = addParam("outputDb", "Output", {-36.0f, 6.0f});
     osc2LevelParam = addParam("osc2Level", "Osc 2", {0.0f, 1.0f});
     osc2TuneParam = addParam("osc2Tune", "Tune 2", {-24.0f, 24.0f, 1.0f});
+    lfoRateParam = addParam("lfoRate", "LFO Rate", {0.05f, 20.0f, 0.0f, 0.35f});
+    lfoPositionParam = addParam("lfoPosition", "LFO Pos", {-1.0f, 1.0f});
+    lfoCutoffParam = addParam("lfoCutoff", "LFO Cutoff", {-1.0f, 1.0f});
+    lfoPitchParam = addParam("lfoPitch", "LFO Pitch", {-12.0f, 12.0f});
+    lfoMotionParam = addParam("lfoMotion", "LFO Motion", {-1.0f, 1.0f});
 
     for (auto pair : std::initializer_list<std::pair<te::AutomatableParameter::Ptr*, juce::CachedValue<float>*>>{
              {&positionParam, &position}, {&shapeParam, &shape}, {&motionParam, &motion}, {&cutoffParam, &cutoff},
              {&filterEnvParam, &filterEnv}, {&driveParam, &driveDb}, {&subParam, &sub}, {&resonanceParam, &resonance}, {&attackParam, &attack}, {&decayParam, &decay},
              {&sustainParam, &sustain}, {&releaseParam, &releaseTime}, {&unisonParam, &unison},
              {&detuneParam, &detune}, {&widthParam, &width}, {&outputParam, &outputDb},
-             {&osc2LevelParam, &osc2Level}, {&osc2TuneParam, &osc2Tune}})
+             {&osc2LevelParam, &osc2Level}, {&osc2TuneParam, &osc2Tune},
+             {&lfoRateParam, &lfoRate}, {&lfoPositionParam, &lfoPosition}, {&lfoCutoffParam, &lfoCutoff},
+             {&lfoPitchParam, &lfoPitch}, {&lfoMotionParam, &lfoMotion}})
         (*pair.first)->attachToCurrentValue(*pair.second);
 
     auto percentText = [] (float value) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; };
@@ -76,6 +89,14 @@ ThetaWaveDevice::ThetaWaveDevice(te::PluginCreationInfo info) : Plugin(info)
     {
         return juce::String(value > 0.0f ? "+" : "") + juce::String(juce::roundToInt(value)) + " st";
     };
+    lfoRateParam->valueToStringFunction = [] (float value) { return juce::String(value, 2) + " Hz"; };
+    lfoPositionParam->valueToStringFunction = percentText;
+    lfoCutoffParam->valueToStringFunction = percentText;
+    lfoPitchParam->valueToStringFunction = [] (float value) { return juce::String(value, 1) + " st"; };
+    lfoMotionParam->valueToStringFunction = percentText;
+    // Construct tables before audio can start; do not first-initialize this
+    // static object from the realtime render path.
+    juce::ignoreUnused(theta_wave::tables());
 }
 
 ThetaWaveDevice::~ThetaWaveDevice()
@@ -95,7 +116,6 @@ void ThetaWaveDevice::reset()
 {
     for (auto& voice : voices)
         voice.active = false;
-    filterL = filterR = 0.0f;
     syncSmoothedParameters(true);
 }
 
@@ -124,21 +144,29 @@ void ThetaWaveDevice::release(int note)
         }
 }
 
-float ThetaWaveDevice::wave(float phase, float motionOffset) const
+float ThetaWaveDevice::wave(float phase, float motionOffset, float frequency) const
 {
     phase -= std::floor(phase);
     const auto positionValue = std::clamp(currentPosition + motionOffset, 0.0f, 1.0f);
-    const auto sine = std::sin(phase * juce::MathConstants<float>::twoPi);
-    const auto tri = 1.0f - 4.0f * std::abs(phase - 0.5f);
-    const auto saw = phase * 2.0f - 1.0f;
-    const auto square = phase < 0.5f ? 1.0f : -1.0f;
-    const auto folded = std::sin((phase + positionValue * 0.35f) * juce::MathConstants<float>::twoPi)
-        * 0.58f + std::sin(phase * juce::MathConstants<float>::twoPi * (2.0f + currentShape * 6.0f)) * 0.42f;
+    const auto& bank = theta_wave::tables();
+    const auto index = static_cast<float>(theta_wave::tableSize) * phase;
+    const auto lower = static_cast<int>(index) & theta_wave::tableMask;
+    const auto upper = (lower + 1) & theta_wave::tableMask;
+    const auto fraction = index - std::floor(index);
     const auto morph = positionValue * 4.0f;
-    const auto index = std::min(3, static_cast<int>(morph));
-    const auto mix = morph - static_cast<float>(index);
-    const float shapes[] {sine, tri, saw, square, folded};
-    return shapes[index] + (shapes[index + 1] - shapes[index]) * mix;
+    const auto frame = std::min(3, static_cast<int>(morph));
+    const auto mix = morph - static_cast<float>(frame);
+    // currentShape still has a musical effect, blending the harmonic folded
+    // frame in after the regular morph. Frequency selection occurs in
+    // renderVoice where pitch is known.
+    const auto& table = bank.tables[theta_wave::bandForFrequency(frequency, sampleRate)];
+    const auto read = [&] (int frameIndex)
+    {
+        const auto& source = table[frameIndex];
+        return source[lower] + (source[upper] - source[lower]) * fraction;
+    };
+    const auto basic = read(frame) + (read(frame + 1) - read(frame)) * mix;
+    return basic + (read(4) - basic) * currentShape * 0.28f;
 }
 
 float ThetaWaveDevice::renderVoice(Voice& voice)
@@ -170,13 +198,18 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
         voice.envelope = std::max(sustainLevel, voice.envelope - (1.0f - sustainLevel) * dt / decaySeconds);
     }
 
-    const auto frequency = std::max(16.35f, static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(voice.note)));
+    voice.lfoPhase += dt * currentLfoRate;
+    if (voice.lfoPhase >= 1.0f)
+        voice.lfoPhase -= std::floor(voice.lfoPhase);
+    const auto lfo = std::sin(voice.lfoPhase * juce::MathConstants<float>::twoPi);
+    const auto baseFrequency = std::max(16.35f, static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(voice.note)));
+    const auto frequency = baseFrequency * std::pow(2.0f, lfo * currentLfoPitch / 12.0f);
     const auto unisonCount = juce::jlimit(1, 4, juce::roundToInt(unisonParam->getCurrentValue()));
     voice.motionPhase += dt * (0.08f + currentMotion * 3.2f);
     if (voice.motionPhase >= 1.0f)
         voice.motionPhase -= std::floor(voice.motionPhase);
     const auto motionOffset = std::sin(voice.motionPhase * juce::MathConstants<float>::twoPi)
-        * currentMotion * 0.18f;
+        * (currentMotion + lfo * currentLfoMotion) * 0.18f + lfo * currentLfoPosition * 0.22f;
     auto sample = 0.0f;
     const auto osc2Mix = std::clamp(currentOsc2Level, 0.0f, 1.0f);
     const auto osc2Ratio = std::pow(2.0f, currentOsc2Tune / 12.0f);
@@ -188,9 +221,9 @@ float ThetaWaveDevice::renderVoice(Voice& voice)
         const auto cents = spread * currentDetune * 48.0f;
         const auto detunedPhase = basePhase * std::pow(2.0f, cents / 1200.0f);
         const auto osc1 = wave(detunedPhase + spread * currentWidth * 0.12f,
-                               motionOffset + spread * currentMotion * 0.04f);
+                               motionOffset + spread * currentMotion * 0.04f, frequency);
         const auto osc2 = wave(baseOsc2Phase + spread * currentWidth * 0.16f + 0.25f,
-                               motionOffset + 0.18f + spread * currentMotion * 0.05f);
+                               motionOffset + 0.18f + spread * currentMotion * 0.05f, frequency * osc2Ratio);
         sample += osc1 * (1.0f - osc2Mix) + osc2 * osc2Mix;
     }
     voice.phase += frequency * dt;
@@ -235,6 +268,11 @@ void ThetaWaveDevice::syncSmoothedParameters(bool immediate)
     update(currentOutput, juce::Decibels::decibelsToGain(std::clamp(outputParam->getCurrentValue(), -36.0f, 6.0f)));
     update(currentOsc2Level, std::clamp(osc2LevelParam->getCurrentValue(), 0.0f, 1.0f));
     update(currentOsc2Tune, std::clamp(osc2TuneParam->getCurrentValue(), -24.0f, 24.0f));
+    update(currentLfoRate, std::clamp(lfoRateParam->getCurrentValue(), 0.05f, 20.0f));
+    update(currentLfoPosition, std::clamp(lfoPositionParam->getCurrentValue(), -1.0f, 1.0f));
+    update(currentLfoCutoff, std::clamp(lfoCutoffParam->getCurrentValue(), -1.0f, 1.0f));
+    update(currentLfoPitch, std::clamp(lfoPitchParam->getCurrentValue(), -12.0f, 12.0f));
+    update(currentLfoMotion, std::clamp(lfoMotionParam->getCurrentValue(), -1.0f, 1.0f));
 }
 
 void ThetaWaveDevice::smoothParameters()
@@ -264,22 +302,30 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
     for (int frame = context.bufferStartSample; frame < context.bufferStartSample + context.bufferNumSamples; ++frame)
     {
         smoothParameters();
-        auto mono = 0.0f;
+        auto mono = 0.0f, side = 0.0f;
         for (auto& voice : voices)
-            mono += renderVoice(voice);
-        auto envelopePeak = 0.0f;
-        for (const auto& voice : voices)
-            if (voice.active)
-                envelopePeak = std::max(envelopePeak, voice.envelope);
-        const auto cutoffHz = std::clamp(currentCutoff * std::pow(2.0f, currentFilterEnv * envelopePeak * 4.0f),
-                                         40.0f, static_cast<float>(sampleRate * 0.45));
-        const auto filterAmount = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * cutoffHz / static_cast<float>(sampleRate));
-        mono = std::tanh(mono * currentDrive * (1.0f + currentResonance * 1.8f)) * currentOutput;
-        filterL += (mono - filterL) * filterAmount;
-        filterR += (mono - filterR) * filterAmount;
-        const auto side = mono - filterL;
-        const auto left = std::clamp(filterL - side * currentWidth * 0.18f, -0.98f, 0.98f);
-        const auto right = std::clamp(filterR + side * currentWidth * 0.18f, -0.98f, 0.98f);
+        {
+            const auto voiceSample = renderVoice(voice);
+            if (!voice.active && voiceSample == 0.0f)
+                continue;
+            const auto lfo = std::sin(voice.lfoPhase * juce::MathConstants<float>::twoPi);
+            const auto cutoffHz = std::clamp(currentCutoff * std::pow(2.0f, currentFilterEnv * voice.envelope * 4.0f
+                                                                      + lfo * currentLfoCutoff * 4.0f),
+                                             40.0f, static_cast<float>(sampleRate * 0.45));
+            const auto g = std::tan(juce::MathConstants<float>::pi * cutoffHz / static_cast<float>(sampleRate));
+            const auto q = 0.5f + currentResonance * 11.5f;
+            const auto damping = 1.0f / (2.0f * q);
+            const auto h = 1.0f / (1.0f + 2.0f * damping * g + g * g);
+            const auto high = (voiceSample - 2.0f * damping * voice.filterBand - voice.filterLow) * h;
+            voice.filterBand += g * high;
+            voice.filterLow += g * voice.filterBand;
+            mono += voice.filterLow;
+            side += voice.filterBand;
+        }
+        mono = std::tanh(mono * currentDrive) * currentOutput;
+        const auto stereoSide = std::tanh(side * currentDrive) * currentOutput;
+        const auto left = std::clamp(mono - stereoSide * currentWidth * 0.18f, -0.98f, 0.98f);
+        const auto right = std::clamp(mono + stereoSide * currentWidth * 0.18f, -0.98f, 0.98f);
         if (buffer.getNumChannels() > 0)
             buffer.setSample(0, frame, std::clamp(buffer.getSample(0, frame) + left, -0.98f, 0.98f));
         if (buffer.getNumChannels() > 1)
@@ -290,7 +336,8 @@ void ThetaWaveDevice::applyToBuffer(const te::PluginRenderContext& context)
 void ThetaWaveDevice::restorePluginStateFromValueTree(const juce::ValueTree& source)
 {
     te::copyPropertiesToCachedValues(source, position, shape, motion, cutoff, filterEnv, driveDb, sub, resonance, attack, decay, sustain, releaseTime,
-                                     unison, detune, width, outputDb, osc2Level, osc2Tune);
+                                     unison, detune, width, outputDb, osc2Level, osc2Tune,
+                                     lfoRate, lfoPosition, lfoCutoff, lfoPitch, lfoMotion);
     for (auto* parameter : getAutomatableParameters())
         parameter->updateFromAttachedValue();
     syncSmoothedParameters(true);

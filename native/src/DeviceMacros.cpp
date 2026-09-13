@@ -57,6 +57,11 @@ te::AutomatableParameter* thetaWaveMacroParameterAt(ThetaWaveDevice& wave, int i
             case 15: return "detune";
             case 16: return "width";
             case 17: return "outputDb";
+            case 18: return "lfoRate";
+            case 19: return "lfoPosition";
+            case 20: return "lfoCutoff";
+            case 21: return "lfoPitch";
+            case 22: return "lfoMotion";
             default: return nullptr;
         }
     }();
@@ -99,6 +104,11 @@ juce::String thetaWaveMacroName(int index)
         case 15: return "Detune";
         case 16: return "Width";
         case 17: return "Output";
+        case 18: return "LFO Rate";
+        case 19: return "LFO Pos";
+        case 20: return "LFO Cutoff";
+        case 21: return "LFO Pitch";
+        case 22: return "LFO Motion";
     }
     return {};
 }
