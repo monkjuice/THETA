@@ -30,15 +30,36 @@ juce_add_binary_data(ThetaNativeAssets
         assets/TR808/TR808LowTom.wav
         assets/TR808/TR808MidTom.wav
         assets/TR808/TR808HighTom.wav)
+# Sources are listed explicitly: a new .cpp must be added here or it will not compile.
+# A class may span several translation units (Session, Arrangement); keep those grouped.
 target_sources(ThetaNative PRIVATE
-    src/Main.cpp src/Session.cpp src/SessionTransport.cpp src/StepGrid.cpp src/Arrangement.cpp src/ArrangementGeometry.cpp src/ProjectFiles.cpp src/Playhead.cpp
-    src/BrowserPanel.cpp src/DeviceRack.cpp src/DrumDevice.cpp src/UtilityDevice.cpp src/ThetaSpaceDevice.cpp src/ThetaBloomDevice.cpp src/ThetaArpDevice.cpp
+    # Session
+    src/Session.cpp
+    src/SessionTransport.cpp
+    # UI
+    src/StepGrid.cpp
+    src/Arrangement.cpp
+    src/ArrangementGeometry.cpp
+    src/BrowserPanel.cpp
+    src/DeviceRack.cpp
+    src/Playhead.cpp
+    # Devices
+    src/UtilityDevice.cpp
+    src/DrumDevice.cpp
+    src/ThetaArpDevice.cpp
+    src/ThetaBloomDevice.cpp
+    src/ThetaSpaceDevice.cpp
     src/ThetaWaveDevice.cpp
+    # App
+    src/Main.cpp
+    src/ProjectFiles.cpp
+    # Tests
     src/tests/SelfTest.cpp
     src/tests/Pattern/DeviceRackTest.cpp
     src/tests/Pattern/WorkflowTest.cpp
     src/tests/Arrangement/ClipGeometryTest.cpp
     src/tests/Arrangement/WorkflowTest.cpp)
+target_include_directories(ThetaNative PRIVATE src)
 target_compile_definitions(ThetaNative PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
     JUCE_PLUGINHOST_VST3=0 JUCE_PLUGINHOST_AU=0

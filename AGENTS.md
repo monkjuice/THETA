@@ -1,11 +1,62 @@
 # Theta project memory
 
+Theta is a native desktop DAW: C++20, Tracktion Engine, JUCE. The application lives entirely in `native/src`. See [the root README](README.md) for what it does, [ARCHITECTURE.md](ARCHITECTURE.md) for direction, and [native/README.md](native/README.md) for implementation contracts.
+
 ## Working preferences
 
 - Build a polished native desktop DAW. Prioritize Windows while preserving macOS portability.
 - Treat UI frame pacing and immediate pointer response as core requirements.
 - Preserve existing native work. Avoid large mock projects or benchmark scaffolding unless requested.
 - The product is Theta and the repository is https://github.com/monkjuice/THETA.git. The local workspace may still be named `theda`.
+
+## Do not read these directories
+
+Two large trees in this workspace are not Theta's code. Reading or searching them wastes context and returns misleading results.
+
+- **`native/.deps/`** — pinned JUCE and Tracktion checkouts, 400,000+ lines, fetched by a script and ignored by git. Never grep or glob here. To understand engine behaviour, read `native/README.md` first, then the curated snapshots below.
+- **`research/sources/`** — read-only snapshots of Ardour, LMMS, Zrythm and Tracktion source, about 30,000 lines, kept as study material. It is tracked by git and therefore **is** searched by default, so exclude it deliberately. Reach it only through the index in [research/SOURCE_MAP.md](research/SOURCE_MAP.md), and only when prior art is explicitly wanted.
+
+Neither tree is compiled or imported. Nothing in either is ever the answer to "where is this implemented".
+
+## Where things live
+
+Application code, `native/src`:
+
+| Area | Files |
+| --- | --- |
+| Session model and engine ownership | `Session.h` declares everything; `Session.cpp` holds construction, project load/save and undo. Implementation is split across `Session*.cpp` by responsibility — notes, devices, automation, clips, presets, tracks, transport. |
+| Note grid UI | `StepGrid.*` — the 16-step pattern editor |
+| Arrangement UI | `Arrangement.*`, `ArrangementGeometry.cpp`, `ClipGeometry.h` |
+| Device rack and editors | `DeviceRack.*` |
+| Browser | `BrowserPanel.*` |
+| App shell and lifecycle | `Main.cpp` |
+| Project files | `ProjectFiles.*` |
+| Playhead rendering | `Playhead.*` |
+| Built-in devices | `UtilityDevice`, `DrumDevice`, `ThetaArpDevice`, `ThetaBloomDevice`, `ThetaSpaceDevice`, `ThetaWaveDevice` |
+| Theme | `Theme.h` |
+
+The UI depends on `Session`; `Session` knows nothing about the UI. Keep that direction.
+
+Every source file is listed explicitly in `native/CMakeLists.txt` — nothing is globbed. A new `.cpp` needs a line there or it silently will not compile.
+
+## Keeping files small
+
+Split a `.cpp` when it passes roughly 600 lines or gains a second responsibility. Prefer the mechanism already used here: **define one class across several translation units**, as `SessionTransport.cpp` does for `Session` and `ArrangementGeometry.cpp` does for `Arrangement`. That needs no header change, no change at any call site, and preserves `friend` declarations used by tests — only a new line in `CMakeLists.txt`.
+
+Extract a genuinely new type only when it buys testability. `ClipGeometry.h` is the model: a pure header with no JUCE or engine dependency, unit-tested in 40 lines without a `Session`.
+
+## Tests
+
+Five CTest cases, all the same binary with different flags. Build and run:
+
+```powershell
+cmake --build native/build --config Release --parallel 2
+ctest --test-dir native/build -C Release --output-on-failure
+```
+
+Workflow scenarios live in `native/src/tests/*/scenarios/*.inc`. They are bare statement blocks included inside a runner function, not translation units — they share one `Session`, run in order, and may depend on state from an earlier scenario. The first failure aborts the whole runner, so you get one message rather than a list. Add a scenario by including it in the runner; `.inc` files are deliberately absent from CMake.
+
+Prefer a unit test over a scenario whenever the code under test needs no `Session`, render, or pointer sequence.
 
 ## Commit and push workflow
 
