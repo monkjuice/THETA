@@ -616,6 +616,15 @@ te::AutomatableParameter* exposedParameterAt(te::Plugin& plugin, int index)
     return activeParameterAt(plugin, index);
 }
 
+float exposedParameterMaximum(te::Plugin& plugin, int index, float maximum)
+{
+    // 4OSC exposes a 60-second amp attack internally.  That makes the rack
+    // control impractical, so Theta presents the musically useful first 6 s.
+    if (dynamic_cast<te::FourOscPlugin*>(&plugin) != nullptr && index == 0)
+        return std::min(maximum, 6.0f);
+    return maximum;
+}
+
 tracktion::core::TimeRange firstFreeDuplicateRange(te::Clip& source)
 {
     const auto old = source.getPosition().time;
@@ -1814,7 +1823,7 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
                                       formatFourOscMacroValue(i, parameter->getCurrentValue(), *parameter),
                                       parameter->getCurrentValue(),
                                       range.getStart(),
-                                      range.getEnd(),
+                                      exposedParameterMaximum(*plugin, i, range.getEnd()),
                                       parameter->isDiscrete(),
                                       hasClipAutomationTarget(*edit, target),
                                       runtime != nullptr && runtime->overridden});
@@ -1894,7 +1903,7 @@ juce::Result Session::setDeviceParameter(int track, int slot, int parameterIndex
     if (parameter == nullptr) return juce::Result::fail("Select a parameter first.");
     lastTouchedParameter = {track, slot, parameterIndex};
     const auto range = parameter->getValueRange();
-    const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
+    const auto next = juce::jlimit(range.getStart(), exposedParameterMaximum(*plugin, parameterIndex, range.getEnd()), value);
     auto& runtime = automationRuntimeFor(lastTouchedParameter);
     runtime.baseValue = next;
     runtime.hasBaseValue = true;
@@ -2375,7 +2384,8 @@ void Session::applyClipAutomationAt(double timelineSeconds)
                     if (runtime.overridden)
                         continue;
 
-                    const auto next = juce::jlimit(range.getStart(), range.getEnd(), value);
+                    const auto next = juce::jlimit(range.getStart(),
+                                                   exposedParameterMaximum(*plugin, automation.target.parameter, range.getEnd()), value);
                     if (std::abs(parameter->getCurrentValue() - next) > 0.0001f)
                     {
                         parameter->setParameter(next, juce::sendNotification);
@@ -2411,7 +2421,8 @@ void Session::applyClipAutomationAt(double timelineSeconds)
         if (auto* parameter = exposedParameterAt(*plugin, runtime.target.parameter))
         {
             const auto range = parameter->getValueRange();
-            const auto next = juce::jlimit(range.getStart(), range.getEnd(), runtime.baseValue);
+            const auto next = juce::jlimit(range.getStart(),
+                                           exposedParameterMaximum(*plugin, runtime.target.parameter, range.getEnd()), runtime.baseValue);
             if (std::abs(parameter->getCurrentValue() - next) > 0.0001f)
             {
                 parameter->setParameter(next, juce::sendNotification);

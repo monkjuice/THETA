@@ -103,6 +103,11 @@
         require(synthMacros.size() == 6 && synthMacros[0].name == "Attack" && synthMacros[1].name == "Decay"
                 && synthMacros[2].name == "Sustain" && synthMacros[3].name == "Release",
                 "4OSC rack exposes musical envelope macros first");
+        require(synthMacros[0].minimum == 0.0f && synthMacros[0].maximum == 6.0f,
+                "4OSC Attack rack range is 0 to 6000 ms");
+        require(session.setDeviceParameter(0, 0, 0, 60.0f).wasOk()
+                    && session.synth->ampAttack->getCurrentValue() == 6.0f,
+                "4OSC Attack rack edits are capped at 6000 ms");
         const auto previousAttack = session.synth->ampAttack->getCurrentValue();
         require(session.setDeviceParameter(0, 0, 0, previousAttack + 0.05f).wasOk(), "4OSC Attack macro can be edited from the rack");
         require(session.synth->ampAttack->getCurrentValue() > previousAttack, "4OSC Attack macro writes to the synth envelope");
