@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
 project(ThetaNative VERSION 0.1.0 LANGUAGES C CXX)
 
+# Every application source is explicitly listed below, so Visual Studio does
+# not need CMake's generated ZERO_CHECK target to discover new files.  Recent
+# CMake/MSBuild combinations in this workspace report a parent-target failure
+# immediately after ZERO_CHECK despite the check itself succeeding.
+set(CMAKE_SUPPRESS_REGENERATION ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

@@ -193,7 +193,7 @@ std::vector<Session::DeviceParameter> Session::deviceParameters(int track, int s
 
     if (auto* wavePlugin = dynamic_cast<ThetaWaveDevice*>(plugin))
     {
-        for (int i = 0; i < 18; ++i)
+        for (int i = 0; i < 23; ++i)
             if (auto* parameter = thetaWaveMacroParameterAt(*wavePlugin, i))
             {
                 const auto range = parameter->getValueRange();

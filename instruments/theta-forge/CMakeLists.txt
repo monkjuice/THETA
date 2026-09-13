@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.24)
 project(ThetaForge VERSION 0.1.0 LANGUAGES CXX)
 
+# Sources are explicit. Suppressing ZERO_CHECK avoids a CMake/MSBuild generated
+# project-reference failure seen on this Windows toolchain after the check
+# succeeds, before the actual plugin target is invoked.
+set(CMAKE_SUPPRESS_REGENERATION ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(THETA_JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../native/.deps/juce" CACHE PATH "JUCE source checkout")
@@ -20,6 +24,11 @@ juce_add_plugin(ThetaForge
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
+    # The pinned JUCE/CMake Visual Studio generator's manifest-helper project
+    # fails before invoking the VST3 target. A VST3 manifest is optional for
+    # development hosts; re-enable it explicitly for release packaging once
+    # that upstream generator issue is resolved.
+    VST3_AUTO_MANIFEST FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE)
 
 target_sources(ThetaForge PRIVATE
@@ -35,4 +44,8 @@ target_link_libraries(ThetaForge PRIVATE
     juce::juce_recommended_warning_flags)
 target_compile_definitions(ThetaForge PRIVATE
     JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0)
+    JUCE_USE_CURL=0
+    # Forge ships VST3 only. JUCE's VST2/VST3 collision guard is therefore not
+    # applicable, while the explicit ParameterID version hints above retain
+    # stable host automation IDs.
+    JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1)

@@ -7,7 +7,9 @@ namespace
 {
 std::unique_ptr<juce::RangedAudioParameter> parameter(const char* id, const char* name, juce::NormalisableRange<float> range, float initial)
 {
-    return std::make_unique<juce::AudioParameterFloat>(id, name, range, initial);
+    // Explicit version hints make VST3 parameter IDs stable from the first
+    // release, rather than relying on JUCE's legacy VST2-compatible mapping.
+    return std::make_unique<juce::AudioParameterFloat>(juce::ParameterID {id, 1}, name, range, initial);
 }
 }
 
