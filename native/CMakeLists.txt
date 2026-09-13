@@ -47,6 +47,9 @@ target_sources(ThetaNative PRIVATE
     src/DeviceMacros.cpp
     # UI
     src/StepGrid.cpp
+    src/StepGridPainter.cpp
+    src/StepGridGestures.cpp
+    src/StepGridEditing.cpp
     src/Arrangement.cpp
     src/ArrangementGeometry.cpp
     src/BrowserPanel.cpp

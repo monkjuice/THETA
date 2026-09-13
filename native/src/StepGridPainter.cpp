@@ -1,0 +1,200 @@
+#include "StepGridInternal.h"
+#include "Playhead.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+// Grid rendering.
+
+namespace theta
+{
+
+void StepGrid::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xff1d2228));
+    if (hasKeyboardFocus(true))
+    {
+        g.setColour(juce::Colour(0xff55c7eb).withAlpha(0.12f));
+        g.fillRect(getLocalBounds().removeFromTop(static_cast<int>(headerHeight)));
+    }
+    g.setFont(juce::FontOptions(12.0f));
+    const auto dirty = g.getClipBounds().toFloat();
+    const auto steps = session.editorStepCount();
+    const auto firstVisibleStep = std::max(0, static_cast<int>(std::floor(stepScroll)));
+    const auto lastVisibleStep = std::min(steps - 1, static_cast<int>(std::ceil(stepScroll + visibleStepSpan())));
+    for (int step = 0; step < steps; ++step)
+    {
+        const auto headerCell = cell(step, 0).withY(0).withHeight(headerHeight);
+        if (headerCell.getRight() < labelWidth || headerCell.getX() > gridRight())
+            continue;
+        g.setColour(juce::Colour(step % 4 == 0 ? 0xffd4dacd : 0xff78818a));
+        g.drawText(juce::String(step + 1), headerCell, juce::Justification::centred);
+    }
+    for (int row = 0; row < Session::pitches; ++row)
+    {
+        const auto pitch = lowestVisiblePitch + Session::pitches - 1 - row;
+        const bool black = juce::MidiMessage::isMidiNoteBlack(pitch);
+        const auto scaleIndex = scaleHighlight - 2;
+        const bool scaleEnabled = !session.isPatternDrums() && scaleIndex >= 0;
+        const auto root = scaleEnabled ? scaleIndex % 12 : 0;
+        const bool minor = scaleEnabled && scaleIndex >= 12;
+        static constexpr std::array<int, 7> major {0, 2, 4, 5, 7, 9, 11};
+        static constexpr std::array<int, 7> naturalMinor {0, 2, 3, 5, 7, 8, 10};
+        const auto& scale = minor ? naturalMinor : major;
+        const auto pitchClass = (pitch % 12 + 12) % 12;
+        const bool inScale = !scaleEnabled || std::find(scale.begin(), scale.end(), (pitchClass - root + 12) % 12) != scale.end();
+        const bool namedDrum = session.isPatternDrums()
+                            && (pitch == 48 || pitch == 50 || pitch == 52 || pitch == 53 || pitch == 54
+                                || pitch == 56 || pitch == 58 || pitch == 59);
+        auto key = cell(0, row).withX(0).withWidth(labelWidth - 4);
+        g.setColour(juce::Colour(namedDrum ? 0xff3a3325 : black ? 0xff15191e : 0xff30373e));
+        g.fillRect(key.reduced(0, 1));
+        g.setColour(juce::Colour(namedDrum ? 0xffffc16a : 0xffbac2ca));
+        g.drawText(session.isPatternDrums() ? drumLaneName(pitch) : juce::MidiMessage::getMidiNoteName(pitch, true, true, 4),
+                   key, juce::Justification::centred);
+        for (int step = firstVisibleStep; step <= lastVisibleStep; ++step)
+        {
+            const auto bounds = cell(step, row);
+            if (!dirty.intersects(bounds)) continue;
+            const auto barColour = step / 4 % 2 == 0 ? juce::Colour(0xff46515a) : juce::Colour(0xff3b4650);
+            g.setColour(barColour);
+            g.fillRect(bounds);
+            if (scaleEnabled && inScale)
+            {
+                g.setColour(juce::Colour(0x123b8d9e));
+                g.fillRect(bounds);
+            }
+        }
+        for (const auto& note : visibleNotes)
+        {
+            if (note.row != row)
+                continue;
+            auto bounds = boundsFor(note);
+            if (bounds.getRight() < labelWidth || !dirty.intersects(bounds))
+                continue;
+
+            const auto selected = isSelected(note.state);
+            g.setColour(selected ? juce::Colour(0xffe9a84a) : juce::Colour(0xffc6d58c));
+            g.fillRect(bounds);
+            g.setColour(selected ? juce::Colour(0x77482d15) : juce::Colour(0x55363f46));
+            g.fillRect(bounds.withWidth(1.0f));
+            g.setColour(selected ? juce::Colour(0xffffe3a3) : juce::Colour(0xffe8f2aa));
+            g.fillRect(bounds.withX(bounds.getRight() - 2.0f).withWidth(2.0f));
+            if (selected)
+            {
+                g.setColour(juce::Colour(0xfffff0c2));
+                g.drawRect(bounds.reduced(1.0f), 2.0f);
+            }
+        }
+    }
+    // Draw the grid after all cells. This avoids the next row's fractional
+    // fill covering the preceding row separator on high-DPI displays.
+    g.setColour(juce::Colour(0xff202930));
+    for (int row = 0; row <= Session::pitches; ++row)
+    {
+        const auto y = headerHeight + row * rowAreaHeight() / Session::pitches;
+        g.fillRect(juce::Rectangle<float>(labelWidth, std::floor(y), gridWidth(), 1.0f));
+    }
+    for (int row = 0; row < Session::pitches; ++row)
+    {
+        std::array<int, Session::steps + 2> sustainedBoundaryDeltas {};
+        for (const auto& note : visibleNotes)
+        {
+            if (note.row != row)
+                continue;
+            const auto noteStart = note.start;
+            const auto noteEnd = noteStart + std::max(0.0625, note.length);
+            constexpr float boundaryTolerance = 0.0001f;
+            const auto firstCovered = std::clamp(static_cast<int>(std::floor(noteStart + boundaryTolerance)) + 1,
+                                                 0, steps + 1);
+            const auto afterLastCovered = std::clamp(static_cast<int>(std::ceil(noteEnd - boundaryTolerance)),
+                                                     0, steps + 1);
+            if (firstCovered < afterLastCovered)
+            {
+                ++sustainedBoundaryDeltas[static_cast<size_t>(firstCovered)];
+                --sustainedBoundaryDeltas[static_cast<size_t>(afterLastCovered)];
+            }
+        }
+
+        int sustainedNotes = 0;
+        const auto rowTop = headerHeight + row * rowAreaHeight() / Session::pitches;
+        const auto rowBottom = headerHeight + (row + 1) * rowAreaHeight() / Session::pitches;
+        for (int step = 0; step <= lastVisibleStep + 1; ++step)
+        {
+            sustainedNotes += sustainedBoundaryDeltas[static_cast<size_t>(step)];
+            if (step >= firstVisibleStep && sustainedNotes == 0)
+            {
+                const auto x = cell(step, 0).getX();
+                g.setColour(juce::Colour(step % 4 == 0 ? 0xff252d35 : 0xff303941));
+                g.drawVerticalLine(juce::roundToInt(x), rowTop, rowBottom);
+            }
+        }
+    }
+    if (!session.isPatternDrums())
+    {
+        const auto maxLowest = 127 - Session::pitches + 1;
+        const auto thumbHeight = std::max(18.0f, rowAreaHeight() * (static_cast<float>(Session::pitches) / 128.0f));
+        const auto thumbTravel = std::max(1.0f, rowAreaHeight() - thumbHeight);
+        const auto thumbY = headerHeight + (maxLowest - lowestVisiblePitch) / static_cast<float>(maxLowest) * thumbTravel;
+        const auto right = gridRight();
+        const juce::Rectangle<float> thumb(right - 5.0f, thumbY, 3.0f, thumbHeight);
+        g.setColour(juce::Colour(0x55313b44));
+        g.fillRect(juce::Rectangle<float>(right - 6.0f, headerHeight + 2.0f, 4.0f, rowAreaHeight() - 4.0f));
+        g.setColour(juce::Colour(0xaa8cc5d2));
+        g.fillRoundedRectangle(thumb, 1.5f);
+    }
+    if (playhead >= 0)
+    {
+        g.setColour(playheadColour);
+        g.fillRect(playhead, headerHeight, 2.0f, rowAreaHeight());
+    }
+    if (hasKeyboardFocus(true))
+    {
+        g.setColour(juce::Colour(0xff55c7eb));
+        g.drawRect(getLocalBounds().toFloat().reduced(1.0f), 2.0f);
+    }
+    if (gesture == Gesture::select && !selectionBox.isEmpty())
+    {
+        g.setColour(juce::Colour(0x3355c7eb));
+        g.fillRect(selectionBox);
+        g.setColour(juce::Colour(0xff55c7eb));
+        static constexpr float dash[] {4.0f, 3.0f};
+        g.drawDashedLine(juce::Line<float>(selectionBox.getTopLeft(), selectionBox.getTopRight()), dash, 2, 1.0f);
+        g.drawDashedLine(juce::Line<float>(selectionBox.getTopRight(), selectionBox.getBottomRight()), dash, 2, 1.0f);
+        g.drawDashedLine(juce::Line<float>(selectionBox.getBottomRight(), selectionBox.getBottomLeft()), dash, 2, 1.0f);
+        g.drawDashedLine(juce::Line<float>(selectionBox.getBottomLeft(), selectionBox.getTopLeft()), dash, 2, 1.0f);
+    }
+    if (subdivisionActive && subdivisionCount >= 2)
+    {
+        const auto centre = subdivisionSourceBounds.getCentre();
+        const auto badge = juce::Rectangle<float>(centre.x - 17.0f, subdivisionSourceBounds.getY() - 28.0f, 34.0f, 22.0f);
+        g.setColour(juce::Colour(0xffe5e8df));
+        g.fillRoundedRectangle(badge, 3.0f);
+        g.setColour(juce::Colour(0xff252a30));
+        g.drawRoundedRectangle(badge, 3.0f, 1.0f);
+        g.setFont(juce::FontOptions(13.0f).withStyle("Bold"));
+        g.drawText(juce::String(subdivisionCount), badge, juce::Justification::centred);
+    }
+    const auto footer = footerBounds();
+    if (dirty.intersects(footer))
+    {
+        g.setColour(juce::Colour(velocityAdjustActive ? 0xff29343b : 0xff171c21));
+        g.fillRect(footer);
+        g.setColour(juce::Colour(0xff3b4650));
+        g.fillRect(footer.withHeight(1.0f));
+        const auto velocity = selectedVelocityPercent();
+        const auto value = velocity >= 0 ? juce::String(velocity) + "%"
+                                         : velocity == -1 ? juce::String("MIXED") : juce::String("-");
+        g.setFont(juce::FontOptions(11.5f).withStyle("Bold"));
+        g.setColour(velocityAdjustActive ? juce::Colour(0xffe9a84a) : juce::Colour(0xffb8c4aa));
+        g.drawText("VELOCITY  " + value, footer.reduced(9.0f, 2.0f), juce::Justification::centredRight);
+        if (velocity >= -1)
+        {
+            g.setFont(juce::FontOptions(10.5f));
+            g.setColour(juce::Colour(0xff78818a));
+            g.drawText("Hold V + Up/Down or wheel", footer.reduced(9.0f, 2.0f), juce::Justification::centredLeft);
+        }
+    }
+}
+
+}
