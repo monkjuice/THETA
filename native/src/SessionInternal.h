@@ -1,0 +1,79 @@
+#pragma once
+#include "Session.h"
+
+// Shared internals of the Session implementation.
+//
+// Session is defined across several translation units (Session.cpp,
+// SessionTransport.cpp, SessionPatches.cpp, DeviceMacros.cpp and friends).
+// Anything those files need in common lives here rather than in a per-file
+// anonymous namespace. This header is internal: nothing outside the Session
+// implementation should include it.
+
+namespace theta
+{
+
+// ValueTree property identifiers owned by the session document.
+extern const juce::Identifier starterPlaceholderID;
+extern const juce::Identifier editorStepsID;
+extern const juce::Identifier clipAutomationID;
+extern const juce::Identifier automationTrackID;
+extern const juce::Identifier automationSlotID;
+extern const juce::Identifier automationParameterID;
+extern const juce::Identifier automationStartID;
+extern const juce::Identifier automationEndID;
+extern const juce::Identifier automationStartValueID;
+extern const juce::Identifier automationEndValueID;
+
+struct PresetNote { int step, pitch, length; };
+
+enum class SynthPatch { Default, ChordPad, SubBass, ReeseBass };
+
+struct PresetPattern
+{
+    const PresetNote* notes = nullptr;
+    int count = 0;
+    juce::String name;
+    bool useDrums = false;
+    bool useThetaWave = false;
+    SynthPatch synthPatch = SynthPatch::Default;
+};
+
+// Pattern and preset data (SessionPatches.cpp)
+PresetPattern presetPattern(Session::PatternPreset preset);
+void fillMidiClip(te::MidiClip& clip, const PresetPattern& preset, juce::UndoManager& undoManager);
+void setPluginParameter(te::AutomatableParameter::Ptr parameter, float value);
+void applySynthPatch(SynthPatch patch, te::FourOscPlugin& synth, juce::UndoManager& undoManager);
+void applyThetaWavePatch(Session::PatternPreset preset, ThetaWaveDevice& wave);
+
+// Device parameter and macro mapping (DeviceMacros.cpp)
+te::AutomatableParameter* activeParameterAt(te::Plugin& plugin, int index);
+te::AutomatableParameter* fourOscMacroParameterAt(te::FourOscPlugin& synth, int index);
+te::AutomatableParameter* thetaWaveMacroParameterAt(ThetaWaveDevice& wave, int index);
+juce::String fourOscMacroName(int index);
+juce::String thetaWaveMacroName(int index);
+juce::String formatFourOscMacroValue(int index, float value, te::AutomatableParameter& parameter);
+juce::String formatThetaWaveMacroValue(int index, float value, te::AutomatableParameter& parameter);
+te::AutomatableParameter* exposedParameterAt(te::Plugin& plugin, int index);
+float exposedParameterMaximum(te::Plugin& plugin, int index, float maximum);
+
+// Engine and model helpers (SessionInternal.cpp)
+void panicMidiOnTrack(te::ClipTrack* clipTrack);
+juce::Colour presetColour(Session::PatternPreset preset);
+juce::Colour instrumentColour(Session::Instrument instrument);
+juce::Colour nextClipColour(juce::Colour current);
+bool effectTypeAndName(Session::AudioEffect effect, const char*& type, juce::String& name);
+void resetPluginList(te::PluginList* list);
+double stepDurationBeats(int steps);
+bool sameDeviceTarget(Session::DeviceTarget a, Session::DeviceTarget b);
+bool hasClipAutomationTarget(const te::Edit& edit, Session::DeviceTarget target);
+te::Plugin* findPlugin(te::AudioTrack& track, const juce::String& type);
+te::FourOscPlugin* findFourOsc(te::AudioTrack& track);
+ThetaWaveDevice* findThetaWave(te::AudioTrack& track);
+DrumDevice* findDrumDevice(te::AudioTrack& track);
+Session::Instrument activeTrackInstrument(te::AudioTrack& track);
+tracktion::core::TimeRange firstFreeDuplicateRange(te::Clip& source);
+juce::Result ensurePlugin(te::Edit& edit, te::AudioTrack& track, const juce::String& type,
+                          int insertIndex, te::Plugin*& plugin, bool& changed);
+juce::Result switchTrackInstrument(te::Edit& edit, te::AudioTrack& track, Session::Instrument instrument, bool& changed);
+
+}

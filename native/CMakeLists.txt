@@ -35,7 +35,10 @@ juce_add_binary_data(ThetaNativeAssets
 target_sources(ThetaNative PRIVATE
     # Session
     src/Session.cpp
+    src/SessionInternal.cpp
+    src/SessionPatches.cpp
     src/SessionTransport.cpp
+    src/DeviceMacros.cpp
     # UI
     src/StepGrid.cpp
     src/Arrangement.cpp
