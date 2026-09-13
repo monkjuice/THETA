@@ -52,6 +52,10 @@ target_sources(ThetaNative PRIVATE
     src/StepGridEditing.cpp
     src/Arrangement.cpp
     src/ArrangementGeometry.cpp
+    src/ArrangementPainter.cpp
+    src/ArrangementSync.cpp
+    src/ArrangementGestures.cpp
+    src/ArrangementDrops.cpp
     src/BrowserPanel.cpp
     src/DeviceRack.cpp
     src/Playhead.cpp

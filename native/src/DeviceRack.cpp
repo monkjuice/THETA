@@ -1,4 +1,5 @@
 #include "DeviceRack.h"
+#include "BrowserIds.h"
 #include <cmath>
 #include <optional>
 
@@ -9,32 +10,19 @@ namespace
 std::optional<Session::AudioEffect> effectFromBrowserDrop(const juce::String& description)
 {
     if (!description.startsWith("theta-browser:effect:")) return std::nullopt;
-    const auto id = description.fromLastOccurrenceOf(":", false, false);
-    if (id == "Equaliser")  return Session::AudioEffect::Equaliser;
-    if (id == "Reverb")     return Session::AudioEffect::Reverb;
-    if (id == "Delay")      return Session::AudioEffect::Delay;
-    if (id == "Compressor") return Session::AudioEffect::Compressor;
-    if (id == "ThetaSpace") return Session::AudioEffect::ThetaSpace;
-    if (id == "ThetaBloom") return Session::AudioEffect::ThetaBloom;
-    return std::nullopt;
+    return audioEffectFromId(browserDropId(description));
 }
 
 std::optional<Session::Instrument> instrumentFromBrowserDrop(const juce::String& description)
 {
     if (!description.startsWith("theta-browser:instrument:")) return std::nullopt;
-    const auto id = description.fromLastOccurrenceOf(":", false, false);
-    if (id == "FourOsc") return Session::Instrument::FourOsc;
-    if (id == "Drums")   return Session::Instrument::Drums;
-    if (id == "Utility") return Session::Instrument::Utility;
-    return std::nullopt;
+    return instrumentFromId(browserDropId(description));
 }
 
 std::optional<Session::MidiEffect> midiEffectFromBrowserDrop(const juce::String& description)
 {
     if (!description.startsWith("theta-browser:midi-effect:")) return std::nullopt;
-    const auto id = description.fromLastOccurrenceOf(":", false, false);
-    if (id == "ThetaArp") return Session::MidiEffect::ThetaArp;
-    return std::nullopt;
+    return midiEffectFromId(browserDropId(description));
 }
 
 void styleAutomationButton(juce::TextButton& button, const Session::DeviceParameter& parameter)

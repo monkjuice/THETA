@@ -1,0 +1,265 @@
+#include "ArrangementInternal.h"
+#include "Playhead.h"
+#include <optional>
+#include <set>
+
+// Pointer gestures: loop range, clip move/trim, and automation drawing.
+
+namespace theta
+{
+
+void Arrangement::mouseDown(const juce::MouseEvent& event)
+{
+    grabKeyboardFocus();
+    if (event.mods.isRightButtonDown() && loopGestureAt(event.position) != LoopGesture::none)
+    {
+        session.clearManualLoopRange();
+        if (status) status("Loop range cleared");
+        repaint();
+        return;
+    }
+    if (!event.mods.isLeftButtonDown()) return;
+    for (int track = 0; track < session.trackCount(); ++track)
+        if (lane(track).withX(0.0f).contains(event.position))
+        {
+            selectTrack(track);
+            break;
+        }
+    if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
+    {
+        const auto loopRange = session.edit->getTransport().getLoopRange();
+        loopOriginalStart = loopRange.getStart().inSeconds();
+        loopOriginalEnd = loopRange.getEnd().inSeconds();
+        loopPreviewStart = loopOriginalStart;
+        loopPreviewEnd = loopOriginalEnd;
+        loopAnchor = timeAt(event.position.x);
+        loopGesture = loopGestureAt(event.position);
+        if (loopGesture == LoopGesture::none)
+        {
+            loopGesture = LoopGesture::create;
+            loopAnchor = snapped(std::max(0.0, loopAnchor), event.mods.isAltDown());
+            loopPreviewStart = loopPreviewEnd = loopAnchor;
+        }
+        repaint();
+        return;
+    }
+    const auto index = hit(event.position);
+    if (index < 0) { selected = {}; repaint(); return; }
+    const auto& clip = clips[static_cast<size_t>(index)];
+    selected = clip.id;
+    selectTrack(clip.track);
+    if (clip.waveform == nullptr)
+    {
+        const auto result = session.selectPatternClip(selected);
+        if (result.failed() && status) status(result.getErrorMessage());
+    }
+    repaint();
+    if (automationButton.getToggleState())
+    {
+        automationTarget = session.lastTouchedDeviceParameter();
+        if (!automationTarget.isValid())
+        {
+            if (status) status("Move a device knob first, then draw automation.");
+            return;
+        }
+        const auto parameters = session.deviceParameters(automationTarget.track, automationTarget.slot);
+        if (!juce::isPositiveAndBelow(automationTarget.parameter, parameters.size()))
+        {
+            if (status) status("The last moved knob is no longer available.");
+            return;
+        }
+        activeAutomationClip = clip.id;
+        activeAutomationTarget = automationTarget;
+        automationDragging = true;
+        automationStartTime = automationEndTime = snapped(std::clamp(timeAt(event.position.x), clip.position.start, clip.position.end), event.mods.isAltDown());
+        automationStartValue = automationEndValue = automationValueForY(clip, event.position.y, automationTarget);
+        repaint(bounds(clip).getSmallestIntegerContainer());
+        return;
+    }
+    original = preview = clip.position;
+    originalTrack = previewTrack = clip.track;
+    sourceDuration = clip.sourceDuration;
+    const auto box = bounds(clip);
+    const auto handleWidth = std::min(7.0f, box.getWidth() * 0.25f);
+    gesture = event.position.x - box.getX() < handleWidth ? ClipGesture::trimLeft
+        : box.getRight() - event.position.x < handleWidth ? ClipGesture::trimRight : ClipGesture::move;
+    dragTime = timeAt(event.position.x);
+    dragging = true;
+}
+
+void Arrangement::mouseDrag(const juce::MouseEvent& event)
+{
+    if (automationDragging)
+    {
+        for (const auto& clip : clips)
+            if (clip.id == selected)
+            {
+                automationEndTime = snapped(std::clamp(timeAt(event.position.x), clip.position.start, clip.position.end), event.mods.isAltDown());
+                automationEndValue = automationValueForY(clip, event.position.y, automationTarget);
+                repaint(bounds(clip).getSmallestIntegerContainer());
+                return;
+            }
+    }
+    if (loopGesture != LoopGesture::none)
+    {
+        constexpr auto minimumLoopSeconds = 0.02;
+        const auto t = std::max(0.0, timeAt(event.position.x));
+        if (loopGesture == LoopGesture::create)
+        {
+            const auto edge = snapped(t, event.mods.isAltDown());
+            loopPreviewStart = std::min(loopAnchor, edge);
+            loopPreviewEnd = std::max(loopAnchor, edge);
+        }
+        else if (loopGesture == LoopGesture::move)
+        {
+            const auto length = loopOriginalEnd - loopOriginalStart;
+            auto start = snapped(loopOriginalStart + t - loopAnchor, event.mods.isAltDown());
+            start = std::max(0.0, start);
+            loopPreviewStart = start;
+            loopPreviewEnd = start + length;
+        }
+        else if (loopGesture == LoopGesture::trimStart)
+        {
+            loopPreviewStart = std::min(snapped(t, event.mods.isAltDown()), loopOriginalEnd - minimumLoopSeconds);
+            loopPreviewStart = std::max(0.0, loopPreviewStart);
+            loopPreviewEnd = loopOriginalEnd;
+        }
+        else if (loopGesture == LoopGesture::trimEnd)
+        {
+            loopPreviewStart = loopOriginalStart;
+            loopPreviewEnd = std::max(snapped(t, event.mods.isAltDown()), loopOriginalStart + minimumLoopSeconds);
+        }
+        repaint();
+        return;
+    }
+    if (!dragging) return;
+    const auto anchor = gesture == ClipGesture::trimRight ? original.end : original.start;
+    auto targetTrack = previewTrack;
+    if (gesture == ClipGesture::move)
+    {
+        if (const auto target = trackAt(event.position.y); target >= 0)
+            targetTrack = target;
+        else if (session.trackCount() > 0 && event.position.y > lane(session.trackCount() - 1).getBottom())
+            targetTrack = session.trackCount();
+        else
+            targetTrack = originalTrack;
+    }
+    const auto rawStart = anchor + timeAt(event.position.x) - dragTime;
+    const auto editTime = gesture == ClipGesture::move
+        ? snappedClipMoveStart(rawStart, original.end - original.start, targetTrack, event.mods.isAltDown())
+        : snapped(rawStart, event.mods.isAltDown());
+    preview = previewClipEdit(original, gesture, editTime, sourceDuration);
+    previewTrack = targetTrack;
+    repaint(lane(originalTrack).getUnion(lane(juce::jlimit(0, session.trackCount() - 1, previewTrack))).getSmallestIntegerContainer());
+}
+
+void Arrangement::mouseUp(const juce::MouseEvent& event)
+{
+    if (automationDragging)
+    {
+        mouseDrag(event);
+        automationDragging = false;
+        const auto result = session.setClipAutomationRamp(selected, automationTarget, automationStartTime, automationEndTime,
+                                                          automationStartValue, automationEndValue);
+        if (status)
+        {
+            const auto parameters = session.deviceParameters(automationTarget.track, automationTarget.slot);
+            const auto name = juce::isPositiveAndBelow(automationTarget.parameter, parameters.size())
+                ? parameters[static_cast<size_t>(automationTarget.parameter)].name
+                : juce::String("parameter");
+            status(result.wasOk() ? "Clip automation: " + name : result.getErrorMessage());
+        }
+        if (result.wasOk())
+        {
+            activeAutomationClip = selected;
+            activeAutomationTarget = automationTarget;
+            // Draw mode is one-shot so the next drag returns to the normal
+            // clip move/trim gesture without requiring an extra toggle.
+            automationButton.setToggleState(false, juce::dontSendNotification);
+        }
+        repaint();
+        return;
+    }
+    if (loopGesture != LoopGesture::none)
+    {
+        mouseDrag(event);
+        const auto completedGesture = loopGesture;
+        loopGesture = LoopGesture::none;
+        if (event.getDistanceFromDragStart() >= 3)
+        {
+            const auto result = session.setLoopRange(loopPreviewStart, loopPreviewEnd);
+            if (result.failed() && status) status(result.getErrorMessage());
+            else if (status) status(completedGesture == LoopGesture::create ? "Loop range selected" : "Loop range updated");
+        }
+        else
+        {
+            session.edit->getTransport().setPosition(tracktion::core::TimePosition::fromSeconds(std::max(0.0, timeAt(event.position.x))));
+            updatePlayhead();
+        }
+        repaint();
+        return;
+    }
+    if (!dragging) return;
+    if (event.getDistanceFromDragStart() >= 3)
+    {
+        mouseDrag(event);
+        dragging = false;
+        const auto result = session.editClip(selected, preview, gesture, gesture == ClipGesture::move ? previewTrack : -1);
+        if (result.failed() && status) status(result.getErrorMessage());
+        else if (gesture == ClipGesture::move)
+            selectTrack(juce::jlimit(0, std::max(0, session.trackCount() - 1), previewTrack));
+    }
+    cancelDrag();
+    repaint();
+}
+
+void Arrangement::mouseMove(const juce::MouseEvent& event)
+{
+    const auto index = hit(event.position);
+    auto pointerStyle = juce::MouseCursor::NormalCursor;
+    const auto loopHit = loopGestureAt(event.position);
+    if (loopHit == LoopGesture::trimStart || loopHit == LoopGesture::trimEnd)
+        pointerStyle = juce::MouseCursor::LeftRightResizeCursor;
+    else if (loopHit == LoopGesture::move)
+        pointerStyle = juce::MouseCursor::DraggingHandCursor;
+    else if (event.y >= rulerTop && event.y < lanesTop && event.x >= headerWidth)
+        pointerStyle = juce::MouseCursor::CrosshairCursor;
+    else if (index >= 0)
+    {
+        if (automationButton.getToggleState())
+            pointerStyle = juce::MouseCursor::CrosshairCursor;
+        else if (automationLaneAt(clips[static_cast<size_t>(index)], event.position) >= 0)
+            pointerStyle = juce::MouseCursor::DraggingHandCursor;
+        else
+        {
+            const auto box = bounds(clips[static_cast<size_t>(index)]);
+            const auto handle = std::min(7.0f, box.getWidth() * 0.25f);
+            pointerStyle = event.position.x - box.getX() < handle || box.getRight() - event.position.x < handle
+                ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor;
+        }
+    }
+    setMouseCursor(pointerStyle);
+}
+
+void Arrangement::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
+{
+    if (dragging) return;
+    if (event.mods.isCommandDown()) zoom(std::exp(-wheel.deltaY * 2.0), timeAt(event.position.x));
+    else if (std::abs(wheel.deltaY) > std::abs(wheel.deltaX)
+             && static_cast<float>(session.trackCount()) * laneHeight() > laneContentHeight() + 1.0f)
+    {
+        trackScroll += -wheel.deltaY * laneHeight() * 1.5;
+        updateScroll();
+        resized();
+        repaint();
+    }
+    else
+    {
+        viewStart -= (std::abs(wheel.deltaX) > std::abs(wheel.deltaY) ? wheel.deltaX : wheel.deltaY) * viewSpan * 0.3;
+        updateScroll();
+        updatePlayhead();
+        repaint();
+    }
+}
+
+}
