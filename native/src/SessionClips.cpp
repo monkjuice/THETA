@@ -80,7 +80,8 @@ juce::Result Session::editClip(te::EditItemID id, ClipGeometry next, ClipGesture
             if (targetTrack == 0)
                 edit->state.setProperty("thetaPatternInstrument",
                                         sourceInstrument == Instrument::Drums ? "drums"
-                                            : sourceInstrument == Instrument::ThetaWave ? "wave" : "synth",
+                                            : sourceInstrument == Instrument::ThetaWave ? "wave"
+                                            : sourceInstrument == Instrument::ThetaForge ? "forge" : "synth",
                                         &edit->getUndoManager());
         }
         if (!clip->moveTo(*target))

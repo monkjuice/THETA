@@ -59,3 +59,7 @@
             require(forgeParameters.size() == 14 && forgeParameters[0].name == "A Position"
                     && forgeParameters[8].name == "Cutoff" && forgeParameters[13].name == "Release",
                     "Theta Forge exposes the shared core parameter surface");
+            require(parameterSession.addInstrument(Session::Instrument::ThetaForge, 0).wasOk(),
+                    "Theta Forge can replace the Pattern synth");
+            require(parameterSession.projectSnapshot().getProperty("thetaPatternInstrument").toString() == "forge",
+                    "Pattern-grid Forge selection persists in the project state");

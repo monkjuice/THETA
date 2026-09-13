@@ -223,6 +223,11 @@ juce::Result Session::restoreProject(const juce::ValueTree& state, const juce::F
         bool instrumentChanged = false;
         juce::ignoreUnused(switchTrackInstrument(*edit, *tracks[0], Instrument::ThetaWave, instrumentChanged));
     }
+    else if (patternInstrument == "forge")
+    {
+        bool instrumentChanged = false;
+        juce::ignoreUnused(switchTrackInstrument(*edit, *tracks[0], Instrument::ThetaForge, instrumentChanged));
+    }
     else
     {
         setPatternInstrument(patternInstrument == "drums");

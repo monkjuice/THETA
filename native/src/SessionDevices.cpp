@@ -94,6 +94,12 @@ juce::Result Session::addInstrument(Instrument instrument, int trackIndex)
         if (result.failed())
             return juce::Result::fail(name + " could not be created.");
     }
+    if (trackIndex == 0 && instrument != Instrument::Utility)
+        edit->state.setProperty("thetaPatternInstrument",
+                                instrument == Instrument::Drums ? "drums"
+                                    : instrument == Instrument::ThetaWave ? "wave"
+                                    : instrument == Instrument::ThetaForge ? "forge" : "synth",
+                                &edit->getUndoManager());
     edit->getUndoManager().beginNewTransaction();
     if (changed)
         markModified();

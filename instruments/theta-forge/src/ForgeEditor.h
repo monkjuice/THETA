@@ -5,7 +5,7 @@
 
 namespace theta::forge
 {
-class Editor final : public juce::AudioProcessorEditor
+class Editor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit Editor(Processor&);
@@ -21,5 +21,7 @@ private:
     };
     Processor& processor;
     std::array<Control, 14> controls;
+
+    void timerCallback() override;
 };
 }

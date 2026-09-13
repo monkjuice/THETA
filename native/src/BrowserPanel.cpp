@@ -276,8 +276,9 @@ void BrowserPanel::applyRow(int row)
     }
     else if (item.instrument)
     {
-        const auto result = session.addInstrument(*item.instrument, 1);
-        if (status) status(result.wasOk() ? "Added " + item.name + " to Audio 1" : result.getErrorMessage());
+        const auto targetTrack = *item.instrument == Session::Instrument::ThetaForge ? 0 : 1;
+        const auto result = session.addInstrument(*item.instrument, targetTrack);
+        if (status) status(result.wasOk() ? "Added " + item.name + (targetTrack == 0 ? " to Pattern synth" : " to Audio 1") : result.getErrorMessage());
     }
     else if (item.midiEffect)
     {
