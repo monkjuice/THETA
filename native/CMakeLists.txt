@@ -81,7 +81,7 @@ target_sources(ThetaNative PRIVATE
     src/tests/Pattern/WorkflowTest.cpp
     src/tests/Arrangement/ClipGeometryTest.cpp
     src/tests/Arrangement/WorkflowTest.cpp)
-target_include_directories(ThetaNative PRIVATE src ../instruments/theta-forge/core)
+target_include_directories(ThetaNative PRIVATE src ../instruments/theta-forge/core ../instruments/theta-forge/ui)
 target_compile_definitions(ThetaNative PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
     JUCE_PLUGINHOST_VST3=0 JUCE_PLUGINHOST_AU=0

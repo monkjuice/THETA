@@ -33,6 +33,7 @@ juce_add_plugin(ThetaForge
 
 target_sources(ThetaForge PRIVATE
     core/ForgeCore.h
+    ui/ForgeVisuals.h
     src/ForgeProcessor.cpp
     src/ForgeProcessor.h
     src/ForgeEditor.cpp
