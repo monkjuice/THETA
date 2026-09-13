@@ -74,6 +74,7 @@ juce::Result Session::addInstrument(Instrument instrument, int trackIndex)
     {
         case Instrument::FourOsc: type = te::FourOscPlugin::xmlTypeName; name = "4OSC"; break;
         case Instrument::ThetaWave: type = ThetaWaveDevice::xmlTypeName; name = "Theta Wave"; break;
+        case Instrument::ThetaForge: type = ThetaForgeDevice::xmlTypeName; name = "Theta Forge"; break;
         case Instrument::Drums:   type = DrumDevice::xmlTypeName;        name = "Theta Drums"; break;
         case Instrument::Utility: type = UtilityDevice::xmlTypeName;     name = "Utility"; break;
     }

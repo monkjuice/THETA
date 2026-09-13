@@ -37,21 +37,11 @@ Processor::Processor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       state(*this, nullptr, "ThetaForgeState", parameterLayout())
 {
-    parameters = {state.getRawParameterValue("oscAPosition"), state.getRawParameterValue("oscBPosition"),
-                  state.getRawParameterValue("oscBLevel"), state.getRawParameterValue("oscBTune"),
-                  state.getRawParameterValue("subLevel"), state.getRawParameterValue("noiseLevel"),
-                  state.getRawParameterValue("unison"), state.getRawParameterValue("detune"),
-                  state.getRawParameterValue("cutoff"), state.getRawParameterValue("resonance"),
-                  state.getRawParameterValue("attack"), state.getRawParameterValue("decay"),
-                  state.getRawParameterValue("sustain"), state.getRawParameterValue("release")};
-    synth.addSound(new Sound());
-    for (int i = 0; i < 16; ++i)
-        synth.addVoice(new Voice(parameters));
 }
 
 void Processor::prepareToPlay(double sampleRate, int)
 {
-    synth.setCurrentPlaybackSampleRate(sampleRate);
+    core.initialise(sampleRate);
 }
 
 bool Processor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -63,7 +53,28 @@ void Processor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
-    synth.renderNextBlock(buffer, midi, 0, buffer.getNumSamples());
+    for (const auto metadata : midi)
+    {
+        const auto message = metadata.getMessage();
+        if (message.isNoteOn()) core.noteOn(message.getNoteNumber(), message.getFloatVelocity());
+        else if (message.isNoteOff()) core.noteOff(message.getNoteNumber());
+        else if (message.isAllNotesOff()) core.allNotesOff();
+    }
+    const auto values = patch();
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    {
+        float left, right; core.renderSample(values, left, right);
+        buffer.addSample(0, i, left);
+        if (buffer.getNumChannels() > 1) buffer.addSample(1, i, right);
+    }
+}
+
+Patch Processor::patch() const
+{
+    const auto value = [this] (const char* id) { return state.getRawParameterValue(id)->load(); };
+    return {value("oscAPosition"), value("oscBPosition"), value("oscBLevel"), value("oscBTune"),
+            value("subLevel"), value("noiseLevel"), value("unison"), value("detune"), value("cutoff"),
+            value("resonance"), value("attack"), value("decay"), value("sustain"), value("release")};
 }
 
 juce::AudioProcessorEditor* Processor::createEditor() { return new Editor(*this); }

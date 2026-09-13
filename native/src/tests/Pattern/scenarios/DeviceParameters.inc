@@ -49,3 +49,13 @@
                     && waveParameters[10].name == "Attack" && waveParameters[17].name == "Output"
                     && waveParameters[18].name == "LFO Rate" && waveParameters[22].name == "LFO Motion",
                     "Theta Wave exposes a full synth panel surface after the rack macros");
+            require(parameterSession.addInstrument(Session::Instrument::ThetaForge, 1).wasOk(), "Audio track can host Theta Forge");
+            int forgeSlot = -1;
+            for (int i = 0; i < parameterTrack->pluginList.size(); ++i)
+                if (auto* plugin = parameterTrack->pluginList[i]; plugin != nullptr && plugin->getPluginType() == ThetaForgeDevice::xmlTypeName)
+                    forgeSlot = i;
+            require(forgeSlot >= 0, "Theta Forge is inserted in the target track chain");
+            auto forgeParameters = parameterSession.deviceParameters(1, forgeSlot);
+            require(forgeParameters.size() == 14 && forgeParameters[0].name == "A Position"
+                    && forgeParameters[8].name == "Cutoff" && forgeParameters[13].name == "Release",
+                    "Theta Forge exposes the shared core parameter surface");

@@ -55,6 +55,7 @@ inline std::optional<Session::Instrument> instrumentFromId(const juce::String& i
 {
     if (id == "FourOsc")   return Session::Instrument::FourOsc;
     if (id == "ThetaWave") return Session::Instrument::ThetaWave;
+    if (id == "ThetaForge") return Session::Instrument::ThetaForge;
     if (id == "Drums")     return Session::Instrument::Drums;
     if (id == "Utility")   return Session::Instrument::Utility;
     return std::nullopt;

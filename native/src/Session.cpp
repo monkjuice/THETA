@@ -22,6 +22,7 @@ Session::Session() : engine(commandLineTestMode ? "Theta Native Tests" : "Theda 
     engine.getPluginManager().createBuiltInType<ThetaBloomDevice>();
     engine.getPluginManager().createBuiltInType<ThetaArpDevice>();
     engine.getPluginManager().createBuiltInType<ThetaWaveDevice>();
+    engine.getPluginManager().createBuiltInType<ThetaForgeDevice>();
     edit = te::createEmptyEdit(engine, {});
     edit->state.setProperty("thetaFormatVersion", 1, nullptr);
     edit->tempoSequence.getTempo(0)->setBpm(120.0);

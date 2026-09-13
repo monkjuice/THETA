@@ -46,6 +46,7 @@ juce::String instrumentId(Session::Instrument instrument)
     {
         case Session::Instrument::FourOsc:   return "FourOsc";
         case Session::Instrument::ThetaWave: return "ThetaWave";
+        case Session::Instrument::ThetaForge: return "ThetaForge";
         case Session::Instrument::Drums:     return "Drums";
         case Session::Instrument::Utility:   return "Utility";
     }
@@ -111,6 +112,7 @@ BrowserPanel::BrowserPanel(Session& s) : session(s)
         {"Drums", "Clap kit", "Kick, clap backbeat, tight hats", Session::PatternPreset::ClapKit, std::nullopt, std::nullopt, std::nullopt},
         {"Instruments", "4OSC synth", "Drop on a track for synth clips", std::nullopt, std::nullopt, Session::Instrument::FourOsc, std::nullopt},
         {"Instruments", "Theta Wave", "Morphing wavetable-style synth", std::nullopt, std::nullopt, Session::Instrument::ThetaWave, std::nullopt},
+        {"Instruments", "Theta Forge", "Two-oscillator Forge synth", std::nullopt, std::nullopt, Session::Instrument::ThetaForge, std::nullopt},
         {"Drums", "Theta Drums", "TR-808 analog kit: kick, snare, toms, closed/open hats", std::nullopt, std::nullopt, Session::Instrument::Drums, std::nullopt},
         {"Instruments", "Utility gain", "Drop on a track for gain", std::nullopt, std::nullopt, Session::Instrument::Utility, std::nullopt},
         {"Audio FX", "Utility gain", "Drop on a track for gain", std::nullopt, std::nullopt, Session::Instrument::Utility, std::nullopt},

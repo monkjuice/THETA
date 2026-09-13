@@ -5,6 +5,7 @@
 #include "ThetaBloomDevice.h"
 #include "ThetaArpDevice.h"
 #include "ThetaWaveDevice.h"
+#include "ThetaForgeDevice.h"
 #include "ClipGeometry.h"
 #include <vector>
 
@@ -45,6 +46,7 @@ public:
     {
         FourOsc,
         ThetaWave,
+        ThetaForge,
         Drums,
         Utility
     };

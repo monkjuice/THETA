@@ -53,6 +53,7 @@ juce::Colour instrumentColour(Session::Instrument instrument)
     {
         case Session::Instrument::FourOsc:    return juce::Colour(0xff3d6f8b);
         case Session::Instrument::ThetaWave:  return juce::Colour(0xff574ec8);
+        case Session::Instrument::ThetaForge: return juce::Colour(0xff3a9aa9);
         case Session::Instrument::Drums:      return juce::Colour(0xff738044);
         case Session::Instrument::Utility:    return juce::Colour(0xff56636c);
     }
@@ -223,6 +224,7 @@ juce::Result switchTrackInstrument(te::Edit& edit, te::AudioTrack& track, Sessio
     te::Plugin* selected = nullptr;
     const auto selectedType = instrument == Session::Instrument::Drums ? juce::String(DrumDevice::xmlTypeName)
         : instrument == Session::Instrument::ThetaWave ? juce::String(ThetaWaveDevice::xmlTypeName)
+        : instrument == Session::Instrument::ThetaForge ? juce::String(ThetaForgeDevice::xmlTypeName)
         : juce::String(te::FourOscPlugin::xmlTypeName);
     auto result = ensurePlugin(edit, track, selectedType, 0, selected, changed);
     if (result.failed())
@@ -239,6 +241,12 @@ juce::Result switchTrackInstrument(te::Edit& edit, te::AudioTrack& track, Sessio
         if (wave->isEnabled() != (instrument == Session::Instrument::ThetaWave))
         {
             wave->setEnabled(instrument == Session::Instrument::ThetaWave);
+            changed = true;
+        }
+    if (auto* forge = findPlugin(track, ThetaForgeDevice::xmlTypeName))
+        if (forge->isEnabled() != (instrument == Session::Instrument::ThetaForge))
+        {
+            forge->setEnabled(instrument == Session::Instrument::ThetaForge);
             changed = true;
         }
 

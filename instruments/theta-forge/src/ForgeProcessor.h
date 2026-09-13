@@ -1,6 +1,7 @@
 #pragma once
 
-#include "ForgeVoice.h"
+#include "../core/ForgeCore.h"
+#include <juce_audio_utils/juce_audio_utils.h>
 
 namespace theta::forge
 {
@@ -30,7 +31,7 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout parameterLayout();
-    Parameters parameters;
-    juce::Synthesiser synth;
+    Core core;
+    Patch patch() const;
 };
 }

@@ -32,10 +32,9 @@ juce_add_plugin(ThetaForge
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE)
 
 target_sources(ThetaForge PRIVATE
+    core/ForgeCore.h
     src/ForgeProcessor.cpp
     src/ForgeProcessor.h
-    src/ForgeVoice.cpp
-    src/ForgeVoice.h
     src/ForgeEditor.cpp
     src/ForgeEditor.h)
 target_link_libraries(ThetaForge PRIVATE
