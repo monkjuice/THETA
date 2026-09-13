@@ -598,7 +598,8 @@ bool StepGrid::copySelection()
 
     for (const auto& state : states)
         if (const auto* note = noteForState(state))
-            noteClipboard.push_back({note->start - minStep, note->pitch - minPitch, std::max(0.001, note->length)});
+            noteClipboard.push_back({note->start - minStep, note->pitch - minPitch,
+                                     std::max(0.001, note->length), note->velocity});
     return !noteClipboard.empty();
 }
 
@@ -657,7 +658,7 @@ bool StepGrid::pasteSelection()
         const auto step = anchorStep + note.step;
         const auto pitch = anchorPitch + note.pitch;
         juce::ValueTree state;
-        if (session.addNote(step, pitch, note.length, &state).wasOk())
+        if (session.addNote(step, pitch, note.length, &state, note.velocity).wasOk())
             pasted.push_back(state);
     }
     session.endNoteGesture();

@@ -811,7 +811,8 @@ std::vector<Session::EditorNote> Session::editorNotes() const
     return result;
 }
 
-juce::Result Session::addNote(double startSteps, int pitch, double lengthSteps, juce::ValueTree* addedState)
+juce::Result Session::addNote(double startSteps, int pitch, double lengthSteps,
+                              juce::ValueTree* addedState, int velocity)
 {
     jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
     const auto gridSteps = editorStepCount();
@@ -829,7 +830,7 @@ juce::Result Session::addNote(double startSteps, int pitch, double lengthSteps, 
     const auto stepBeats = stepDurationBeats(editorStepResolution());
     auto* added = sequence.addNote(pitch, tracktion::core::BeatPosition::fromBeats(startSteps * stepBeats),
                                    tracktion::core::BeatDuration::fromBeats(lengthSteps * stepBeats),
-                                   100, 0, &edit->getUndoManager());
+                                   juce::jlimit(0, 127, velocity), 0, &edit->getUndoManager());
     if (added == nullptr)
         return juce::Result::fail("The note could not be added.");
     if (addedState != nullptr)

@@ -128,7 +128,8 @@ public:
     void setEditorStepCount(int newSteps);
     bool hasNote(int step, int pitch) const;
     std::vector<EditorNote> editorNotes() const;
-    juce::Result addNote(double startSteps, int pitch, double lengthSteps, juce::ValueTree* addedState = nullptr);
+    juce::Result addNote(double startSteps, int pitch, double lengthSteps,
+                         juce::ValueTree* addedState = nullptr, int velocity = 100);
     bool removeNotes(const std::vector<juce::ValueTree>&);
     bool adjustNoteVelocities(const std::vector<juce::ValueTree>&, int percentageDelta);
     void setNote(int step, int pitch, bool enabled);

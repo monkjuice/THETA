@@ -27,7 +27,7 @@ public:
 private:
     friend int runArrangementTest();
     enum class Gesture { none, draw, move, resize, select };
-    struct CopiedNote { double step = 0.0; int pitch = 0; double length = 1.0; };
+    struct CopiedNote { double step = 0.0; int pitch = 0; double length = 1.0; int velocity = 100; };
     struct MovingNote { juce::ValueTree state; double step = 0.0; int pitch = 0; };
     struct VisibleNote
     {

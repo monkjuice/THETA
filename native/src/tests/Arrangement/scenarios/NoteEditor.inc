@@ -158,12 +158,22 @@
         selectionGrid.selectedNotes.reset();
         selectionGrid.selectedNotes.set(static_cast<size_t>(selectionGrid.indexForCell(4, 55)));
         selectionGrid.selectedNotes.set(static_cast<size_t>(selectionGrid.indexForCell(8, 60)));
+        const auto copiedStates = selectionGrid.selectedStates();
+        session.beginNoteGesture("Set copied note velocity");
+        require(session.adjustNoteVelocities({copiedStates.front()}, -10),
+                "A source note can have a distinct velocity before copying");
+        session.endNoteGesture();
+        selectionGrid.changeListenerCallback(nullptr);
+        require(selectionGrid.selectedVelocityPercent() == -1,
+                "The copied selection contains distinct velocities");
         require(selectionGrid.keyPressed(juce::KeyPress('C', juce::ModifierKeys::commandModifier, 'c')),
                 "Command-C copies selected notes");
         require(selectionGrid.keyPressed(juce::KeyPress('V', juce::ModifierKeys::commandModifier, 'v')),
                 "Command-V pastes selected notes");
         require(session.hasNote(0, 55) && session.hasNote(4, 60),
                 "Paste places the selected shape at the first empty grid position");
+        require(selectionGrid.selectedVelocityPercent() == -1,
+                "Paste preserves each copied note's velocity");
         require(selectionGrid.keyPressed(juce::KeyPress('Z', juce::ModifierKeys::commandModifier, 'z')),
                 "Command-Z undoes a note-editor edit while the grid is focused");
         require(!session.hasNote(0, 55) && !session.hasNote(4, 60),
