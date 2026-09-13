@@ -36,7 +36,13 @@ target_sources(ThetaNative PRIVATE
     # Session
     src/Session.cpp
     src/SessionInternal.cpp
+    src/SessionNotes.cpp
+    src/SessionPresets.cpp
     src/SessionPatches.cpp
+    src/SessionDevices.cpp
+    src/SessionTracks.cpp
+    src/SessionClips.cpp
+    src/SessionAutomation.cpp
     src/SessionTransport.cpp
     src/DeviceMacros.cpp
     # UI
