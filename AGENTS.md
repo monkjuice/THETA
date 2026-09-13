@@ -43,7 +43,11 @@ Every source file is listed explicitly in `native/CMakeLists.txt` — nothing is
 
 Split a `.cpp` when it passes roughly 600 lines or gains a second responsibility. Prefer the mechanism already used here: **define one class across several translation units**, as `SessionTransport.cpp` does for `Session` and `ArrangementGeometry.cpp` does for `Arrangement`. That needs no header change, no change at any call site, and preserves `friend` declarations used by tests — only a new line in `CMakeLists.txt`.
 
+When those units need to share helpers that were previously in an anonymous namespace, put them in a `*Internal.h` header next to the class — `SessionInternal.h`, `StepGridInternal.h`, `ArrangementInternal.h`. Those headers are private to the class's own translation units; nothing else should include them. Helpers shared by *different* classes get a normal header instead, as `BrowserIds.h` does for the arrangement and the device rack.
+
 Extract a genuinely new type only when it buys testability. `ClipGeometry.h` is the model: a pure header with no JUCE or engine dependency, unit-tested in 40 lines without a `Session`.
+
+Two classes are still defined inline inside a single `.cpp` and are the next things worth separating: `ControlWindow` in `Main.cpp` and `FloatingDeviceWindow` in `DeviceRack.cpp`. Splitting either means converting inline method bodies to declaration plus definition, which is a real restructuring rather than a file move — do it deliberately, not as a side effect of another change.
 
 ## Tests
 
